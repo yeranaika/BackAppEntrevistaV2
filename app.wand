@@ -1,0 +1,2136 @@
+{
+  "version": 1,
+  "dialect": "postgresql",
+  "tables": [
+    {
+      "id": "tbl_L9XZnixkWJKG",
+      "name": "usuario",
+      "columns": [
+        {
+          "id": "col_tBratp_2X5FG",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_VFOMX13-HLvi",
+          "name": "correo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true
+        },
+        {
+          "id": "col__Hr6N3LKR6ij",
+          "name": "contrasena_hash",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_sGaU5UZ3hdf0",
+          "name": "nombre",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_gM6byhARLX6X",
+          "name": "idioma",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'es'"
+        },
+        {
+          "id": "col_ZuuXoLxf_DaG",
+          "name": "estado",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'activo'"
+        },
+        {
+          "id": "col_wI-kFj2JYak4",
+          "name": "fecha_creacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_nbnegJCFP5Kz",
+          "name": "rol",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'user'"
+        },
+        {
+          "id": "col_CnbPsb8iGdV2",
+          "name": "telefono",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_mduwA6xG5DZm",
+          "name": "origen_registro",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'local'"
+        },
+        {
+          "id": "col_DyEKyXSJ9YxX",
+          "name": "fecha_ultimo_login",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_nGZDCV8XD3q6",
+          "name": "fecha_nacimiento",
+          "type": "date",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_j2Zzo0Qsgvch",
+          "name": "genero",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_usuario_correo_activo",
+          "columns": [
+            "col_VFOMX13-HLvi"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 50,
+        "y": 50
+      }
+    },
+    {
+      "id": "tbl_KwMgmH-uBdEm",
+      "name": "refresh_token",
+      "columns": [
+        {
+          "id": "col_usGSIB-EGYVy",
+          "name": "refresh_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_tB1_-O1ya_MA",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_Aqr4Lmnt0Z3y",
+          "name": "token_hash",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_JlK0RQJSD_xF",
+          "name": "issued_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_XV8wzMgaCtFo",
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_DbHPCNgXda20",
+          "name": "revoked",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "FALSE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_refresh_usuario",
+          "columns": [
+            "col_tB1_-O1ya_MA"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_refresh_activo",
+          "columns": [
+            "col_tB1_-O1ya_MA",
+            "col_XV8wzMgaCtFo"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 400,
+        "y": 50
+      }
+    },
+    {
+      "id": "tbl_VINkzkkACDm4",
+      "name": "oauth_account",
+      "columns": [
+        {
+          "id": "col_WKxzvfFIj-xX",
+          "name": "oauth_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_DVFbHWa4zQXw",
+          "name": "provider",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_UbJO-fZAZJ7m",
+          "name": "subject",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_H2ZS4jBSQrgG",
+          "name": "email",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_PHlJ-6zodqne",
+          "name": "email_verified",
+          "type": "boolean",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_IBMsPd49WpvR",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_rHYCkdWl9_lW",
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 750,
+        "y": 50
+      }
+    },
+    {
+      "id": "tbl_3kVX249KEdcO",
+      "name": "password_reset",
+      "columns": [
+        {
+          "id": "col_bc23iW8K6qWg",
+          "name": "token",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false
+        },
+        {
+          "id": "col_pzooTgPw7p89",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_9ogHdvn6lCUX",
+          "name": "code",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_3H281arNa4vH",
+          "name": "issued_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_ajT22khu55eg",
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_3HJP7hs4ZgIn",
+          "name": "used",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "FALSE"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 1100,
+        "y": 50
+      }
+    },
+    {
+      "id": "tbl_c9uYYY5y9RVC",
+      "name": "recovery_code",
+      "columns": [
+        {
+          "id": "col_hBnJpSxb6fIz",
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_pw4eg9XluFFs",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_vUXmtaMM3l4z",
+          "name": "codigo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_MxvBpjpwc3Sg",
+          "name": "fecha_expiracion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_f896EEoJnBGx",
+          "name": "usado",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "FALSE"
+        },
+        {
+          "id": "col_lgxVCUHhTpOR",
+          "name": "fecha_creacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 50,
+        "y": 350
+      }
+    },
+    {
+      "id": "tbl_es_weQL0VtZy",
+      "name": "perfil_usuario",
+      "columns": [
+        {
+          "id": "col_YFaYJ5-AJMqZ",
+          "name": "perfil_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_LBo7_qXYESBk",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_UuBRaDBLnZGw",
+          "name": "nivel_experiencia",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_be0EzIuhtio7",
+          "name": "area",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_j2igNGjgxhRc",
+          "name": "flags_accesibilidad",
+          "type": "jsonb",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_1ps0Xfx6WeZI",
+          "name": "nota_objetivos",
+          "type": "text",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_BM9wFLg3anNg",
+          "name": "pais",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_WT6NioVAWmwz",
+          "name": "fecha_actualizacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 400,
+        "y": 350
+      }
+    },
+    {
+      "id": "tbl_rfyUw6vtHeYA",
+      "name": "objetivo_carrera",
+      "columns": [
+        {
+          "id": "col_GZvlIkAHMH-e",
+          "name": "objetivo_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_1UM2M_N6JxvT",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_sdoT_f7tTm0i",
+          "name": "nombre_cargo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_YoLgGsuhT9Ve",
+          "name": "sector",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_oHjEYyh6kw16",
+          "name": "activo",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        },
+        {
+          "id": "col_ayBGjD2trZqx",
+          "name": "fecha_creacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_objetivo_usuario",
+          "columns": [
+            "col_1UM2M_N6JxvT"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 750,
+        "y": 350
+      }
+    },
+    {
+      "id": "tbl_mSqWnNnJ3swQ",
+      "name": "recordatorio_preferencia",
+      "columns": [
+        {
+          "id": "col_hsnrrIHjcZGv",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_GALZkBTI6AbS",
+          "name": "dias_semana",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_AJnATCH5wyce",
+          "name": "hora",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_ghUObBqhg6_J",
+          "name": "tipo_practica",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_5O9p1osZL6Oh",
+          "name": "habilitado",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 1100,
+        "y": 350
+      }
+    },
+    {
+      "id": "tbl_5hzUBS-3ke3v",
+      "name": "consentimiento_texto",
+      "columns": [
+        {
+          "id": "col_oKW8T_tuJ2le",
+          "name": "version",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false
+        },
+        {
+          "id": "col_FsgR4WzHq_c_",
+          "name": "titulo",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_HT4lXMAP3jVM",
+          "name": "cuerpo",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_cLevvJb5X5dQ",
+          "name": "fecha_publicacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_MSvJQtDsVsIp",
+          "name": "vigente",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 50,
+        "y": 650
+      }
+    },
+    {
+      "id": "tbl_s3y3KStLuvob",
+      "name": "consentimiento",
+      "columns": [
+        {
+          "id": "col_ptUlQrRCWUSN",
+          "name": "consentimiento_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_bm8Tw9SH2KT3",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_5jVhC4dZLYBG",
+          "name": "version",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_5hzUBS-3ke3v",
+            "targetColumnId": "col_oKW8T_tuJ2le",
+            "onDelete": "no-action",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_B23d9tYFKosi",
+          "name": "alcances",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_Rn8f0FrUaXlt",
+          "name": "fecha_otorgado",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_t7Fr-ytNNUtU",
+          "name": "fecha_revocado",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 400,
+        "y": 650
+      }
+    },
+    {
+      "id": "tbl_QD8O7XZ4HqIc",
+      "name": "codigo_suscripcion",
+      "columns": [
+        {
+          "id": "col_C2FSX_Q6WvqX",
+          "name": "codigo_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_kxnPYwiU95Za",
+          "name": "codigo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true
+        },
+        {
+          "id": "col_dtwqdGv_jUbf",
+          "name": "label",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_0H82Z3lS0PFo",
+          "name": "duracion_dias",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_JsT0yjIJuF9O",
+          "name": "max_usos",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "1"
+        },
+        {
+          "id": "col_4-CIBP9eLMfG",
+          "name": "usos_realizados",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_L4bewFKCbua4",
+          "name": "fecha_creacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_ZMt7is_Ig1cW",
+          "name": "fecha_expiracion",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_yrAkgYDnCNz7",
+          "name": "activo",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 750,
+        "y": 650
+      }
+    },
+    {
+      "id": "tbl_8NAZsKNhufoM",
+      "name": "suscripcion",
+      "columns": [
+        {
+          "id": "col_TKY_NyZuHwHg",
+          "name": "suscripcion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_FyIvDwKbdkpT",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_Rvsx9dxP88in",
+          "name": "plan",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'free'"
+        },
+        {
+          "id": "col_UP9lzEvTx9fk",
+          "name": "proveedor",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_380hfXxAk921",
+          "name": "estado",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'inactiva'"
+        },
+        {
+          "id": "col_jN-KGIbklZn6",
+          "name": "fecha_inicio",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_Xt0c4ippKyq9",
+          "name": "fecha_renovacion",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_VLzMzmXP3myw",
+          "name": "fecha_expiracion",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_mStPd_E2U4JL",
+          "name": "codigo_id",
+          "type": "uuid",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_QD8O7XZ4HqIc",
+            "targetColumnId": "col_C2FSX_Q6WvqX",
+            "onDelete": "no-action",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_suscripcion_usuario_estado",
+          "columns": [
+            "col_FyIvDwKbdkpT",
+            "col_380hfXxAk921"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 1100,
+        "y": 650
+      }
+    },
+    {
+      "id": "tbl_QnOxkjLnlcTX",
+      "name": "institucion",
+      "columns": [
+        {
+          "id": "col_jTL_w8YK08I5",
+          "name": "institucion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_-O7fO4sIoJkM",
+          "name": "nombre",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_SFEW88DHtzh3",
+          "name": "dominio_correo",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_oAgosO3SCyrw",
+          "name": "contacto_email",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_8kON5HQG0QJF",
+          "name": "fecha_registro",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_institucion_dominio",
+          "columns": [
+            "col_SFEW88DHtzh3"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 50,
+        "y": 950
+      }
+    },
+    {
+      "id": "tbl_UxE8EJT36eKb",
+      "name": "licencia_institucional",
+      "columns": [
+        {
+          "id": "col_1PKGZ6ntFdIJ",
+          "name": "licencia_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_UQriqDcvqiLT",
+          "name": "institucion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_QnOxkjLnlcTX",
+            "targetColumnId": "col_jTL_w8YK08I5",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_QYEtnJofM0nc",
+          "name": "codigo_acceso",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true
+        },
+        {
+          "id": "col_ghsQ1cTyPQqu",
+          "name": "max_usuarios",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "50"
+        },
+        {
+          "id": "col__1GnMjV5OtGX",
+          "name": "usuarios_activos",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_rNCYLQkMH5TH",
+          "name": "fecha_inicio",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_g0a6XrXxqB72",
+          "name": "fecha_expiracion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_X7PAFRUwkiki",
+          "name": "activa",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_licencia_activa",
+          "columns": [
+            "col_UQriqDcvqiLT",
+            "col_X7PAFRUwkiki",
+            "col_g0a6XrXxqB72"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 400,
+        "y": 950
+      }
+    },
+    {
+      "id": "tbl_xLI9xQaRs3kZ",
+      "name": "usuario_licencia",
+      "columns": [
+        {
+          "id": "col_-8NXXD04IQIT",
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_PMSk8aDcx2HY",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_FT6YJLYOmPYq",
+          "name": "licencia_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_UxE8EJT36eKb",
+            "targetColumnId": "col_1PKGZ6ntFdIJ",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_SQPudHxSROiR",
+          "name": "fecha_asignacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 750,
+        "y": 950
+      }
+    },
+    {
+      "id": "tbl_R7hjZ33zDmjk",
+      "name": "skill",
+      "columns": [
+        {
+          "id": "col_VtofC8-o60cm",
+          "name": "skill_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_zOb6khRkgovP",
+          "name": "nombre",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true
+        },
+        {
+          "id": "col_JRxNAVB2IyMi",
+          "name": "categoria",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_VBNwX19Dh3q_",
+          "name": "tipo_area",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_66q_hQ_HVqAS",
+          "name": "descripcion",
+          "type": "text",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_o8nlD0WAVeey",
+          "name": "demanda_score",
+          "type": "smallint",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "50"
+        },
+        {
+          "id": "col_SQDDUmPVRaMo",
+          "name": "activo",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_skill_lookup",
+          "columns": [
+            "col_JRxNAVB2IyMi",
+            "col_VBNwX19Dh3q_",
+            "col_SQDDUmPVRaMo"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 1100,
+        "y": 950
+      }
+    },
+    {
+      "id": "tbl_dcK0GcBKUFi4",
+      "name": "skill_tendencia",
+      "columns": [
+        {
+          "id": "col_tdvCJTNSzcbb",
+          "name": "tendencia_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_KrOkGtTRQNqA",
+          "name": "skill_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_R7hjZ33zDmjk",
+            "targetColumnId": "col_VtofC8-o60cm",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_W-fSGxUqUB3f",
+          "name": "frecuencia_ofertas",
+          "type": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_Dsj1zm9BMsJV",
+          "name": "nivel_requerido",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'intermedio'"
+        },
+        {
+          "id": "col_SngjJk8LtSGN",
+          "name": "fecha_actualizacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_skill_tendencia",
+          "columns": [
+            "col_KrOkGtTRQNqA",
+            "col_SngjJk8LtSGN"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 50,
+        "y": 1250
+      }
+    },
+    {
+      "id": "tbl_bzu_K0NpkP0c",
+      "name": "pregunta",
+      "columns": [
+        {
+          "id": "col_GbC79JUJNzmq",
+          "name": "pregunta_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_T-PcQZf3ykvB",
+          "name": "skill_id",
+          "type": "uuid",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_R7hjZ33zDmjk",
+            "targetColumnId": "col_VtofC8-o60cm",
+            "onDelete": "set-null",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_tRIVQNUig5GW",
+          "name": "tipo_pregunta",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_oYoIhp8YhQlK",
+          "name": "categoria_habilidad",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_nz_HfXWWLDwv",
+          "name": "nivel_dificultad",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_2qKTMgbEpB7J",
+          "name": "enunciado",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_uR4DQ03u-oF0",
+          "name": "contexto_evaluacion_ia",
+          "type": "jsonb",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_-q58Z4tivuQT",
+          "name": "generada_por_ia",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "FALSE"
+        },
+        {
+          "id": "col_hK2w1dpmHiXX",
+          "name": "estado",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'pendiente'"
+        },
+        {
+          "id": "col_7EQKv5OMmrag",
+          "name": "fecha_creacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_pregunta_lookup",
+          "columns": [
+            "col_T-PcQZf3ykvB",
+            "col_nz_HfXWWLDwv"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_pregunta_admin",
+          "columns": [
+            "col_hK2w1dpmHiXX",
+            "col_tRIVQNUig5GW",
+            "col_-q58Z4tivuQT",
+            "col_7EQKv5OMmrag"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 400,
+        "y": 1250
+      }
+    },
+    {
+      "id": "tbl_JzwWAHU-gd7g",
+      "name": "opcion_pregunta",
+      "columns": [
+        {
+          "id": "col_dp1HBi6FqXI5",
+          "name": "opcion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_3oiR5SYK1lVC",
+          "name": "pregunta_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_bzu_K0NpkP0c",
+            "targetColumnId": "col_GbC79JUJNzmq",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_MigB8zWPvTAn",
+          "name": "texto_opcion",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_uJ4cunfdNWLO",
+          "name": "es_correcta",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "FALSE"
+        },
+        {
+          "id": "col_vaTlAKVl0AnM",
+          "name": "explicacion",
+          "type": "text",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_opcion_pregunta",
+          "columns": [
+            "col_3oiR5SYK1lVC"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 750,
+        "y": 1250
+      }
+    },
+    {
+      "id": "tbl_aIPVO2bUTR1a",
+      "name": "test_nivelacion",
+      "columns": [
+        {
+          "id": "col_32w87ATmpFD_",
+          "name": "test_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_YL9bC2KYDFfe",
+          "name": "titulo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_W9LjLfAtUNme",
+          "name": "area",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_bjTunI8-KzLQ",
+          "name": "nivel_objetivo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'mixto'"
+        },
+        {
+          "id": "col_uFY-8pRNDqPr",
+          "name": "descripcion",
+          "type": "text",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_uek_Oe8Shwwc",
+          "name": "preguntas_ids",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'[]'"
+        },
+        {
+          "id": "col_bAQPJyeFfeN0",
+          "name": "activo",
+          "type": "boolean",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "TRUE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_test_activo",
+          "columns": [
+            "col_W9LjLfAtUNme",
+            "col_bAQPJyeFfeN0"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 1100,
+        "y": 1250
+      }
+    },
+    {
+      "id": "tbl_1jNUpwmxxlRJ",
+      "name": "intento_test",
+      "columns": [
+        {
+          "id": "col_I9lzJGIfC5_t",
+          "name": "intento_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_ner3niEJSeZR",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_U4lHz7Rl-KsR",
+          "name": "test_id",
+          "type": "uuid",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_aIPVO2bUTR1a",
+            "targetColumnId": "col_32w87ATmpFD_",
+            "onDelete": "set-null",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_WVXzgmL5bOe2",
+          "name": "tipo_test",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_noO_0K7_slPy",
+          "name": "puntaje_obtenido",
+          "type": "numeric",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_PJQtHpFInbhy",
+          "name": "nivel_asignado",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_qweyIoaACIAM",
+          "name": "respuestas_detalle",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'[]'"
+        },
+        {
+          "id": "col_sXm7a3xKMDCA",
+          "name": "fecha_inicio",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_JrOcQg0fP-KC",
+          "name": "fecha_fin",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_intento_usuario",
+          "columns": [
+            "col_ner3niEJSeZR",
+            "col_WVXzgmL5bOe2",
+            "col_sXm7a3xKMDCA"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 50,
+        "y": 1550
+      }
+    },
+    {
+      "id": "tbl_6Vhmwe1_ekmJ",
+      "name": "sesion_entrevista",
+      "columns": [
+        {
+          "id": "col_giTjcVibC6tt",
+          "name": "sesion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_NjcLDSrcFfYR",
+          "name": "usuario_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_L9XZnixkWJKG",
+            "targetColumnId": "col_tBratp_2X5FG",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_64d_fzzi6sXs",
+          "name": "cargo_objetivo",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_IpeKApI3yx2Y",
+          "name": "nivel_dificultad",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_kaeeiUu_Fkw5",
+          "name": "estado",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'en_progreso'"
+        },
+        {
+          "id": "col_ZbOGIaOMBWy7",
+          "name": "webrtc_room_id",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_lO1i3PP7QgvP",
+          "name": "fecha_inicio",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        },
+        {
+          "id": "col_NpKzaOVnSG3N",
+          "name": "fecha_fin",
+          "type": "timestamptz",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_sesion_usuario",
+          "columns": [
+            "col_NjcLDSrcFfYR",
+            "col_kaeeiUu_Fkw5",
+            "col_lO1i3PP7QgvP"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_sesion_activa",
+          "columns": [
+            "col_NjcLDSrcFfYR"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 400,
+        "y": 1550
+      }
+    },
+    {
+      "id": "tbl_c_XgwF4thIp7",
+      "name": "sesion_pregunta_respuesta",
+      "columns": [
+        {
+          "id": "col__wD64Up8TTSq",
+          "name": "respuesta_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_nBACKwzcBG6g",
+          "name": "sesion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_6Vhmwe1_ekmJ",
+            "targetColumnId": "col_giTjcVibC6tt",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_f0BQpa_6Kr25",
+          "name": "pregunta_id",
+          "type": "uuid",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_bzu_K0NpkP0c",
+            "targetColumnId": "col_GbC79JUJNzmq",
+            "onDelete": "set-null",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_dNg1Rscjj9uW",
+          "name": "enunciado_pregunta",
+          "type": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_KBRLnTbwI_Ib",
+          "name": "transcripcion_audio",
+          "type": "text",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_cpVKaqVYzkUG",
+          "name": "video_clip_url",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_dPhPcUp3rU5x",
+          "name": "feedback_ia_tecnico",
+          "type": "jsonb",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_Y94SY81vL_UT",
+          "name": "feedback_ia_blando",
+          "type": "jsonb",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_gPrkJ-4F2TXy",
+          "name": "orden",
+          "type": "smallint",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_spr_sesion",
+          "columns": [
+            "col_nBACKwzcBG6g",
+            "col_gPrkJ-4F2TXy"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 750,
+        "y": 1550
+      }
+    },
+    {
+      "id": "tbl_8axWa1pghypN",
+      "name": "metrica_video",
+      "columns": [
+        {
+          "id": "col_Mo6c1oISMDLZ",
+          "name": "metrica_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_3g6Sj1VQcKIA",
+          "name": "sesion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "reference": {
+            "targetTableId": "tbl_6Vhmwe1_ekmJ",
+            "targetColumnId": "col_giTjcVibC6tt",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col__aRcwVzmsAqv",
+          "name": "timestamp_ms",
+          "type": "bigint",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_GFl827WwvTSs",
+          "name": "contacto_visual",
+          "type": "numeric",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_OUWqbr5ew5ZO",
+          "name": "postura_score",
+          "type": "numeric",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_iyHJW5HwS1do",
+          "name": "gestos_detectados",
+          "type": "jsonb",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "id": "col_tRVDSaRa2jt4",
+          "name": "expresion_dominante",
+          "type": "varchar",
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_metrica_video",
+          "columns": [
+            "col_3g6Sj1VQcKIA",
+            "col__aRcwVzmsAqv"
+          ],
+          "unique": false
+        }
+      ],
+      "position": {
+        "x": 1100,
+        "y": 1550
+      }
+    },
+    {
+      "id": "tbl_SNJZyplQBdIX",
+      "name": "reporte_entrevista",
+      "columns": [
+        {
+          "id": "col_dSVaEWU4wMFP",
+          "name": "reporte_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "id": "col_Yxc64B2yPaBU",
+          "name": "sesion_id",
+          "type": "uuid",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "reference": {
+            "targetTableId": "tbl_6Vhmwe1_ekmJ",
+            "targetColumnId": "col_giTjcVibC6tt",
+            "onDelete": "cascade",
+            "onUpdate": "no-action",
+            "relation": "1:n"
+          }
+        },
+        {
+          "id": "col_3Kbe78df7XPO",
+          "name": "puntaje_global",
+          "type": "numeric",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_ixtvPy8kyuWq",
+          "name": "puntaje_tecnico",
+          "type": "numeric",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_WcbUgyuqjHYH",
+          "name": "puntaje_blando",
+          "type": "numeric",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_b_9SKxgoxEoE",
+          "name": "puntaje_lenguaje_corporal",
+          "type": "numeric",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "0"
+        },
+        {
+          "id": "col_2Yns65jHhF4z",
+          "name": "fortalezas",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'[]'"
+        },
+        {
+          "id": "col_DprT8XKpePuM",
+          "name": "areas_mejora",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'[]'"
+        },
+        {
+          "id": "col_fq0nrDGP2Mvy",
+          "name": "recomendaciones_skills",
+          "type": "jsonb",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'[]'"
+        },
+        {
+          "id": "col_tQvKPQO0LzWb",
+          "name": "estado_generacion",
+          "type": "varchar",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "'generando'"
+        },
+        {
+          "id": "col_o5Bs-7MoUT6j",
+          "name": "fecha_generacion",
+          "type": "timestamptz",
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [],
+      "position": {
+        "x": 50,
+        "y": 1850
+      }
+    }
+  ],
+  "enums": [],
+  "comments": []
+}

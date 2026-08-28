@@ -1,27 +1,100 @@
-# Compiled class file
-*.class
+# Gradle & Build
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!**/src/main/**/build/
+!**/src/test/**/build/
+bin/
+out/
+.kotlin/
 
-# Log file
+# Android / Local Gradle configuration
+local.properties
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Environment variables & secrets
+.env
+.env.*
+.env(MV)
+!.env.example
+secrets.conf
+*.secrets.*
+/src/main/resources/secrets.conf
+*.keystore
+*.jks
+
+# Database local storage & mock data
+/src/DB/data/*
+!/src/DB/data/.gitkeep
+src/main/kotlin/routes/jobs/datos.json
+*.sql~
+docker-compose.override.yml
+
+# Logs & Temporary files
 *.log
+*.log.*
+*_log.txt
+build_log.txt
+build_out.txt
+run_log.txt
+*.tmp
+*.temp
+nul
 
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
-*.jar
-*.war
-*.nar
-*.ear
+# Archives & Compressed files
 *.zip
+*.tar
 *.tar.gz
 *.rar
+*.7z
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# IDE & Editor files
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iws
+*.iml
+*.ipr
+*.bundle/
+out/
 
-# Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
-.kotlin/
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Eclipse / STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# AI tool directories & helper scripts
+.kiro/
+.claude/
+.gemini/
+.cursor/
+/estructura.py
+/estructura_front.txt

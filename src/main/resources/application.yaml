@@ -1,0 +1,26 @@
+ktor:
+  application:
+    modules:
+      - com.example.ApplicationKt.module
+  deployment:
+    port: 8080
+
+db:
+  url: ${?DB_URL}
+  user: ${?DB_USER}
+  pass: ${?DB_PASS}
+
+security:
+  jwt:
+    issuer: ${?JWT_ISSUER}
+    audience: ${?JWT_AUDIENCE}
+    secret: ${?JWT_SECRET}
+
+google:
+  clientId: ${?GOOGLE_CLIENT_ID}
+  clientSecret: ${?GOOGLE_CLIENT_SECRET}
+  redirectUri: ${?GOOGLE_REDIRECT_URI}
+  play:
+    package: ${?GOOGLE_PLAY_PACKAGE}
+    serviceJsonB64: ${?GOOGLE_PLAY_SERVICE_JSON_B64}
+    billingMock: ${?GOOGLE_PLAY_BILLING_MOCK}

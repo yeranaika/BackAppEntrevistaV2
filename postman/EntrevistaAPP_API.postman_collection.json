@@ -1,0 +1,1377 @@
+{
+	"info": {
+		"_postman_id": "e89c0251-460f-48e2-9be7-1601362e541a",
+		"name": "EntrevistaAPP - API Completa",
+		"description": "Colección completa de endpoints para el backend Ktor de EntrevistaAPP.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. Sistema",
+			"item": [
+				{
+					"name": "Healthcheck",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Verifica el estado del servicio HTTP."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "1. Autenticación Local",
+			"item": [
+				{
+					"name": "Register (Registro)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var data = pm.response.json();",
+									"    if (data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', data.accessToken);",
+									"    }",
+									"    if (data.refreshToken) {",
+									"        pm.collectionVariables.set('refreshToken', data.refreshToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123\",\n  \"nombre\": \"Juan Pérez\",\n  \"idioma\": \"es\",\n  \"telefono\": \"+56912345678\",\n  \"fechaNacimiento\": \"1995-05-20\",\n  \"genero\": \"masculino\",\n  \"nivelExperiencia\": \"jr\",\n  \"area\": \"TI\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Prepararme para entrevistas de Desarrollador Backend\",\n  \"flagsAccesibilidad\": null\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login (Iniciar Sesión)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', data.accessToken);",
+									"    }",
+									"    if (data.refreshToken) {",
+									"        pm.collectionVariables.set('refreshToken', data.refreshToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token (Rotación)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', data.accessToken);",
+									"    }",
+									"    if (data.refreshToken) {",
+									"        pm.collectionVariables.set('refreshToken', data.refreshToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout (Cerrar Sesión)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Request Reset Password (Dev)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"usuario@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/request-reset",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"request-reset"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Reset Password (Dev)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"<TOKEN_UUID>\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NuevaPassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/confirm-reset",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"confirm-reset"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Autenticación Google",
+			"item": [
+				{
+					"name": "Login con Google (Android / idToken)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', data.accessToken);",
+									"    }",
+									"    if (data.refreshToken) {",
+									"        pm.collectionVariables.set('refreshToken', data.refreshToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"<GOOGLE_ID_TOKEN_DEL_CLIENTE_ANDROID>\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/google",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"google"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Google Web OAuth - Iniciar",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/google/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"google",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Google Web OAuth - Callback",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/google/callback",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"google",
+								"callback"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Recuperación de Contraseña (Email OTP)",
+			"item": [
+				{
+					"name": "Forgot Password (Enviar código OTP)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"usuario@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/forgot-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"forgot-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password (Validar OTP y cambiar)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"usuario@example.com\",\n  \"codigo\": \"123456\",\n  \"nuevaContrasena\": \"NuevaPassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/reset-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"reset-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password (Usuario Autenticado)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nuevaContrasena\": \"NuevaPassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/change-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Cuenta & Perfil del Usuario",
+			"item": [
+				{
+					"name": "Obtener mi Usuario (/me)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar mi Usuario (PUT /me)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Juan Alberto Pérez\",\n  \"idioma\": \"es\",\n  \"telefono\": \"+56987654321\",\n  \"fechaNacimiento\": \"1995-05-20\",\n  \"genero\": \"masculino\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener mi Perfil (GET /me/perfil)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me/perfil",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"perfil"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar mi Perfil (PUT /me/perfil)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nivelExperiencia\": \"mid\",\n  \"area\": \"TI\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Especializarme en arquitectura de microservicios\",\n  \"flagsAccesibilidad\": null\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/me/perfil",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"perfil"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener mi Objetivo (GET /me/objetivo)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me/objetivo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"objetivo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crear/Actualizar mi Objetivo (PUT /me/objetivo)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombreCargo\": \"Desarrollador Backend Kotlin/Java\",\n  \"sector\": \"Tecnología y Software\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/me/objetivo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"objetivo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Eliminar mi Objetivo (DELETE /me/objetivo)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me/objetivo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"objetivo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Eliminar Cuenta (GDPR Derecho al Olvido)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"confirmar\": \"eliminar\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cuenta",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cuenta"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Onboarding",
+			"item": [
+				{
+					"name": "Guardar Onboarding Completo (POST /onboarding)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"area\": \"Ingenieria Informatica\",\n  \"nivelExperiencia\": \"Junior\",\n  \"nombreCargo\": \"Desarrollador Full Stack\",\n  \"descripcionObjetivo\": \"Quiero mejorar mi fluidez en entrevistas técnicas con IA\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/onboarding",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"onboarding"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Datos de Onboarding (GET /onboarding)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/onboarding",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"onboarding"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Estado de Onboarding (GET /onboarding/status)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/onboarding/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"onboarding",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar Objetivo Rápido (PUT /perfil/objetivo)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"area\": \"TI\",\n  \"metaCargo\": \"Ingeniero de Software\",\n  \"nivel\": \"Senior\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/perfil/objetivo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"perfil",
+								"objetivo"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Recordatorios y Preferencias",
+			"item": [
+				{
+					"name": "Obtener Preferencias de Recordatorio",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/recordatorios/preferencias",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"recordatorios",
+								"preferencias"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Guardar Preferencias de Recordatorio",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"diasSemana\": [\"lunes\", \"miercoles\", \"viernes\"],\n  \"hora\": \"19:00\",\n  \"tipoPractica\": \"simulacion_ia\",\n  \"habilitado\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/recordatorios/preferencias",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"recordatorios",
+								"preferencias"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "7. Consentimientos Legales",
+			"item": [
+				{
+					"name": "Obtener Texto Legal Vigente (Público)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/consent/current",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"consent",
+								"current"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Aceptar Consentimiento Legal (Usuario)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"version\": \"v1.0\",\n  \"alcances\": {\n    \"uso_datos_sesion\": true,\n    \"analisis_respuestas_texto\": true,\n    \"analisis_video_expresiones\": true,\n    \"mejora_modelos_ia\": false,\n    \"comunicaciones_plataforma\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/me/consent",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"consent"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Último Consentimiento Vigente",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me/consent/latest",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"consent",
+								"latest"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revocar Consentimiento Vigente",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me/consent/revoke",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me",
+								"consent",
+								"revoke"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "8. Billing y Suscripciones",
+			"item": [
+				{
+					"name": "Consultar Estado de Suscripción",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/billing/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"billing",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verificar Compra de Google Play",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"product_id\": \"entrevista_premium_monthly\",\n  \"purchase_token\": \"fake_or_real_google_purchase_token\",\n  \"purchase_time\": 1735689600000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/billing/google/verify",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"billing",
+								"google",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Canjear Código de Suscripción (Redeem)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"PROM-ABC123XYZ\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/billing/code/redeem",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"billing",
+								"code",
+								"redeem"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crear Código de Suscripción (Solo Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"days\": 30,\n  \"label\": \"Promoción Beta Testers\",\n  \"max_uses\": 100,\n  \"license_type\": \"PROM\",\n  \"expires_at\": \"2026-12-31T23:59:59Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/billing/admin/codes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"billing",
+								"admin",
+								"codes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "9. Sync y Práctica Freemium",
+			"item": [
+				{
+					"name": "Evaluar Respuesta Freemium (Público / Sin IA)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"preguntaId\": \"preg-001\",\n  \"userText\": \"Utilizo corrutinas con Dispatchers.IO para operaciones en background y ViewModelScope para el ciclo de vida.\",\n  \"idealText\": \"Las corrutinas permiten ejecutar tareas asíncronas en hilos secundarios usando Dispatchers.IO y evitando bloquear el hilo principal.\",\n  \"expectedKeywords\": [\"corrutinas\", \"Dispatchers.IO\", \"hilo\", \"asíncronas\", \"background\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/practice/evaluate-freemium",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"practice",
+								"evaluate-freemium"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sincronizar Intentos Offline (Batch Sync)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"attempts\": [\n    {\n      \"localAttemptId\": \"local-att-101\",\n      \"skillId\": \"skill-kotlin-01\",\n      \"cargoId\": null,\n      \"modo\": \"abierta_texto\",\n      \"categoria\": \"tecnica\",\n      \"nivelPreguntas\": \"junior\",\n      \"puntajeTotal\": 85.5,\n      \"fechaCreacionIso\": \"2026-08-28T14:30:00Z\",\n      \"respuestas\": [\n        {\n          \"preguntaId\": \"preg-kt-01\",\n          \"enunciado\": \"¿Qué es un Data Class en Kotlin?\",\n          \"respuestaTexto\": \"Es una clase diseñada para almacenar datos, autogenera equals, hashCode y toString.\",\n          \"esCorrecta\": true,\n          \"puntaje\": 90.0,\n          \"feedbackTexto\": \"Respuesta precisa y clara.\",\n          \"tiempoRespuestaMs\": 12500,\n          \"orden\": 1\n        }\n      ]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/sync/attempts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"sync",
+								"attempts"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "10. Panel de Administración (Solo Admin)",
+			"item": [
+				{
+					"name": "Listar Usuarios (GET /admin/usuarios)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crear Usuario Admin (POST /admin/users)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"admin2@example.com\",\n  \"contrasena\": \"AdminSecret123!\",\n  \"nombre\": \"Admin Secundario\",\n  \"idioma\": \"es\",\n  \"rol\": \"admin\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crear Usuario Admin Alternativo (POST /admin/usuarios)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"tester@example.com\",\n  \"contrasena\": \"TesterPassword123\",\n  \"nombre\": \"Tester QA\",\n  \"idioma\": \"es\",\n  \"rol\": \"user\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cambiar Rol de Usuario (PATCH /admin/usuarios/:id/rol)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nuevoRol\": \"admin\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/rol",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios",
+								"{{usuarioId}}",
+								"rol"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Activar Usuario (PATCH /admin/usuarios/:id/activar)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/activar",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios",
+								"{{usuarioId}}",
+								"activar"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resetear Contraseña por Admin (PATCH /admin/usuarios/:id/password)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nuevaContrasena\": \"AdminResetPass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios",
+								"{{usuarioId}}",
+								"password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Desactivar Usuario (DELETE /admin/usuarios/:id)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"usuarios",
+								"{{usuarioId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Publicar Texto de Consentimiento Legal (POST /admin/consent/text)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"version\": \"v1.1\",\n  \"title\": \"Términos de Privacidad y Procesamiento con IA Actualizados\",\n  \"body\": \"Texto legal completo con las nuevas disposiciones de privacidad y procesamiento de datos biométricos y de voz con modelos de IA.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/consent/text",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"consent",
+								"text"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8080"
+		},
+		{
+			"key": "accessToken",
+			"value": ""
+		},
+		{
+			"key": "refreshToken",
+			"value": ""
+		},
+		{
+			"key": "adminToken",
+			"value": ""
+		},
+		{
+			"key": "usuarioId",
+			"value": ""
+		}
+	]
+}
+
