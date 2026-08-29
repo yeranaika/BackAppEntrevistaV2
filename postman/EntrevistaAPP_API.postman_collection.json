@@ -1349,6 +1349,183 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "9. Mercado y Generador de Skills",
+			"item": [
+				{
+					"name": "Crear Carrera y Generar Skills Automáticamente",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"nombre\": \"AI & Machine Learning Engineer\",\n    \"area\": \"data\",\n    \"descripcion\": \"Especialista en IA, LLMs y modelos de aprendizaje automático\",\n    \"nivelBase\": \"semisenior\",\n    \"autoGenerateSkills\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/market/cargos",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"market",
+								"cargos"
+							]
+						},
+						"description": "Crea una nueva carrera en la BD y consulta las APIs de empleo para extraer y vincular automáticamente sus skills con sus pesos reales."
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Todas las Carreras",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/market/cargos",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"market",
+								"cargos"
+							]
+						},
+						"description": "Devuelve todas las carreras activas registradas en la base de datos."
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Skills Requeridas por Carrera",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/market/cargos/{{cargoId}}/skills",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"market",
+								"cargos",
+								"{{cargoId}}",
+								"skills"
+							]
+						},
+						"description": "Retorna las skills asociadas a un cargo específico con sus pesos (1-100), obligatoriedad y nivel requerido."
+					},
+					"response": []
+				},
+				{
+					"name": "Regenerar Requisitos para un Cargo Específico",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/market/cargos/{{cargoId}}/generate-requirements",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"market",
+								"cargos",
+								"{{cargoId}}",
+								"generate-requirements"
+							]
+						},
+						"description": "Fuerza la consulta del mercado laboral para actualizar las skills y pesos de un cargo en particular."
+					},
+					"response": []
+				},
+				{
+					"name": "Generación Masiva de Requisitos (Todas las Carreras)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/market/cargos/generate-all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"market",
+								"cargos",
+								"generate-all"
+							]
+						},
+						"description": "Recorre todos los cargos de la base de datos y actualiza sus requisitos con las últimas ofertas del mercado."
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Catálogo de Skills Ordenadas por Demanda",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/market/skills",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"market",
+								"skills"
+							]
+						},
+						"description": "Obtiene todas las skills activas ordenadas por demanda_score DESC."
+					},
+					"response": []
+				},
+				{
+					"name": "Historial de Tendencias de una Skill",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/market/skills/{{skillId}}/tendencias",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"market",
+								"skills",
+								"{{skillId}}",
+								"tendencias"
+							]
+						},
+						"description": "Consulta el histórico de frecuencia y nivel de una skill específica."
+					},
+					"response": []
+				},
+				{
+					"name": "Sincronizar Tendencias Globales de Skills (Worker)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/market/sync-trends",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"admin",
+								"market",
+								"sync-trends"
+							]
+						},
+						"description": "Dispara manualmente el worker de actualización de demanda_score y tendencias."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
