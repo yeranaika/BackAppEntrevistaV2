@@ -1,6 +1,6 @@
-﻿package routes.market
+package routes.market
 
-import data.models.market.CreateCargoReq
+import data.models.market.*
 import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
 import io.ktor.http.HttpStatusCode
@@ -118,12 +118,15 @@ fun Route.marketRoutes(
                 if (req.autoGenerateSkills) {
                     val cargoUuid = UUID.fromString(createdCargo.cargoId)
                     val genResult = cargoSkillGenerator.generateRequirementsForCargo(cargoUuid)
-                    call.respond(HttpStatusCode.Created, mapOf(
-                        "cargo" to createdCargo,
-                        "generatedSkills" to genResult
+                    call.respond(HttpStatusCode.Created, CreateCargoResponse(
+                        cargo = createdCargo,
+                        generatedSkills = genResult
                     ))
                 } else {
-                    call.respond(HttpStatusCode.Created, createdCargo)
+                    call.respond(HttpStatusCode.Created, CreateCargoResponse(
+                        cargo = createdCargo,
+                        generatedSkills = null
+                    ))
                 }
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Error al crear cargo")))
@@ -156,9 +159,9 @@ fun Route.marketRoutes(
         post("/cargos/generate-all") {
             try {
                 val results = cargoSkillGenerator.generateRequirementsForAllCargos()
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "totalCargosProcessed" to results.size,
-                    "results" to results
+                call.respond(HttpStatusCode.OK, BulkCargoGenerationResponse(
+                    totalCargosProcessed = results.size,
+                    results = results
                 ))
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Error en generación masiva")))

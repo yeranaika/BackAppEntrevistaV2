@@ -1,4 +1,4 @@
-﻿package data.models.market
+package data.models.market
 
 import kotlinx.serialization.Serializable
 
@@ -77,4 +77,16 @@ data class CargoGenerationResult(
     val cargoNombre: String,
     val skillsLinkedCount: Int,
     val skills: List<CargoSkillDetailDto>
+)
+
+@Serializable
+data class CreateCargoResponse(
+    val cargo: CargoDto,
+    val generatedSkills: CargoGenerationResult? = null
+)
+
+@Serializable
+data class BulkCargoGenerationResponse(
+    val totalCargosProcessed: Int,
+    val results: List<CargoGenerationResult>
 )
