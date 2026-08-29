@@ -1355,6 +1355,22 @@
 			"item": [
 				{
 					"name": "Crear Carrera y Generar Skills Automáticamente",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var data = pm.response.json();",
+									"    if (data.cargo && data.cargo.cargoId) {",
+									"        pm.collectionVariables.set('cargoId', data.cargo.cargoId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -1365,7 +1381,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"nombre\": \"AI & Machine Learning Engineer\",\n    \"area\": \"data\",\n    \"descripcion\": \"Especialista en IA, LLMs y modelos de aprendizaje automático\",\n    \"nivelBase\": \"semisenior\",\n    \"autoGenerateSkills\": true\n}"
+							"raw": "{\n    \"nombre\": \"Android Developer\",\n    \"area\": \"mobile\",\n    \"descripcion\": \"Desarrollador móvil Android con Kotlin y Compose\",\n    \"nivelBase\": \"semisenior\",\n    \"autoGenerateSkills\": true\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/admin/market/cargos",
@@ -1384,6 +1400,22 @@
 				},
 				{
 					"name": "Listar Todas las Carreras",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (Array.isArray(data) && data.length > 0) {",
+									"        pm.collectionVariables.set('cargoId', data[0].cargoId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -1467,6 +1499,22 @@
 				},
 				{
 					"name": "Listar Catálogo de Skills Ordenadas por Demanda",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (Array.isArray(data) && data.length > 0) {",
+									"        pm.collectionVariables.set('skillId', data[0].skillId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -1547,6 +1595,14 @@
 		},
 		{
 			"key": "usuarioId",
+			"value": ""
+		},
+		{
+			"key": "cargoId",
+			"value": ""
+		},
+		{
+			"key": "skillId",
 			"value": ""
 		}
 	]
