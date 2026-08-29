@@ -1,4 +1,4 @@
-﻿package data.models.market
+package data.models.market
 
 import kotlinx.serialization.Serializable
 
@@ -39,4 +39,42 @@ data class MarketSyncResult(
     val durationMs: Long,
     val timestamp: String,
     val topSkills: List<SkillDemandSummary> = emptyList()
+)
+
+@Serializable
+data class CargoDto(
+    val cargoId: String,
+    val nombre: String,
+    val area: String,
+    val descripcion: String? = null,
+    val nivelBase: String,
+    val activo: Boolean
+)
+
+@Serializable
+data class CargoSkillDetailDto(
+    val skillId: String,
+    val nombre: String,
+    val categoria: String,
+    val tipoArea: String,
+    val nivelRequerido: String,
+    val peso: Short,
+    val obligatoria: Boolean
+)
+
+@Serializable
+data class CreateCargoReq(
+    val nombre: String,
+    val area: String,
+    val descripcion: String? = null,
+    val nivelBase: String = "semisenior",
+    val autoGenerateSkills: Boolean = true
+)
+
+@Serializable
+data class CargoGenerationResult(
+    val cargoId: String,
+    val cargoNombre: String,
+    val skillsLinkedCount: Int,
+    val skills: List<CargoSkillDetailDto>
 )

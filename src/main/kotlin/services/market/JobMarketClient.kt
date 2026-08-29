@@ -1,4 +1,4 @@
-﻿package services.market
+package services.market
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -42,16 +42,17 @@ class JobMarketClient(
         }
     }
 
-    suspend fun fetchTechJobPostings(): List<RawJobPosting> {
+    suspend fun fetchTechJobPostings(specificQuery: String? = null): List<RawJobPosting> {
         val jobs = mutableListOf<RawJobPosting>()
 
         // 1. Intentar JSearch API si hay API key configurada
         if (!rapidApiKey.isNullOrBlank() && !rapidApiKey.startsWith("your_")) {
             try {
-                logger.info("Consultando JSearch API...")
-                val queries = listOf("Software Engineer", "Backend Developer", "Frontend Developer", "Data Engineer", "Android Developer", "DevOps")
+                logger.info("Consultando JSearch API para query: {}", specificQuery ?: "Default tech queries")
+                val queries = if (!specificQuery.isNullOrBlank()) listOf(specificQuery)
+                else listOf("Software Engineer", "Backend Developer", "Frontend Developer", "Data Engineer", "Android Developer", "DevOps")
                 for (query in queries) {
-                    val response = client.get("https:///search") {
+                    val response = client.get("https://$rapidApiHost/search") {
                         header("X-RapidAPI-Key", rapidApiKey)
                         header("X-RapidAPI-Host", rapidApiHost)
                         parameter("query", query)
@@ -86,6 +87,9 @@ class JobMarketClient(
             logger.info("Consultando Remotive API como respaldo...")
             val response = client.get("https://remotive.com/api/remote-jobs") {
                 parameter("category", "software-dev")
+                if (!specificQuery.isNullOrBlank()) {
+                    parameter("search", specificQuery)
+                }
                 parameter("limit", "50")
             }
             if (response.status.isSuccess()) {
@@ -96,8 +100,10 @@ class JobMarketClient(
                     val obj = el.jsonObject
                     val title = obj["title"]?.jsonPrimitive?.content ?: ""
                     val desc = obj["description"]?.jsonPrimitive?.content ?: ""
-                    if (title.isNotBlank() || desc.isNotBlank()) {
-                        jobs.add(RawJobPosting(title, desc, "Remotive"))
+                    val tags = obj["tags"]?.jsonArray?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }?.joinToString(" ") ?: ""
+                    val fullContent = "$desc $tags"
+                    if (title.isNotBlank() || fullContent.isNotBlank()) {
+                        jobs.add(RawJobPosting(title, fullContent, "Remotive"))
                     }
                 }
                 if (jobs.isNotEmpty()) {
@@ -111,11 +117,11 @@ class JobMarketClient(
 
         // 3. Fallback a Dataset Estructurado de Mercado
         logger.info("Cargando dataset estructurado de mercado...")
-        return getStructuredFallbackDataset()
+        return getStructuredFallbackDataset(specificQuery)
     }
 
-    private fun getStructuredFallbackDataset(): List<RawJobPosting> {
-        return listOf(
+    private fun getStructuredFallbackDataset(specificQuery: String? = null): List<RawJobPosting> {
+        val full = listOf(
             RawJobPosting(
                 "Senior Backend Engineer (Kotlin & Spring Boot)",
                 "Buscamos Backend Developer Senior con experiencia sólida en Kotlin, Java, Spring Boot, Ktor, REST APIs y Microservicios. " +
@@ -173,6 +179,12 @@ class JobMarketClient(
                 "Dataset-Estructurado"
             )
         )
+        if (specificQuery.isNullOrBlank()) return full
+        val filtered = full.filter {
+            it.title.contains(specificQuery, ignoreCase = true) ||
+            it.description.contains(specificQuery, ignoreCase = true)
+        }
+        return if (filtered.isNotEmpty()) filtered else full
     }
 
     fun close() {

@@ -1,4 +1,4 @@
-package com.example
+﻿package com.example
 
 import io.ktor.server.application.*
 import io.ktor.server.routing.IgnoreTrailingSlash
@@ -16,17 +16,15 @@ import security.configureSecurity
 import routes.configureRouting
 
 import data.repository.admin.AdminUserRepository
-// ❌ Antes:
-// import data.repository.auth.RecoveryCodeRepository
-// ✅ Ahora:
 import data.repository.usuarios.PasswordResetRepository
+import data.repository.market.CargoRepository
+import data.repository.market.SkillMarketRepository
+import services.market.CargoSkillGeneratorService
+import services.market.JobMarketClient
+import services.market.SkillTrendWorker
 
 import services.EmailService
 import io.github.cdimascio.dotenv.dotenv
-
-import data.repository.market.SkillMarketRepository
-import services.market.JobMarketClient
-import services.market.SkillTrendWorker
 
 fun main(args: Array<String>) = EngineMain.main(args)
 
@@ -43,10 +41,8 @@ fun Application.module() {
     val db = DatabaseFactory.db
     val adminUserRepo = AdminUserRepository(db)
     val skillMarketRepo = SkillMarketRepository(db)
+    val cargoRepo = CargoRepository(db)
 
-    // ❌ Antes:
-    // val recoveryCodeRepo = RecoveryCodeRepository(db)
-    // ✅ Ahora usamos el repo nuevo de reset de contraseña:
     val recoveryCodeRepo = PasswordResetRepository()
 
     // Configurar EmailService con variables de entorno
@@ -62,14 +58,23 @@ fun Application.module() {
         fromEmail = dotenv["GMAIL_USER"] ?: throw RuntimeException("GMAIL_USER no configurado")
     )
 
-    // Worker de actualización de tendencias y skills del mercado
+    // Cliente de ofertas y generador de skills por carrera
     val jobMarketClient = JobMarketClient(
         rapidApiKey = dotenv["JSEARCH_API_KEY"],
         rapidApiHost = dotenv["JSEARCH_API_HOST"] ?: "jsearch.p.rapidapi.com"
     )
+
+    val cargoSkillGenerator = CargoSkillGeneratorService(
+        cargoRepository = cargoRepo,
+        skillMarketRepository = skillMarketRepo,
+        jobMarketClient = jobMarketClient
+    )
+
+    // Worker de actualización de tendencias y skills del mercado
     val skillTrendWorker = SkillTrendWorker(
         repository = skillMarketRepo,
-        jobMarketClient = jobMarketClient
+        jobMarketClient = jobMarketClient,
+        cargoSkillGenerator = cargoSkillGenerator
     )
     skillTrendWorker.start()
 
@@ -78,13 +83,15 @@ fun Application.module() {
         jobMarketClient.close()
     }
 
-    // 👇 ahora configureRouting recibe PasswordResetRepository y SkillTrendWorker
+    // Configurar routing con todos los repositorios y servicios
     configureRouting(
         adminUserRepo = adminUserRepo,
         recoveryCodeRepo = recoveryCodeRepo,
         emailService = emailService,
         db = db,
         skillMarketRepo = skillMarketRepo,
+        cargoRepo = cargoRepo,
+        cargoSkillGenerator = cargoSkillGenerator,
         skillTrendWorker = skillTrendWorker
     )
 

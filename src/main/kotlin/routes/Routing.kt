@@ -37,8 +37,10 @@ import services.EmailService
 
 import data.repository.sync.SyncRepository
 import routes.sync.syncRoutes
+import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
 import routes.market.marketRoutes
+import services.market.CargoSkillGeneratorService
 import services.market.SkillTrendWorker
 
 /** API reducida al dominio de cuentas y administracion de usuarios. */
@@ -48,6 +50,8 @@ fun Application.configureRouting(
     emailService: EmailService,
     db: Database,
     skillMarketRepo: SkillMarketRepository = SkillMarketRepository(db),
+    cargoRepo: CargoRepository = CargoRepository(db),
+    cargoSkillGenerator: CargoSkillGeneratorService? = null,
     skillTrendWorker: SkillTrendWorker? = null
 ) {
     val users = UserRepository()
@@ -89,8 +93,13 @@ fun Application.configureRouting(
         AdminUserCreateRoutes(adminUserRepo)
         adminRoutes(adminUserRepo)
 
-        if (skillTrendWorker != null) {
-            marketRoutes(skillMarketRepo, skillTrendWorker)
+        if (skillTrendWorker != null && cargoSkillGenerator != null) {
+            marketRoutes(
+                skillMarketRepository = skillMarketRepo,
+                cargoRepository = cargoRepo,
+                cargoSkillGenerator = cargoSkillGenerator,
+                skillTrendWorker = skillTrendWorker
+            )
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿package services.market
+package services.market
 
 import data.models.market.MarketSyncResult
 import data.models.market.SkillDemandSummary
@@ -16,6 +16,7 @@ import kotlin.time.Duration.Companion.days
 class SkillTrendWorker(
     private val repository: SkillMarketRepository,
     private val jobMarketClient: JobMarketClient,
+    private val cargoSkillGenerator: CargoSkillGeneratorService? = null,
     private val interval: Duration = 7.days,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) {
@@ -137,6 +138,16 @@ class SkillTrendWorker(
                     nivelPredominante = predominantSeniority
                 )
             )
+        }
+
+        // 4. Sincronización detallada de requisitos por carrera/cargo
+        if (cargoSkillGenerator != null) {
+            try {
+                logger.info("Ejecutando generador de requisitos específicos por carrera...")
+                cargoSkillGenerator.generateRequirementsForAllCargos()
+            } catch (e: Exception) {
+                logger.warn("Error en generador de requisitos por carrera: {}", e.message)
+            }
         }
 
         val duration = System.currentTimeMillis() - startTime
