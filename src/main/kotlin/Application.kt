@@ -24,6 +24,10 @@ import data.repository.usuarios.PasswordResetRepository
 import services.EmailService
 import io.github.cdimascio.dotenv.dotenv
 
+import data.repository.market.SkillMarketRepository
+import services.market.JobMarketClient
+import services.market.SkillTrendWorker
+
 fun main(args: Array<String>) = EngineMain.main(args)
 
 fun Application.module() {
@@ -38,6 +42,7 @@ fun Application.module() {
     // --- crea repos (UNA sola vez) y pásalos al routing ---
     val db = DatabaseFactory.db
     val adminUserRepo = AdminUserRepository(db)
+    val skillMarketRepo = SkillMarketRepository(db)
 
     // ❌ Antes:
     // val recoveryCodeRepo = RecoveryCodeRepository(db)
@@ -56,12 +61,31 @@ fun Application.module() {
         password = dotenv["GMAIL_APP_PASSWORD"] ?: throw RuntimeException("GMAIL_APP_PASSWORD no configurado"),
         fromEmail = dotenv["GMAIL_USER"] ?: throw RuntimeException("GMAIL_USER no configurado")
     )
-    // 👇 ahora configureRouting recibe PasswordResetRepository
+
+    // Worker de actualización de tendencias y skills del mercado
+    val jobMarketClient = JobMarketClient(
+        rapidApiKey = dotenv["JSEARCH_API_KEY"],
+        rapidApiHost = dotenv["JSEARCH_API_HOST"] ?: "jsearch.p.rapidapi.com"
+    )
+    val skillTrendWorker = SkillTrendWorker(
+        repository = skillMarketRepo,
+        jobMarketClient = jobMarketClient
+    )
+    skillTrendWorker.start()
+
+    monitor.subscribe(ApplicationStopped) {
+        skillTrendWorker.stop()
+        jobMarketClient.close()
+    }
+
+    // 👇 ahora configureRouting recibe PasswordResetRepository y SkillTrendWorker
     configureRouting(
         adminUserRepo = adminUserRepo,
         recoveryCodeRepo = recoveryCodeRepo,
         emailService = emailService,
-        db = db
+        db = db,
+        skillMarketRepo = skillMarketRepo,
+        skillTrendWorker = skillTrendWorker
     )
 
     configureMonitoring()

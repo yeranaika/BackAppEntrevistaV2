@@ -18,6 +18,8 @@ data class Settings(
     val googlePlayPackage: String,
     val googlePlayServiceJsonBase64: String,
     val googlePlayBillingMock: Boolean,
+    val jsearchApiKey: String? = null,
+    val jsearchApiHost: String = "jsearch.p.rapidapi.com",
 )
 
 // Cache en attributes para no releer en cada uso
@@ -74,5 +76,7 @@ private fun loadSettings(envApp: ApplicationEnvironment): Settings {
         googlePlayPackage = read("GOOGLE_PLAY_PACKAGE", "google.play.package"),
         googlePlayServiceJsonBase64 = read("GOOGLE_PLAY_SERVICE_JSON_B64", "google.play.serviceJsonB64"),
         googlePlayBillingMock = readBool("GOOGLE_PLAY_BILLING_MOCK", "google.play.billingMock", default = false),
+        jsearchApiKey = readOrNull("JSEARCH_API_KEY", "jsearch.apiKey"),
+        jsearchApiHost = readOrNull("JSEARCH_API_HOST", "jsearch.apiHost") ?: "jsearch.p.rapidapi.com",
     )
 }
