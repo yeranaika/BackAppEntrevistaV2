@@ -1,4 +1,4 @@
-package data.models.market
+﻿package data.models.market
 
 import kotlinx.serialization.Serializable
 

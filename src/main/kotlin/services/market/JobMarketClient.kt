@@ -31,7 +31,7 @@ class JobMarketClient(
     private val rapidApiHost: String = "jsearch.p.rapidapi.com"
 ) {
     private val logger = LoggerFactory.getLogger(JobMarketClient::class.java)
-    private val htmlTagPattern = Pattern.compile("""<[^>]*>""")
+    private val htmlTagPattern = Pattern.compile("<[^>]*>")
 
     private val jsonConfig = Json {
         ignoreUnknownKeys = true
@@ -68,7 +68,7 @@ class JobMarketClient(
                 else listOf("Software Engineer", "Backend Developer", "Frontend Developer", "Data Engineer", "Android Developer", "DevOps")
 
                 for (query in queries) {
-                    val response = client.get("https:///search") {
+                    val response = client.get("https://$rapidApiHost/search") {
                         header("X-RapidAPI-Key", rapidApiKey)
                         header("X-RapidAPI-Host", rapidApiHost)
                         parameter("query", query)
@@ -87,7 +87,7 @@ class JobMarketClient(
                             val qualifications = obj["job_highlights"]?.jsonObject?.get("Qualifications")?.jsonArray
                                 ?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }
                                 ?.joinToString(" ") ?: ""
-                            val fullText = cleanHtml(" ")
+                            val fullText = cleanHtml("$desc $qualifications")
                             if (title.isNotBlank() || fullText.isNotBlank()) {
                                 jobs.add(RawJobPosting(title, fullText, "JSearch (LinkedIn/Indeed/Glassdoor)"))
                             }
@@ -99,7 +99,7 @@ class JobMarketClient(
                     return jobs
                 }
             } catch (e: Exception) {
-                logger.warn("Aviso JSearch API: {}. Probando fuente en vivo Remotive...", e.message)
+                logger.warn("Aviso JSearch API: {}: {}. Probando fuente en vivo Remotive...", e.javaClass.simpleName, e.message)
             }
         }
 
@@ -122,7 +122,7 @@ class JobMarketClient(
                     val title = obj["title"]?.jsonPrimitive?.content ?: ""
                     val desc = cleanHtml(obj["description"]?.jsonPrimitive?.content ?: "")
                     val tags = obj["tags"]?.jsonArray?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }?.joinToString(" ") ?: ""
-                    val fullContent = " "
+                    val fullContent = "$desc $tags"
                     if (title.isNotBlank() || fullContent.isNotBlank()) {
                         jobs.add(RawJobPosting(title, fullContent, "Remotive API"))
                     }
@@ -133,7 +133,7 @@ class JobMarketClient(
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Aviso Remotive API: {}. Probando Arbeitnow API en vivo...", e.message)
+            logger.warn("Aviso Remotive API: {}: {}. Probando Arbeitnow API en vivo...", e.javaClass.simpleName, e.message)
         }
 
         // 3. Consulta en VIVO a Arbeitnow API (ofertas tech directas de ATS Greenhouse/Lever)
@@ -153,7 +153,7 @@ class JobMarketClient(
                     val title = obj["title"]?.jsonPrimitive?.content ?: ""
                     val desc = cleanHtml(obj["description"]?.jsonPrimitive?.content ?: "")
                     val tags = obj["tags"]?.jsonArray?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }?.joinToString(" ") ?: ""
-                    val fullContent = " "
+                    val fullContent = "$desc $tags"
                     if (title.isNotBlank() || fullContent.isNotBlank()) {
                         jobs.add(RawJobPosting(title, fullContent, "Arbeitnow API"))
                     }
@@ -164,7 +164,7 @@ class JobMarketClient(
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Aviso Arbeitnow API: {}. Usando dataset estructurado de contingencia...", e.message)
+            logger.warn("Aviso Arbeitnow API: {}: {}. Usando dataset estructurado de contingencia...", e.javaClass.simpleName, e.message)
         }
 
         // 4. Contingencia segura si no hay conexión a internet
