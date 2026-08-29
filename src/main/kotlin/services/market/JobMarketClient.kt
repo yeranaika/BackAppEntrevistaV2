@@ -1,4 +1,4 @@
-package services.market
+﻿package services.market
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
+import java.util.regex.Pattern
 
 data class RawJobPosting(
     val title: String,
@@ -30,6 +31,7 @@ class JobMarketClient(
     private val rapidApiHost: String = "jsearch.p.rapidapi.com"
 ) {
     private val logger = LoggerFactory.getLogger(JobMarketClient::class.java)
+    private val htmlTagPattern = Pattern.compile("""<[^>]*>""")
 
     private val jsonConfig = Json {
         ignoreUnknownKeys = true
@@ -42,23 +44,38 @@ class JobMarketClient(
         }
     }
 
+    private fun cleanHtml(raw: String): String {
+        return htmlTagPattern.matcher(raw).replaceAll(" ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&nbsp;", " ")
+    }
+
+    /**
+     * Consulta en tiempo real las APIs de empleo en vivo (JSearch RapidAPI, Remotive y Arbeitnow).
+     */
     suspend fun fetchTechJobPostings(specificQuery: String? = null): List<RawJobPosting> {
         val jobs = mutableListOf<RawJobPosting>()
 
-        // 1. Intentar JSearch API si hay API key configurada
+        // 1. Consulta en VIVO a JSearch API (LinkedIn, Indeed, Glassdoor agregados)
         if (!rapidApiKey.isNullOrBlank() && !rapidApiKey.startsWith("your_")) {
             try {
-                logger.info("Consultando JSearch API para query: {}", specificQuery ?: "Default tech queries")
+                logger.info("Conectando en vivo a JSearch API (RapidAPI) para: {}", specificQuery ?: "Roles tech")
                 val queries = if (!specificQuery.isNullOrBlank()) listOf(specificQuery)
                 else listOf("Software Engineer", "Backend Developer", "Frontend Developer", "Data Engineer", "Android Developer", "DevOps")
+
                 for (query in queries) {
-                    val response = client.get("https://$rapidApiHost/search") {
+                    val response = client.get("https:///search") {
                         header("X-RapidAPI-Key", rapidApiKey)
                         header("X-RapidAPI-Host", rapidApiHost)
                         parameter("query", query)
                         parameter("page", "1")
                         parameter("num_pages", "1")
                     }
+
                     if (response.status.isSuccess()) {
                         val text = response.bodyAsText()
                         val parsed = jsonConfig.parseToJsonElement(text).jsonObject
@@ -67,24 +84,28 @@ class JobMarketClient(
                             val obj = el.jsonObject
                             val title = obj["job_title"]?.jsonPrimitive?.content ?: ""
                             val desc = obj["job_description"]?.jsonPrimitive?.content ?: ""
-                            if (title.isNotBlank() || desc.isNotBlank()) {
-                                jobs.add(RawJobPosting(title, desc, "JSearch"))
+                            val qualifications = obj["job_highlights"]?.jsonObject?.get("Qualifications")?.jsonArray
+                                ?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                                ?.joinToString(" ") ?: ""
+                            val fullText = cleanHtml(" ")
+                            if (title.isNotBlank() || fullText.isNotBlank()) {
+                                jobs.add(RawJobPosting(title, fullText, "JSearch (LinkedIn/Indeed/Glassdoor)"))
                             }
                         }
                     }
                 }
                 if (jobs.isNotEmpty()) {
-                    logger.info("Se obtuvieron {} ofertas desde JSearch", jobs.size)
+                    logger.info("JSearch API devolvió {} ofertas reales en vivo", jobs.size)
                     return jobs
                 }
             } catch (e: Exception) {
-                logger.warn("Error consultando JSearch API: {}. Probando fuente de respaldo...", e.message)
+                logger.warn("Aviso JSearch API: {}. Probando fuente en vivo Remotive...", e.message)
             }
         }
 
-        // 2. Intentar Remotive API (gratis, sin key)
+        // 2. Consulta en VIVO a Remotive API (ofertas remotas en vivo con tags y descripciones reales)
         try {
-            logger.info("Consultando Remotive API como respaldo...")
+            logger.info("Conectando en vivo a Remotive API...")
             val response = client.get("https://remotive.com/api/remote-jobs") {
                 parameter("category", "software-dev")
                 if (!specificQuery.isNullOrBlank()) {
@@ -99,24 +120,55 @@ class JobMarketClient(
                 jobsArray?.forEach { el ->
                     val obj = el.jsonObject
                     val title = obj["title"]?.jsonPrimitive?.content ?: ""
-                    val desc = obj["description"]?.jsonPrimitive?.content ?: ""
+                    val desc = cleanHtml(obj["description"]?.jsonPrimitive?.content ?: "")
                     val tags = obj["tags"]?.jsonArray?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }?.joinToString(" ") ?: ""
-                    val fullContent = "$desc $tags"
+                    val fullContent = " "
                     if (title.isNotBlank() || fullContent.isNotBlank()) {
-                        jobs.add(RawJobPosting(title, fullContent, "Remotive"))
+                        jobs.add(RawJobPosting(title, fullContent, "Remotive API"))
                     }
                 }
                 if (jobs.isNotEmpty()) {
-                    logger.info("Se obtuvieron {} ofertas desde Remotive", jobs.size)
+                    logger.info("Remotive API devolvió {} ofertas reales en vivo", jobs.size)
                     return jobs
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Error consultando Remotive API: {}. Usando dataset estructurado de contingencia...", e.message)
+            logger.warn("Aviso Remotive API: {}. Probando Arbeitnow API en vivo...", e.message)
         }
 
-        // 3. Fallback a Dataset Estructurado de Mercado
-        logger.info("Cargando dataset estructurado de mercado...")
+        // 3. Consulta en VIVO a Arbeitnow API (ofertas tech directas de ATS Greenhouse/Lever)
+        try {
+            logger.info("Conectando en vivo a Arbeitnow API...")
+            val response = client.get("https://www.arbeitnow.com/api/job-board-api") {
+                if (!specificQuery.isNullOrBlank()) {
+                    parameter("search", specificQuery)
+                }
+            }
+            if (response.status.isSuccess()) {
+                val text = response.bodyAsText()
+                val parsed = jsonConfig.parseToJsonElement(text).jsonObject
+                val dataArray = parsed["data"]?.jsonArray
+                dataArray?.forEach { el ->
+                    val obj = el.jsonObject
+                    val title = obj["title"]?.jsonPrimitive?.content ?: ""
+                    val desc = cleanHtml(obj["description"]?.jsonPrimitive?.content ?: "")
+                    val tags = obj["tags"]?.jsonArray?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }?.joinToString(" ") ?: ""
+                    val fullContent = " "
+                    if (title.isNotBlank() || fullContent.isNotBlank()) {
+                        jobs.add(RawJobPosting(title, fullContent, "Arbeitnow API"))
+                    }
+                }
+                if (jobs.isNotEmpty()) {
+                    logger.info("Arbeitnow API devolvió {} ofertas reales en vivo", jobs.size)
+                    return jobs
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Aviso Arbeitnow API: {}. Usando dataset estructurado de contingencia...", e.message)
+        }
+
+        // 4. Contingencia segura si no hay conexión a internet
+        logger.warn("Sin acceso a APIs externas. Cargando dataset estructurado de contingencia...")
         return getStructuredFallbackDataset(specificQuery)
     }
 
