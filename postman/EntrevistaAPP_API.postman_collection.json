@@ -1574,6 +1574,75 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "10. Evaluación Freemium y Sincronización Offline",
+			"item": [
+				{
+					"name": "Evaluar Respuesta Texto Freemium (Cero costo IA)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"preguntaId\": \"f7b8a1c2-3d4e-5f6a-7b8c-9d0e1f2a3b4c\",\n    \"userText\": \"Un deadlock ocurre cuando dos o más procesos compiten por recursos y cada uno espera que el otro libere un bloqueo mutuo permanente.\",\n    \"idealText\": \"Un interbloqueo o deadlock es una situación donde dos o más procesos quedan bloqueados indefinidamente porque cada uno retiene un recurso que el otro necesita.\",\n    \"expectedKeywords\": [\n        \"deadlock\",\n        \"interbloqueo\",\n        \"procesos\",\n        \"recursos\",\n        \"bloqueo mutuo\"\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/practice/evaluate-freemium",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"practice",
+								"evaluate-freemium"
+							]
+						},
+						"description": "Evalúa una respuesta abierta usando el motor determinista local en menos de 5ms (sin consumir OpenAI/Claude)."
+					},
+					"response": []
+				},
+				{
+					"name": "Sincronizar Intentos Offline",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"attempts\": [\n        {\n            \"localAttemptId\": \"local-att-001\",\n            \"skillId\": \"{{skillId}}\",\n            \"modo\": \"abierta_texto\",\n            \"categoria\": \"tecnica\",\n            \"nivelPreguntas\": \"junior\",\n            \"puntajeTotal\": 85.5,\n            \"respuestas\": [\n                {\n                    \"preguntaId\": \"p-001\",\n                    \"enunciado\": \"¿Qué es un deadlock?\",\n                    \"respuestaTexto\": \"Un bloqueo mutuo de procesos esperando recursos.\",\n                    \"esCorrecta\": true,\n                    \"puntaje\": 85.5,\n                    \"feedbackTexto\": \"Excelente respuesta.\",\n                    \"tiempoRespuestaMs\": 4500,\n                    \"orden\": 1\n                }\n            ]\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/sync/attempts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"sync",
+								"attempts"
+							]
+						},
+						"description": "Sincroniza un lote de intentos y respuestas registrados offline en la aplicación Android."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
