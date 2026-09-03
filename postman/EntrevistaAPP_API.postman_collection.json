@@ -1399,7 +1399,7 @@
 					"response": []
 				},
 				{
-					"name": "Listar Todas las Carreras",
+					"name": "Listar Cargos y Niveles (API v1 - Redis Cache-Aside 6h)",
 					"event": [
 						{
 							"listen": "test",
@@ -1420,37 +1420,72 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/market/cargos",
+							"raw": "{{baseUrl}}/api/v1/cargos",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"market",
+								"api",
+								"v1",
 								"cargos"
 							]
 						},
-						"description": "Devuelve todas las carreras activas registradas en la base de datos."
+						"description": "Lista de puestos disponibles con sus niveles (junior, semisenior, senior), servida desde Redis (clave cargos:lista con TTL de 6 horas)."
 					},
 					"response": []
 				},
 				{
-					"name": "Consultar Skills Requeridas por Carrera",
+					"name": "Consultar Matriz de Skills por Cargo (API v1 - Redis Cache-Aside 12h)",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/market/cargos/{{cargoId}}/skills",
+							"raw": "{{baseUrl}}/api/v1/cargos/{{cargoId}}/skills",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"market",
+								"api",
+								"v1",
 								"cargos",
 								"{{cargoId}}",
 								"skills"
 							]
 						},
-						"description": "Retorna las skills asociadas a un cargo específico con sus pesos (1-100), obligatoriedad y nivel requerido."
+						"description": "Retorna las skills obligatorias y opcionales del cargo con sus pesos (1-100) y nivel requerido, servida desde Redis (clave cargo:{id}:skills con TTL de 12 horas)."
+					},
+					"response": []
+				},
+				{
+					"name": "Top Skills Trending del Mercado (API v1)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/skills/trending?categoria=tecnica&limit=15",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"skills",
+								"trending"
+							],
+							"query": [
+								{
+									"key": "categoria",
+									"value": "tecnica",
+									"description": "Filtro opcional: 'tecnica' o 'blanda'"
+								},
+								{
+									"key": "limit",
+									"value": "15",
+									"description": "Cantidad máxima de skills a retornar"
+								}
+							]
+						},
+						"description": "Top skills más demandadas del mercado filtradas por categoría técnica o blanda."
 					},
 					"response": []
 				},

@@ -19,6 +19,16 @@ services:
       - ./BasedeDatos.EntrevistaApp.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
       - ./BasedeDatos.EntrevistaApp.Seeds.sql:/docker-entrypoint-initdb.d/002-seeds.sql:ro
 
+  redis:
+    image: redis:7-alpine
+    container_name: Entrevista_Redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
 volumes:
   pgdata:
+  redisdata:
 

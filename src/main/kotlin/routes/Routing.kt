@@ -39,7 +39,10 @@ import data.repository.sync.SyncRepository
 import routes.sync.syncRoutes
 import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
+import data.repository.skills.CargoSkillRepository
 import routes.market.marketRoutes
+import routes.skills.skillRoutes
+import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.SkillTrendWorker
 
@@ -51,6 +54,8 @@ fun Application.configureRouting(
     db: Database,
     skillMarketRepo: SkillMarketRepository = SkillMarketRepository(db),
     cargoRepo: CargoRepository = CargoRepository(db),
+    cargoSkillRepo: CargoSkillRepository = CargoSkillRepository(db),
+    redisCacheService: RedisCacheService = RedisCacheService(),
     cargoSkillGenerator: CargoSkillGeneratorService? = null,
     skillTrendWorker: SkillTrendWorker? = null
 ) {
@@ -92,6 +97,7 @@ fun Application.configureRouting(
 
         AdminUserCreateRoutes(adminUserRepo)
         adminRoutes(adminUserRepo)
+        skillRoutes(cargoSkillRepo, redisCacheService)
 
         if (skillTrendWorker != null && cargoSkillGenerator != null) {
             marketRoutes(

@@ -19,6 +19,8 @@ import data.repository.admin.AdminUserRepository
 import data.repository.usuarios.PasswordResetRepository
 import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
+import data.repository.skills.CargoSkillRepository
+import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.JobMarketClient
 import services.market.SkillTrendWorker
@@ -37,19 +39,27 @@ fun Application.module() {
     configureDatabase()
     configureSecurity()   // esto inicializa AuthCtx
 
+    val dotenv = dotenv {
+        ignoreIfMissing = true
+    }
+
     // --- crea repos (UNA sola vez) y pásalos al routing ---
     val db = DatabaseFactory.db
     val adminUserRepo = AdminUserRepository(db)
     val skillMarketRepo = SkillMarketRepository(db)
     val cargoRepo = CargoRepository(db)
+    val cargoSkillRepo = CargoSkillRepository(db)
 
     val recoveryCodeRepo = PasswordResetRepository()
 
-    // Configurar EmailService con variables de entorno
-    val dotenv = dotenv {
-        ignoreIfMissing = true
-    }
+    // Servicio de Caché Redis (Cache-Aside)
+    val redisCacheService = RedisCacheService(
+        host = dotenv["REDIS_HOST"] ?: "localhost",
+        port = dotenv["REDIS_PORT"]?.toIntOrNull() ?: 6379,
+        password = dotenv["REDIS_PASSWORD"]
+    )
 
+    // Configurar EmailService con variables de entorno
     val emailService = EmailService(
         smtpHost = dotenv["SMTP_HOST"] ?: "smtp.gmail.com",
         smtpPort = dotenv["SMTP_PORT"]?.toIntOrNull() ?: 465,
@@ -81,6 +91,7 @@ fun Application.module() {
     monitor.subscribe(ApplicationStopped) {
         skillTrendWorker.stop()
         jobMarketClient.close()
+        redisCacheService.close()
     }
 
     // Configurar routing con todos los repositorios y servicios
@@ -91,6 +102,8 @@ fun Application.module() {
         db = db,
         skillMarketRepo = skillMarketRepo,
         cargoRepo = cargoRepo,
+        cargoSkillRepo = cargoSkillRepo,
+        redisCacheService = redisCacheService,
         cargoSkillGenerator = cargoSkillGenerator,
         skillTrendWorker = skillTrendWorker
     )
