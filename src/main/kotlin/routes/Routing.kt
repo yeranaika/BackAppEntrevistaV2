@@ -42,6 +42,7 @@ import data.repository.market.SkillMarketRepository
 import data.repository.skills.CargoSkillRepository
 import routes.market.marketRoutes
 import routes.skills.skillRoutes
+import routes.legal.legalRoutes
 import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.SkillTrendWorker
@@ -98,6 +99,7 @@ fun Application.configureRouting(
         AdminUserCreateRoutes(adminUserRepo)
         adminRoutes(adminUserRepo)
         skillRoutes(cargoSkillRepo, redisCacheService)
+        legalRoutes()
 
         if (skillTrendWorker != null && cargoSkillGenerator != null) {
             marketRoutes(

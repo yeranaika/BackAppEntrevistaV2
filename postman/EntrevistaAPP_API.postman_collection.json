@@ -1678,6 +1678,74 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "11. Legal y EULA",
+			"item": [
+				{
+					"name": "Consultar EULA (Acuerdo de Licencia)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/legal/eula",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"legal",
+								"eula"
+							]
+						},
+						"description": "Retorna el Acuerdo de Licencia de Usuario Final (EULA) vigente para la aplicación móvil."
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Términos de Servicio",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/legal/terms",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"legal",
+								"terms"
+							]
+						},
+						"description": "Retorna los Términos y Condiciones de Servicio."
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Política de Privacidad",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/legal/privacy",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"legal",
+								"privacy"
+							]
+						},
+						"description": "Retorna la Política de Privacidad y Consentimiento de Datos."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
