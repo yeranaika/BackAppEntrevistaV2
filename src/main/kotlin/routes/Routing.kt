@@ -92,14 +92,15 @@ fun Application.configureRouting(
         profileRoutes(onboardingRepo)
         onboardingRoutes(profiles, objetivos)
         recordatorioRoutes(recordatorioRepo)
-        ConsentRoutes(consentRepo, ConsentTextRepository())
+        val consentTextRepo = ConsentTextRepository(db)
+        ConsentRoutes(consentRepo, consentTextRepo)
         billingRoutes(billingService, suscripcionRepo)
         syncRoutes(syncRepo)
 
         AdminUserCreateRoutes(adminUserRepo)
         adminRoutes(adminUserRepo)
         skillRoutes(cargoSkillRepo, redisCacheService)
-        legalRoutes()
+        legalRoutes(consentTextRepo)
 
         if (skillTrendWorker != null && cargoSkillGenerator != null) {
             marketRoutes(
