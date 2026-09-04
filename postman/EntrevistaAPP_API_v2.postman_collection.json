@@ -1,0 +1,945 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "EntrevistaAPP - API v2",
+    "description": "Colección completa y ordenada. Login/Register guardan tokens automáticamente. Login Admin guarda adminToken. Variables: baseUrl, accessToken, refreshToken, adminToken, usuarioId, cargoId, skillId.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://127.0.0.1:8080" },
+    { "key": "accessToken",  "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "adminToken",   "value": "" },
+    { "key": "usuarioId",    "value": "" },
+    { "key": "cargoId",      "value": "" },
+    { "key": "skillId",      "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "00. Sistema",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Healthcheck. Responde OK si el servidor está vivo."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "01. Autenticación Local",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.accessToken)  pm.collectionVariables.set('accessToken',  d.accessToken);",
+                  "    if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123\",\n  \"nombre\": \"Juan Pérez\",\n  \"idioma\": \"es\",\n  \"telefono\": \"+56912345678\",\n  \"fechaNacimiento\": \"1995-05-20\",\n  \"genero\": \"masculino\",\n  \"nivelExperiencia\": \"jr\",\n  \"area\": \"TI\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Prepararme para entrevistas técnicas\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth","register"] },
+            "description": "Registro de usuario. Guarda accessToken y refreshToken automáticamente."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.accessToken)  pm.collectionVariables.set('accessToken',  d.accessToken);",
+                  "    if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth","login"] },
+            "description": "Login. Guarda accessToken y refreshToken automáticamente."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login (Admin) → guarda adminToken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.accessToken) pm.collectionVariables.set('adminToken', d.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"AdminPassword123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth","login"] },
+            "description": "Login con cuenta admin. Guarda el token en {{adminToken}}."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.accessToken)  pm.collectionVariables.set('accessToken',  d.accessToken);",
+                  "    if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth","refresh"] },
+            "description": "Rotación de tokens. Invalida el anterior y emite un nuevo par."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth","logout"] },
+            "description": "Revoca el refreshToken. El accessToken expira solo (15 min)."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "02. Recuperación de Contraseña",
+      "item": [
+        {
+          "name": "POST /auth/forgot-password  (envía OTP por email)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"correo\": \"usuario@example.com\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["auth","forgot-password"] },
+            "description": "Envía un código OTP de 6 dígitos al correo del usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/reset-password  (valida OTP y cambia)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"usuario@example.com\",\n  \"codigo\": \"123456\",\n  \"nuevaContrasena\": \"NuevaPassword123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth","reset-password"] },
+            "description": "Valida el OTP y actualiza la contraseña."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/change-password  (usuario autenticado) 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nuevaContrasena\": \"NuevaPassword456\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change-password", "host": ["{{baseUrl}}"], "path": ["auth","change-password"] },
+            "description": "Cambio de contraseña con sesión activa (requiere JWT)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/request-reset  (dev: devuelve token+code)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"usuario@example.com\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/request-reset", "host": ["{{baseUrl}}"], "path": ["auth","request-reset"] },
+            "description": "Solo para desarrollo. Devuelve el token y code en la respuesta (no manda email)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/confirm-reset  (dev: consume token+code)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<TOKEN_UUID_DEL_REQUEST_RESET>\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NuevaPassword123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/confirm-reset", "host": ["{{baseUrl}}"], "path": ["auth","confirm-reset"] },
+            "description": "Solo para desarrollo. Consume el token+code y setea la nueva contraseña."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "03. Google OAuth",
+      "item": [
+        {
+          "name": "POST /auth/google  (Android idToken) 📱",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.accessToken)  pm.collectionVariables.set('accessToken',  d.accessToken);",
+                  "    if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"idToken\": \"<GOOGLE_ID_TOKEN_DEL_CLIENTE_ANDROID>\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/google", "host": ["{{baseUrl}}"], "path": ["auth","google"] },
+            "description": "Login desde Android con el idToken de Google Sign-In."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/google/start  (flujo web)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/google/start", "host": ["{{baseUrl}}"], "path": ["auth","google","start"] },
+            "description": "Inicia el flujo OAuth web. Redirige a Google."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/google/callback  (flujo web)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/google/callback", "host": ["{{baseUrl}}"], "path": ["auth","google","callback"] },
+            "description": "Callback de Google. Devuelve TokenPair."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "04. Mi Cuenta y Perfil  🔒",
+      "item": [
+        {
+          "name": "GET /me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"] },
+            "description": "Retorna datos del usuario, perfil y objetivo de carrera."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /me",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan Alberto Pérez\",\n  \"idioma\": \"es\",\n  \"telefono\": \"+56987654321\",\n  \"fechaNacimiento\": \"1995-05-20\",\n  \"genero\": \"masculino\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"] },
+            "description": "Actualiza nombre, idioma, teléfono, fecha de nacimiento y género."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /me/perfil",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me/perfil", "host": ["{{baseUrl}}"], "path": ["me","perfil"] },
+            "description": "Retorna perfil: nivel de experiencia, área, país, accesibilidad."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /me/perfil",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nivelExperiencia\": \"mid\",\n  \"area\": \"TI\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Especializarme en microservicios\",\n  \"flagsAccesibilidad\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/me/perfil", "host": ["{{baseUrl}}"], "path": ["me","perfil"] },
+            "description": "Crea o actualiza el perfil del usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /me/objetivo",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me/objetivo", "host": ["{{baseUrl}}"], "path": ["me","objetivo"] },
+            "description": "Retorna el objetivo de carrera actual."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /me/objetivo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCargo\": \"Desarrollador Backend Kotlin\",\n  \"sector\": \"Tecnología\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/me/objetivo", "host": ["{{baseUrl}}"], "path": ["me","objetivo"] },
+            "description": "Crea o actualiza el objetivo de carrera."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /me/objetivo",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me/objetivo", "host": ["{{baseUrl}}"], "path": ["me","objetivo"] },
+            "description": "Elimina el objetivo de carrera."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /cuenta  (GDPR - borrado total)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"confirmar\": \"eliminar\"\n}" },
+            "url": { "raw": "{{baseUrl}}/cuenta", "host": ["{{baseUrl}}"], "path": ["cuenta"] },
+            "description": "⚠️ Elimina la cuenta y TODOS los datos en cascada. Irreversible."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "05. Onboarding  🔒",
+      "item": [
+        {
+          "name": "POST /onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": \"Ingenieria Informatica\",\n  \"nivelExperiencia\": \"Junior\",\n  \"nombreCargo\": \"Desarrollador Full Stack\",\n  \"descripcionObjetivo\": \"Mejorar mi fluidez en entrevistas técnicas\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/onboarding", "host": ["{{baseUrl}}"], "path": ["onboarding"] },
+            "description": "Guarda la información inicial del onboarding."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /onboarding",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/onboarding", "host": ["{{baseUrl}}"], "path": ["onboarding"] },
+            "description": "Retorna los datos guardados del onboarding."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /onboarding/status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/onboarding/status", "host": ["{{baseUrl}}"], "path": ["onboarding","status"] },
+            "description": "Retorna { completed: true/false }."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /perfil/objetivo  (actualización rápida)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": \"TI\",\n  \"metaCargo\": \"Ingeniero de Software\",\n  \"nivel\": \"Senior\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/perfil/objetivo", "host": ["{{baseUrl}}"], "path": ["perfil","objetivo"] },
+            "description": "Actualización rápida de área, cargo objetivo y nivel."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "06. Recordatorios  🔒",
+      "item": [
+        {
+          "name": "GET /recordatorios/preferencias",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/recordatorios/preferencias", "host": ["{{baseUrl}}"], "path": ["recordatorios","preferencias"] },
+            "description": "Obtiene días, hora y tipo de práctica configurados."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /recordatorios/preferencias",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diasSemana\": [\"lunes\", \"miercoles\", \"viernes\"],\n  \"hora\": \"19:00\",\n  \"tipoPractica\": \"simulacion_ia\",\n  \"habilitado\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/recordatorios/preferencias", "host": ["{{baseUrl}}"], "path": ["recordatorios","preferencias"] },
+            "description": "Guarda preferencias de recordatorios y notificaciones."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "07. Consentimientos Legales",
+      "item": [
+        {
+          "name": "GET /consent/current  (público)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/consent/current", "host": ["{{baseUrl}}"], "path": ["consent","current"] },
+            "description": "Texto y versión del consentimiento legal vigente. Público."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /me/consent  (aceptar) 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"v1.0\",\n  \"alcances\": {\n    \"uso_datos_sesion\": true,\n    \"analisis_respuestas_texto\": true,\n    \"analisis_video_expresiones\": false,\n    \"mejora_modelos_ia\": false,\n    \"comunicaciones_plataforma\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/me/consent", "host": ["{{baseUrl}}"], "path": ["me","consent"] },
+            "description": "Registra la aceptación del consentimiento."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /me/consent/latest  🔒",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me/consent/latest", "host": ["{{baseUrl}}"], "path": ["me","consent","latest"] },
+            "description": "Retorna el último consentimiento activo del usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /me/consent/revoke  🔒",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/me/consent/revoke", "host": ["{{baseUrl}}"], "path": ["me","consent","revoke"] },
+            "description": "Revoca el consentimiento activo del usuario."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "08. Billing y Suscripciones  🔒",
+      "item": [
+        {
+          "name": "GET /billing/status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/billing/status", "host": ["{{baseUrl}}"], "path": ["billing","status"] },
+            "description": "Estado actual de suscripción: plan, vencimiento, es Premium."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /billing/google/verify  (Google Play)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"entrevista_premium_monthly\",\n  \"purchase_token\": \"fake_purchase_token_para_mock\",\n  \"purchase_time\": 1735689600000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/billing/google/verify", "host": ["{{baseUrl}}"], "path": ["billing","google","verify"] },
+            "description": "Valida y activa una compra de Google Play Billing. Usa GOOGLE_PLAY_BILLING_MOCK=true en dev."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /billing/code/redeem  (canjear código)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"PROM-ABC123XYZ\"\n}" },
+            "url": { "raw": "{{baseUrl}}/billing/code/redeem", "host": ["{{baseUrl}}"], "path": ["billing","code","redeem"] },
+            "description": "Canjea un código promocional o institucional."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /billing/admin/codes  (crear código) 👑",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"days\": 30,\n  \"label\": \"Beta Testers\",\n  \"max_uses\": 50,\n  \"license_type\": \"PROM\",\n  \"expires_at\": \"2027-12-31T23:59:59Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/billing/admin/codes", "host": ["{{baseUrl}}"], "path": ["billing","admin","codes"] },
+            "description": "Solo admin. Crea códigos de suscripción (PROM, INST, GOOG)."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "09. Skills y Mercado Laboral",
+      "item": [
+        {
+          "name": "GET /api/v1/cargos  (lista cargos - cache Redis 6h)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (Array.isArray(d) && d.length > 0) pm.collectionVariables.set('cargoId', d[0].cargoId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/cargos", "host": ["{{baseUrl}}"], "path": ["api","v1","cargos"] },
+            "description": "Lista cargos disponibles con niveles. Guarda el primer cargoId en variable."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/cargos/:cargoId/skills  (matrix skills - cache 12h)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/cargos/{{cargoId}}/skills", "host": ["{{baseUrl}}"], "path": ["api","v1","cargos","{{cargoId}}","skills"] },
+            "description": "Skills obligatorias y opcionales del cargo con sus pesos (1-100)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/skills/trending  (top skills del mercado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/skills/trending?categoria=tecnica&limit=15",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","skills","trending"],
+              "query": [
+                { "key": "categoria", "value": "tecnica", "description": "tecnica | blanda" },
+                { "key": "limit",     "value": "15" }
+              ]
+            },
+            "description": "Top skills más demandadas filtradas por categoría."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /market/skills  (catálogo ordenado por demanda)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json();",
+                  "    if (Array.isArray(d) && d.length > 0) pm.collectionVariables.set('skillId', d[0].skillId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/market/skills", "host": ["{{baseUrl}}"], "path": ["market","skills"] },
+            "description": "Todas las skills activas ordenadas por demanda_score DESC. Guarda el primer skillId."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /market/skills/:skillId/tendencias  (historial)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/market/skills/{{skillId}}/tendencias", "host": ["{{baseUrl}}"], "path": ["market","skills","{{skillId}}","tendencias"] },
+            "description": "Historial de frecuencia y nivel requerido de una skill."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "10. Sync Offline y Freemium",
+      "item": [
+        {
+          "name": "POST /api/v1/practice/evaluate-freemium  (público, sin IA)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preguntaId\": \"preg-001\",\n  \"userText\": \"Un deadlock ocurre cuando dos procesos se bloquean mutuamente esperando recursos que el otro retiene.\",\n  \"idealText\": \"Un interbloqueo es cuando dos o más procesos quedan bloqueados indefinidamente porque cada uno retiene un recurso que el otro necesita.\",\n  \"expectedKeywords\": [\"deadlock\", \"interbloqueo\", \"procesos\", \"recursos\", \"bloqueo\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/practice/evaluate-freemium", "host": ["{{baseUrl}}"], "path": ["api","v1","practice","evaluate-freemium"] },
+            "description": "Evaluación algorítmica local (N-gramas + keywords). Sin costo de IA, respuesta en < 5ms."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/sync/attempts  (batch sync offline) 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attempts\": [\n    {\n      \"localAttemptId\": \"local-att-001\",\n      \"skillId\": \"{{skillId}}\",\n      \"modo\": \"abierta_texto\",\n      \"categoria\": \"tecnica\",\n      \"nivelPreguntas\": \"junior\",\n      \"puntajeTotal\": 85.5,\n      \"fechaCreacionIso\": \"2026-09-03T14:30:00Z\",\n      \"respuestas\": [\n        {\n          \"preguntaId\": \"preg-kt-01\",\n          \"enunciado\": \"¿Qué es un Data Class en Kotlin?\",\n          \"respuestaTexto\": \"Es una clase para almacenar datos. Genera automáticamente equals, hashCode y toString.\",\n          \"esCorrecta\": true,\n          \"puntaje\": 90.0,\n          \"feedbackTexto\": \"Respuesta precisa.\",\n          \"tiempoRespuestaMs\": 12500,\n          \"orden\": 1\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/sync/attempts", "host": ["{{baseUrl}}"], "path": ["api","v1","sync","attempts"] },
+            "description": "Sincroniza intentos de práctica realizados offline en la app Android."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "11. Legal (EULA / Términos / Privacidad)",
+      "item": [
+        {
+          "name": "GET /api/v1/legal/eula",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/legal/eula", "host": ["{{baseUrl}}"], "path": ["api","v1","legal","eula"] },
+            "description": "EULA vigente de la aplicación móvil."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/legal/terms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/legal/terms", "host": ["{{baseUrl}}"], "path": ["api","v1","legal","terms"] },
+            "description": "Términos y Condiciones de Servicio."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/legal/privacy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/legal/privacy", "host": ["{{baseUrl}}"], "path": ["api","v1","legal","privacy"] },
+            "description": "Política de Privacidad."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "12. Administración  👑 (Solo Admin)",
+      "item": [
+        {
+          "name": "GET /admin/usuarios  (listar todos)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/usuarios", "host": ["{{baseUrl}}"], "path": ["admin","usuarios"] },
+            "description": "Lista todos los usuarios del sistema."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/users  (crear usuario)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.id) pm.collectionVariables.set('usuarioId', d.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"nuevo@example.com\",\n  \"contrasena\": \"Password123!\",\n  \"nombre\": \"Usuario Nuevo\",\n  \"idioma\": \"es\",\n  \"rol\": \"user\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/users", "host": ["{{baseUrl}}"], "path": ["admin","users"] },
+            "description": "Crea un usuario con rol especificado. Guarda su id en {{usuarioId}}."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /admin/usuarios/:id/rol",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nuevoRol\": \"admin\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/rol", "host": ["{{baseUrl}}"], "path": ["admin","usuarios","{{usuarioId}}","rol"] },
+            "description": "Cambia el rol de un usuario (user → admin o viceversa)."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /admin/usuarios/:id/activar",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/activar", "host": ["{{baseUrl}}"], "path": ["admin","usuarios","{{usuarioId}}","activar"] },
+            "description": "Reactiva una cuenta desactivada."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /admin/usuarios/:id/password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nuevaContrasena\": \"AdminReset123!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/password", "host": ["{{baseUrl}}"], "path": ["admin","usuarios","{{usuarioId}}","password"] },
+            "description": "Resetea la contraseña de cualquier usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /admin/usuarios/:id  (desactivar)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}", "host": ["{{baseUrl}}"], "path": ["admin","usuarios","{{usuarioId}}"] },
+            "description": "Soft-delete: desactiva el usuario (no borra de la BD)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/consent/text  (publicar texto legal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"v1.1\",\n  \"title\": \"Términos Actualizados\",\n  \"body\": \"Texto legal completo con las nuevas disposiciones de privacidad.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/consent/text", "host": ["{{baseUrl}}"], "path": ["admin","consent","text"] },
+            "description": "Publica una nueva versión del texto de consentimiento."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/market/cargos  (crear cargo + auto-skills)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var d = pm.response.json();",
+                  "    if (d.cargo && d.cargo.cargoId) pm.collectionVariables.set('cargoId', d.cargo.cargoId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Android Developer\",\n  \"area\": \"mobile\",\n  \"descripcion\": \"Desarrollador móvil Android con Kotlin y Compose\",\n  \"nivelBase\": \"semisenior\",\n  \"autoGenerateSkills\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/market/cargos", "host": ["{{baseUrl}}"], "path": ["admin","market","cargos"] },
+            "description": "Crea un cargo y consulta APIs de empleo para vincular skills automáticamente."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/market/cargos/:id/generate-requirements",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/market/cargos/{{cargoId}}/generate-requirements", "host": ["{{baseUrl}}"], "path": ["admin","market","cargos","{{cargoId}}","generate-requirements"] },
+            "description": "Actualiza skills y pesos de un cargo consultando el mercado laboral."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/market/cargos/generate-all  (todos los cargos)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/market/cargos/generate-all", "host": ["{{baseUrl}}"], "path": ["admin","market","cargos","generate-all"] },
+            "description": "Recorre todos los cargos y actualiza sus requisitos."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/market/sync-trends  (forzar worker)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/market/sync-trends", "host": ["{{baseUrl}}"], "path": ["admin","market","sync-trends"] },
+            "description": "Dispara manualmente el worker de actualización de demanda_score."
+          },
+          "response": []
+        }
+      ]
+    }
+
+  ]
+}
