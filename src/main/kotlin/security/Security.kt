@@ -42,7 +42,7 @@ fun Application.configureSecurity() {
         }
         install(Logging) {
             logger = Logger.DEFAULT
-            level = LogLevel.ALL   // MUY VERBOSO, solo para debug
+            level = LogLevel.NONE
         }
     }
 

@@ -62,21 +62,18 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
     testImplementation("com.h2database:h2:2.3.232")
 
-    // para la serialización JSON
-    implementation("org.jetbrains.exposed:exposed-json:0.55.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")    
+    // serialización JSON
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-java-time:0.55.0")    // <- ACTUALIZA ESTO
+    implementation("org.jetbrains.exposed:exposed-java-time:0.55.0")
     implementation("org.jetbrains.exposed:exposed-core:0.55.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.55.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.55.0")
     implementation("org.jetbrains.exposed:exposed-kotlin-datetime:0.55.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.55.0")
     implementation("org.postgresql:postgresql:42.7.4")
     implementation("com.zaxxer:HikariCP:5.1.0")
-
-    // para JSON en DB
-    implementation("org.jetbrains.exposed:exposed-json:0.55.0")
 
     // Redis Cache
     implementation("redis.clients:jedis:5.2.0")
