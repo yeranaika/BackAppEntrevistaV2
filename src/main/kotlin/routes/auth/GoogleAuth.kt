@@ -7,6 +7,7 @@ import io.ktor.server.request.*
 import io.ktor.server.auth.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import data.repository.usuarios.RefreshTokenRepository
 import data.repository.usuarios.UsuariosOAuthRepository
 import security.auth.GoogleTokenVerifier
 import security.tokens.TokenGoogleService
@@ -32,7 +33,8 @@ data class TokenPair(
  */
 fun Route.googleAuthRoutes(
     repo: UsuariosOAuthRepository,
-    verifier: GoogleTokenVerifier
+    verifier: GoogleTokenVerifier,
+    refreshRepo: RefreshTokenRepository = RefreshTokenRepository()
 ) {
     val log = application.log
 
@@ -99,7 +101,8 @@ fun Route.googleAuthRoutes(
                         userId = userId,
                         issuer = ctx.issuer,
                         audience = ctx.audience,
-                        algorithm = ctx.algorithm
+                        algorithm = ctx.algorithm,
+                        refreshRepo = refreshRepo
                     )
 
                     // Para el flujo web devolvemos TokenPair (snake_case) como ya tenías
@@ -162,7 +165,8 @@ fun Route.googleAuthRoutes(
                     userId = userId,
                     issuer = ctx.issuer,
                     audience = ctx.audience,
-                    algorithm = ctx.algorithm
+                    algorithm = ctx.algorithm,
+                    refreshRepo = refreshRepo
                 )
 
                 // 2.5) Devolver LoginOk con camelCase para que case con /auth/login

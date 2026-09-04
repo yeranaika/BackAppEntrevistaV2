@@ -1,31 +1,33 @@
 package security.tokens
 
-import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import data.repository.usuarios.RefreshTokenRepository
 import routes.auth.TokenPair
-import java.util.*
-import java.util.concurrent.TimeUnit
+import routes.auth.issueNewRefresh
+import security.generateRefreshToken
+import security.issueAccessToken
+import java.util.UUID
 
 object TokenGoogleService {
-    fun issue(
+    suspend fun issue(
         userId: UUID,
         issuer: String,
         audience: String,
-        algorithm: Algorithm
+        algorithm: Algorithm,
+        refreshRepo: RefreshTokenRepository
     ): TokenPair {
-        val now = System.currentTimeMillis()
+        val access = issueAccessToken(
+            subject = userId.toString(),
+            issuer = issuer,
+            audience = audience,
+            algorithm = algorithm,
+            ttlSeconds = 15 * 60,
+            extraClaims = emptyMap()
+        )
 
-        val access = JWT.create()
-            .withIssuer(issuer)
-            .withAudience(audience)
-            .withSubject(userId.toString())
-            .withIssuedAt(Date(now))
-            .withExpiresAt(Date(now + TimeUnit.MINUTES.toMillis(15)))
-            .sign(algorithm)
+        val refreshPlain = generateRefreshToken()
+        issueNewRefresh(refreshRepo, refreshPlain, userId)
 
-        // TODO: genera y persiste el refresh (hash) en tu tabla refresh_token
-        val refresh = UUID.randomUUID().toString()
-
-        return TokenPair(access_token = access, refresh_token = refresh)
+        return TokenPair(access_token = access, refresh_token = refreshPlain)
     }
 }
