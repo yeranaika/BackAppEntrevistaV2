@@ -12,6 +12,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import security.userIdFromJwt
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
@@ -134,13 +135,6 @@ object Validaciones {
         if (idioma == null) return null
         return if (idioma in IDIOMAS) null else "idioma_invalido"
     }
-}
-
-// ---------- Helper ----------
-private fun ApplicationCall.userIdFromJwt(): UUID {
-    val principal = this.principal<JWTPrincipal>() ?: error("No principal")
-    val sub = principal.subject ?: error("No subject")
-    return UUID.fromString(sub)
 }
 
 // ---------- Routes ----------

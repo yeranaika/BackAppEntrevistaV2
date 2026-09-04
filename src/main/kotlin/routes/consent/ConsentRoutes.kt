@@ -1,8 +1,9 @@
 // src/main/kotlin/routes/consent/ConsentRoutes.kt
 package routes.consent
 
-import data.mapper.toConsentRes
 import data.models.usuarios.ConsentTextRes
+import data.tables.usuarios.ConsentimientoTable
+import org.jetbrains.exposed.sql.ResultRow
 import data.models.usuarios.CreateConsentReq
 import data.models.usuarios.CreateConsentTextReq
 import data.models.usuarios.RevokeRes
@@ -147,3 +148,12 @@ fun Route.ConsentRoutes(
 
 private fun JWTPrincipal.userIdOrNull(): UUID? =
     runCatching { UUID.fromString(this.subject) }.getOrNull()
+
+private fun ResultRow.toConsentRes(): ConsentRes =
+    ConsentRes(
+        id             = this[ConsentimientoTable.id].toString(),
+        version        = this[ConsentimientoTable.version],
+        alcances       = this[ConsentimientoTable.alcances],
+        fechaOtorgado  = this[ConsentimientoTable.fechaOtorgado].toString(),
+        fechaRevocado  = this[ConsentimientoTable.fechaRevocado]?.toString()
+    )
