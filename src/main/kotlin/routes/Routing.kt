@@ -43,6 +43,8 @@ import data.repository.skills.CargoSkillRepository
 import routes.market.marketRoutes
 import routes.skills.skillRoutes
 import routes.legal.legalRoutes
+import routes.admin.adminAiRoutes
+import services.ai.AiQuestionGenerationUseCase
 import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.SkillTrendWorker
@@ -58,7 +60,8 @@ fun Application.configureRouting(
     cargoSkillRepo: CargoSkillRepository = CargoSkillRepository(db),
     redisCacheService: RedisCacheService = RedisCacheService(),
     cargoSkillGenerator: CargoSkillGeneratorService? = null,
-    skillTrendWorker: SkillTrendWorker? = null
+    skillTrendWorker: SkillTrendWorker? = null,
+    aiService: AiQuestionGenerationUseCase? = null
 ) {
     val users = UserRepository()
     val profiles = ProfileRepository()
@@ -101,6 +104,8 @@ fun Application.configureRouting(
         adminRoutes(adminUserRepo)
         skillRoutes(cargoSkillRepo, redisCacheService)
         legalRoutes(consentTextRepo)
+
+        aiService?.let { adminAiRoutes(it) }
 
         if (skillTrendWorker != null && cargoSkillGenerator != null) {
             marketRoutes(
