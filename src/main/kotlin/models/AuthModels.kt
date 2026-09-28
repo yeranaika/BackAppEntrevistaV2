@@ -1,20 +1,21 @@
-package routes.auth
+package models
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-// ====== DTOs ======
+// ====== Modelos (DTOs) del dominio de autenticación ======
+// Agrupa lo que antes vivía disperso en routes/auth/AuthDtos.kt y routes/auth/GoogleAuth.kt.
+// Usado por controllers.AuthController y services.AuthService.
+
 @Serializable
 data class RegisterReq(
     val email: String,
     val password: String,
     val nombre: String? = null,
     val idioma: String? = null,
-    // NUEVOS OPCIONALES
     val telefono: String? = null,
     val fechaNacimiento: String? = null, // "YYYY-MM-DD"
     val genero: String? = null,
-    // Datos de perfil (opcionales)
     val nivelExperiencia: String? = null,
     val area: String? = null,
     val pais: String? = null,
@@ -34,9 +35,36 @@ data class LoginOk(
     val refreshToken: String? = null
 )
 
+// 👇 DTO que usa la APP ANDROID (idToken de Google) — también sirve para el auto-registro
+@Serializable
+data class GoogleLoginReq(
+    val idToken: String
+)
+
+// Respuesta del flujo WEB (callback), en snake_case por compatibilidad con lo ya existente
+@Serializable
+data class TokenPair(
+    val access_token: String,
+    val refresh_token: String
+)
+
+@Serializable
+data class UpdateProfileReq(
+    val nombre: String? = null,
+    val idioma: String? = null,
+    val telefono: String? = null,
+    val fechaNacimiento: String? = null, // "YYYY-MM-DD" o null
+    val genero: String? = null
+)
+
 @Serializable
 data class ErrorRes(
     val error: String
+)
+
+@Serializable
+data class OkRes(
+    val ok: Boolean = true
 )
 
 @Serializable
@@ -59,11 +87,6 @@ data class ConfirmResetReq(
 )
 
 @Serializable
-data class OkRes(
-    val ok: Boolean = true
-)
-
-@Serializable
 data class RefreshReq(
     val refreshToken: String
 )
@@ -74,12 +97,6 @@ data class RefreshOk(
     val refreshToken: String
 )
 
-// 👇 DTO que usa la APP ANDROID (idToken de Google)
-@Serializable
-data class GoogleLoginReq(
-    val idToken: String
-)
-
 @Serializable
 data class LogoutReq(
     val refreshToken: String
@@ -87,9 +104,8 @@ data class LogoutReq(
 
 @Serializable
 data class ConfirmarBorradoReq(
-    val confirmar: String   
+    val confirmar: String
 )
-
 
 @Serializable
 data class DeleteAccountOk(

@@ -21,7 +21,6 @@ import routes.admin.AdminUserCreateRoutes
 import routes.admin.adminRoutes
 import routes.auth.authRoutes
 import routes.auth.deleteAccountRoute
-import routes.auth.googleAuthRoutes
 import routes.auth.passwordRecoveryRoutes
 import routes.auth.profileRoutes
 import routes.billing.billingRoutes
@@ -29,10 +28,13 @@ import routes.consent.ConsentRoutes
 import routes.me.meRoutes
 import routes.onboarding.onboardingRoutes
 import routes.usuario.recordatorios.recordatorioRoutes
-import security.AuthCtx
-import security.AuthCtxKey
+import controllers.authController
+import data.repository.usuarios.RefreshTokenRepository
+import middlewares.AuthCtx
+import middlewares.AuthCtxKey
 import security.auth.GoogleTokenVerifier
 import security.billing.GooglePlayBillingService
+import services.AuthService
 import services.EmailService
 
 import data.repository.sync.SyncRepository
@@ -83,11 +85,20 @@ fun Application.configureRouting(
         useMock = s.googlePlayBillingMock
     )
 
+    // Servicio de autenticación (Controller → Service → Repository)
+    val authService = AuthService(
+        users = users,
+        profiles = profiles,
+        refreshRepo = RefreshTokenRepository(),
+        oauthRepo = oauthRepo,
+        googleVerifier = GoogleTokenVerifier(s.googleClientId)
+    )
+
     routing {
         get("/health") { call.respondText("OK") }
 
+        authController(authService, ctx.issuer, ctx.audience, ctx.algorithm)
         authRoutes(ctx.issuer, ctx.audience, ctx.algorithm)
-        googleAuthRoutes(oauthRepo, GoogleTokenVerifier(s.googleClientId))
         passwordRecoveryRoutes(recoveryCodeRepo, emailService, db, oauthRepo)
         deleteAccountRoute(users)
 

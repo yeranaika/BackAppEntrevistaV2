@@ -1,4 +1,5 @@
-package security
+// middlewares/AuthMiddleware.kt
+package middlewares
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
@@ -14,14 +15,18 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
-import kotlinx.serialization.Serializable
 import io.ktor.server.application.Application
 import io.ktor.util.AttributeKey
 import plugins.settings
-import io.ktor.client.plugins.logging.*   // ⬅️ IMPORTANTE
+import io.ktor.client.plugins.logging.*
 
+/**
+ * Middleware de autenticación: aquí vive todo lo transversal a "estar logueado" —
+ * el esquema JWT y el esquema OAuth de Google que usan authenticate("auth-jwt")
+ * y authenticate("google-oauth") en los controllers.
+ */
 
-// --- Contexto JWT que ya usabas ---
+// --- Contexto JWT compartido (issuer/audience/algorithm) ---
 data class AuthCtx(val issuer: String, val audience: String, val algorithm: Algorithm)
 val AuthCtxKey = AttributeKey<AuthCtx>("auth-ctx")
 
@@ -30,7 +35,7 @@ val AuthCtxKey = AttributeKey<AuthCtx>("auth-ctx")
 data class OAuthSession(val state: String = "")
 
 fun Application.configureSecurity() {
-    // ---------- Tu config JWT ----------
+    // ---------- Config JWT ----------
     val s = settings()
     val algorithm = Algorithm.HMAC512(s.jwtSecret)
     attributes.put(AuthCtxKey, AuthCtx(s.jwtIssuer, s.jwtAudience, algorithm))
@@ -46,7 +51,7 @@ fun Application.configureSecurity() {
         }
     }
 
-    // ---------- (Opcional pero recomendado) sesiones para el state OAuth ----------
+    // ---------- Sesiones para el state del flujo OAuth ----------
     install(Sessions) {
         cookie<OAuthSession>("oauth_session")
     }
@@ -54,7 +59,7 @@ fun Application.configureSecurity() {
     // ---------- Autenticación: JWT + Google OAuth ----------
     install(Authentication) {
 
-        // 1) Tu esquema JWT existente (lo dejamos igual)
+        // 1) Esquema JWT
         jwt("auth-jwt") {
             realm = "app-entrevista"
             verifier(
@@ -66,7 +71,7 @@ fun Application.configureSecurity() {
             validate { cred -> if (cred.subject != null) JWTPrincipal(cred.payload) else null }
         }
 
-        // 2) Nuevo: esquema OAuth de Google (Authorization Code + OIDC)
+        // 2) Esquema OAuth de Google (Authorization Code + OIDC) — usado por el flujo web
         oauth("google-oauth") {
             // Debe coincidir EXACTAMENTE con el Redirect URI configurado en Google Cloud
             val redirectUri = s.googleRedirectUri
@@ -88,6 +93,5 @@ fun Application.configureSecurity() {
             // HttpClient usado para canjear el "code" por tokens
             client = oauthHttpClient
         }
-
     }
 }

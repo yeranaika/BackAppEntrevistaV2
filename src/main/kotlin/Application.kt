@@ -12,7 +12,7 @@ import plugins.configureDatabase
 import plugins.configureCORS
 import plugins.DatabaseFactory
 
-import security.configureSecurity
+import middlewares.configureSecurity
 import routes.configureRouting
 
 import data.repository.admin.AdminUserRepository
