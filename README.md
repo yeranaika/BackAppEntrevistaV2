@@ -49,6 +49,22 @@ docker compose -f src/DB/docker-compose.yml up -d
 
 ---
 
+## 🧪 Pruebas de punta a punta (E2E)
+
+Scripts en [`PRUEBAS_E2E/`](PRUEBAS_E2E) que recorren cada fase contra el **servidor levantado y Postgres real**.
+Crean usuarios `e2e_*@prueba.local` y los borran al terminar. Requieren PowerShell 7 y el contenedor `Entrevista_APP`.
+
+```powershell
+# 1) levantar el backend
+.\gradlew.bat run
+# 2) en otra terminal
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1                      # contra http://127.0.0.1:8080
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
+```
+Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend no responde.
+
+---
+
 ## 📮 Colección de Postman
 
 Se incluye una colección completa lista para importar en Postman ubicada en:
