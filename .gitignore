@@ -98,3 +98,8 @@ Desktop.ini
 .cursor/
 /estructura.py
 /estructura_front.txt
+
+# Obsidian: estado local de la boveda docs/ (cambia con cada uso)
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/cache
