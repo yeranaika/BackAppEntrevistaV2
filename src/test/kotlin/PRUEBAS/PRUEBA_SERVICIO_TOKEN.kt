@@ -2,11 +2,11 @@ package PRUEBAS
 
 import CONFIGURACION.DIAS_VIGENCIA_REFRESH_TOKEN
 import CONFIGURACION.TTL_TOKEN_ACCESO_SEGUNDOS
-import ERRORES.ErrorAplicacion
 import ERRORES.ErrorNoAutorizado
 import ERRORES.ErrorProhibido
 import ERRORES.ErrorValidacion
 import MODELOS.ROL_ADMIN
+import PRUEBAS.DOBLES.fallaCon
 import PRUEBAS.DOBLES.JWT_PRUEBA
 import PRUEBAS.DOBLES.RefreshTokensEnMemoria
 import PRUEBAS.DOBLES.RelojAjustable
@@ -17,7 +17,6 @@ import kotlinx.coroutines.runBlocking
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -28,11 +27,6 @@ class PruebaServicioToken {
     private val reloj = RelojAjustable()
     private val servicio = ServicioToken(repositorio, usuarios, JWT_PRUEBA, reloj)
     private val usuario = usuarios.agregar("ana@ejemplo.com", "Clave-segura-1")
-
-    private inline fun <reified T : ErrorAplicacion> fallaCon(codigo: String, noinline bloque: suspend () -> Unit) {
-        val error = assertFailsWith<T> { runBlocking { bloque() } }
-        assertEquals(codigo, error.codigo)
-    }
 
     @Test
     fun `emitirPar firma un JWT con sujeto, rol, emisor, audiencia y vida corta`() = runBlocking<Unit> {

@@ -7,3 +7,11 @@ const val TTL_TOKEN_ACCESO_SEGUNDOS = 15 * 60
 const val DIAS_VIGENCIA_REFRESH_TOKEN = 15L
 
 const val LARGO_MINIMO_CONTRASENA = 8
+
+// Tope para no gastar CPU de Argon2 con entradas gigantes.
+const val LARGO_MAXIMO_CONTRASENA = 128
+
+const val MINUTOS_VIGENCIA_CODIGO_RECUPERACION = 15L
+
+/** Tras estos intentos fallidos el código se invalida: 6 dígitos no resisten fuerza bruta sin límite. */
+const val INTENTOS_MAXIMOS_CODIGO_RECUPERACION = 5

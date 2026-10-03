@@ -41,7 +41,7 @@ class ServicioLogin(
         }
 
         val usuarioId = cuentasOAuth.vincularOCrearDesdeGoogle(identidad.subject, normalizarCorreo(correo))
-        val usuario = usuarios.buscarPorId(usuarioId)
+        val usuario = usuarios.buscarSesionPorId(usuarioId)
             ?: error("Usuario $usuarioId vinculado a Google no existe")
         return abrirSesion(usuario)
     }

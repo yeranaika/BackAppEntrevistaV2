@@ -3,13 +3,9 @@ package PRUEBAS.DOBLES
 import CONFIGURACION.ConfiguracionJwt
 import INTEGRACIONES.IdentidadGoogle
 import INTEGRACIONES.VerificadorIdentidadGoogle
-import MODELOS.LectorUsuarioSesion
-import MODELOS.ROL_USUARIO
 import MODELOS.RefreshToken
 import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioRefreshToken
-import MODELOS.UsuarioSesion
-import UTILIDADES.generarHashContrasena
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -25,25 +21,6 @@ class RelojAjustable(private var ahora: Instant = Instant.parse("2026-01-01T00:0
     override fun instant(): Instant = ahora
     override fun getZone(): ZoneId = ZoneOffset.UTC
     override fun withZone(zone: ZoneId?): Clock = this
-}
-
-class UsuariosEnMemoria : LectorUsuarioSesion {
-    val usuarios = mutableMapOf<UUID, UsuarioSesion>()
-    val ultimosLogin = mutableListOf<UUID>()
-
-    fun agregar(correo: String, contrasena: String, rol: String = ROL_USUARIO, estaActivo: Boolean = true): UsuarioSesion {
-        val usuario = UsuarioSesion(UUID.randomUUID(), correo, generarHashContrasena(contrasena), rol, estaActivo)
-        usuarios[usuario.id] = usuario
-        return usuario
-    }
-
-    fun actualizar(id: UUID, cambio: (UsuarioSesion) -> UsuarioSesion) {
-        usuarios[id] = cambio(usuarios.getValue(id))
-    }
-
-    override suspend fun buscarPorCorreo(correo: String) = usuarios.values.firstOrNull { it.correo == correo }
-    override suspend fun buscarPorId(id: UUID) = usuarios[id]
-    override suspend fun registrarUltimoLogin(id: UUID) { ultimosLogin += id }
 }
 
 class RefreshTokensEnMemoria : RepositorioRefreshToken {
@@ -67,6 +44,8 @@ class RefreshTokensEnMemoria : RepositorioRefreshToken {
         delUsuario.forEach { (hash, token) -> tokens[hash] = token.copy(estaRevocado = true) }
         return delUsuario.size
     }
+
+    fun sesionesActivas(usuarioId: UUID) = tokens.values.count { it.usuarioId == usuarioId && !it.estaRevocado }
 }
 
 /** Vincula por subject; si no existe, usa el usuario con ese correo o crea uno nuevo en `usuarios`. */

@@ -1,10 +1,10 @@
 package PRUEBAS
 
-import ERRORES.ErrorAplicacion
 import ERRORES.ErrorNoAutorizado
 import ERRORES.ErrorProhibido
 import INTEGRACIONES.IdentidadGoogle
 import MODELOS.ROL_ADMIN
+import PRUEBAS.DOBLES.fallaCon
 import PRUEBAS.DOBLES.CuentasOAuthEnMemoria
 import PRUEBAS.DOBLES.GoogleEnMemoria
 import PRUEBAS.DOBLES.JWT_PRUEBA
@@ -16,7 +16,6 @@ import com.auth0.jwt.JWT
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 class PruebaServicioLogin {
@@ -29,11 +28,6 @@ class PruebaServicioLogin {
         verificadorGoogle = GoogleEnMemoria(identidades),
         tokens = ServicioToken(RefreshTokensEnMemoria(), usuarios, JWT_PRUEBA)
     )
-
-    private inline fun <reified T : ErrorAplicacion> fallaCon(codigo: String, noinline bloque: suspend () -> Unit) {
-        val error = assertFailsWith<T> { runBlocking { bloque() } }
-        assertEquals(codigo, error.codigo)
-    }
 
     private fun rolDe(tokenAcceso: String) = JWT.decode(tokenAcceso).getClaim("role").asString()
 
@@ -84,7 +78,7 @@ class PruebaServicioLogin {
         servicio.iniciarSesionConGoogle("token-ana")
 
         val creado = assertNotNull(usuarios.buscarPorCorreo("ana@gmail.com"))
-        assertEquals(1, usuarios.usuarios.size)
+        assertEquals(1, usuarios.cantidad)
         assertEquals(listOf(creado.id, creado.id), usuarios.ultimosLogin)
     }
 

@@ -61,7 +61,7 @@ class ServicioToken(
         }
         if (!repositorio.revocarSiActivo(registro.id, reloj.instant())) throw refreshInvalido()
 
-        val usuario = usuarios.buscarPorId(registro.usuarioId) ?: throw refreshInvalido()
+        val usuario = usuarios.buscarSesionPorId(registro.usuarioId) ?: throw refreshInvalido()
         if (!usuario.estaActivo) throw ErrorProhibido("inactive_user", "La cuenta no está activa")
 
         return emitirPar(usuario.id, usuario.rol)
@@ -71,6 +71,11 @@ class ServicioToken(
     suspend fun revocar(tokenRefresco: String) {
         val registro = repositorio.buscarPorHash(hashear(exigirToken(tokenRefresco))) ?: return
         repositorio.revocarSiActivo(registro.id, reloj.instant())
+    }
+
+    /** Tras restablecer la contraseña o desactivar la cuenta: ningún refresh emitido antes sirve. */
+    suspend fun cerrarTodasLasSesiones(usuarioId: UUID) {
+        repositorio.revocarTodosDelUsuario(usuarioId)
     }
 
     private fun exigirToken(tokenRefresco: String): String =

@@ -27,6 +27,9 @@ class ErrorNoEncontrado(codigo: String, mensaje: String = codigo) : ErrorAplicac
 /** El recurso ya existe o choca con el estado actual → 409. */
 class ErrorConflicto(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
 
+/** Se superó el límite de intentos (ej: código de recuperación) → 429. */
+class ErrorDemasiadosIntentos(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
+
 /** Un proveedor externo (LLM, correo, Google, JSearch…) falló o no está configurado → 503. */
 class ErrorServicioExterno(
     codigo: String,

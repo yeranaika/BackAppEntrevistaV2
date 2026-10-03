@@ -60,6 +60,7 @@ Crean usuarios `e2e_*@prueba.local` y los borran al terminar. Requieren PowerShe
 # 2) en otra terminal
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1                      # contra http://127.0.0.1:8080
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplicada
 ```
 Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend no responde.
 

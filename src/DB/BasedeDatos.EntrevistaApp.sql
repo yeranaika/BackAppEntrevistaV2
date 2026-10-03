@@ -89,8 +89,12 @@ CREATE TABLE IF NOT EXISTS password_reset (
     code       VARCHAR(12)  NOT NULL,
     issued_at  TIMESTAMPTZ  NOT NULL,
     expires_at TIMESTAMPTZ  NOT NULL,
-    used       BOOLEAN      NOT NULL DEFAULT FALSE
+    used       BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- Tras INTENTOS_MAXIMOS_CODIGO_RECUPERACION fallos el código se invalida
+    intentos_fallidos SMALLINT NOT NULL DEFAULT 0
 );
+CREATE INDEX IF NOT EXISTS idx_password_reset_usuario_vigente
+    ON password_reset(usuario_id, expires_at) WHERE used = FALSE;
 
 CREATE TABLE IF NOT EXISTS recovery_code (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

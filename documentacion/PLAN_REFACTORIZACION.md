@@ -92,7 +92,36 @@ Resultado:
 - Pruebas: login ok, credenciales malas, usuario inactivo, refresh rotado, refresh revocado, Google con correo no verificado.
 - Mover `security/` y `controllers/AuthController` a la estructura nueva; `configurarSeguridad` ya vive en `MIDDLEWARES/`.
 
-## Fase 2 — Creación de usuario (cuenta, perfil, recuperación)
+## Fase 2 — Creación de usuario ✅ (rama `refactor/fase-2-usuario`)
+**Estado:** completada para cuenta, perfil, objetivo/onboarding, contraseñas y administración de usuarios.
+128 pruebas en verde + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1` (48/48) contra Postgres real.
+Requiere aplicar `migrations/014_password_reset_intentos.sql`.
+
+Hecho:
+- `CONTROLADOR_USUARIO`, `CONTROLADOR_ONBOARDING`, `CONTROLADOR_CONTRASENA`, `CONTROLADOR_ADMIN_USUARIO` → `SERVICIO_USUARIO`, `SERVICIO_ONBOARDING`, `SERVICIO_CONTRASENA`, `SERVICIO_ADMIN_USUARIO` → repositorios con interfaz en `MODELOS/`.
+- `VISTAS/VISTA_USUARIO`: traducción modelo → JSON (incluye nivel `junior/semisenior/senior` ↔ `jr/mid/sr`).
+- `INTEGRACIONES/CLIENTE_CORREO` detrás de `EnviadorCorreo` (envío en segundo plano, HTML escapado).
+- Validaciones únicas en `UTILIDADES/UTILIDAD_VALIDACION_USUARIO` (registro y actualización usan las mismas reglas).
+- Eliminados `controllers/`, `models/`, `services/AuthService`, `routes/{me,onboarding,auth,admin usuarios}` y los repositorios antiguos de usuario.
+
+Corregido (verificado contra la BD real):
+- **El registro desde Android fallaba siempre**: enviaba `nivelExperiencia: ""`, el perfil violaba el CHECK de `perfil_usuario`, respondía 500 y dejaba el usuario creado a medias (el reintento decía "correo ya registrado"). Ahora vacío = ausente y usuario + perfil se guardan en una sola transacción.
+- **Guardar el nivel nunca funcionó**: el código escribía `jr`/`mid`/frases de la app y la BD solo acepta `junior/semisenior/senior`.
+- `change-password` aceptaba cualquier contraseña actual.
+- El código de recuperación no tenía límite de intentos (ahora 5, luego 429) y los códigos anteriores seguían vigentes.
+- `forgot-password` revelaba si un correo existía o era de Google; ahora responde igual y el correo sale en segundo plano.
+- Restablecer la contraseña (usuario o admin) y desactivar una cuenta cierran todas sus sesiones.
+- Las cuentas creadas con Google quedaban con `origen_registro = 'local'`.
+- Un admin podía quitarse el rol o desactivarse a sí mismo.
+
+Compatibilidad con Android (se mantiene):
+- Rutas y JSON de éxito iguales; `/perfil/objetivo` se conserva (la app la usa en el onboarding).
+- `/auth/register` responde errores como `{"error"}` + 409/422 porque la app los decodifica con un `Json` estricto.
+- Los errores incluyen `message` además de `mensaje`: la app lo muestra en los flujos de contraseña.
+
+Pendiente (se movió a la Fase 4, junto a Google Play): consentimientos/EULA, recordatorios y billing siguen en `routes/`.
+
+Tareas originales:
 **Hoy:** registro en `AuthService`, `/me` partido entre `AuthController` y `MeRoutes`, objetivo por 3 caminos (`/me/objetivo`, `/perfil/objetivo`, onboarding), dos flujos de recuperación, alta por admin en `repository-add-user-admin`, borrado de cuenta en `DeleteAccountRoute`.
 
 Resultado:

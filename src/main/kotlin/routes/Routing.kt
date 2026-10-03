@@ -1,24 +1,20 @@
 package routes
 
 import CONFIGURACION.ContenedorDependencias
+import CONTROLADORES.controladorAdminUsuario
+import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
-import controllers.authController
+import CONTROLADORES.controladorOnboarding
+import CONTROLADORES.controladorUsuario
 import io.ktor.server.application.Application
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import routes.admin.AdminUserCreateRoutes
 import routes.admin.adminAiRoutes
-import routes.admin.adminRoutes
-import routes.auth.deleteAccountRoute
-import routes.auth.passwordRecoveryRoutes
-import routes.auth.profileRoutes
 import routes.billing.billingRoutes
 import routes.consent.ConsentRoutes
 import routes.legal.legalRoutes
 import routes.market.marketRoutes
-import routes.me.meRoutes
-import routes.onboarding.onboardingRoutes
 import routes.skills.skillRoutes
 import routes.sync.syncRoutes
 import routes.usuario.recordatorios.recordatorioRoutes
@@ -28,21 +24,18 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
     routing {
         get("/health") { call.respondText("OK") }
 
+        // Fases 1 y 2: capas MVC
         controladorLogin(d.servicioLogin)
-        authController(d.servicioAuth)
-        passwordRecoveryRoutes(d.repositorioRecuperacion, d.servicioCorreo, d.repositorioUsuario, d.repositorioCuentaOAuth)
-        deleteAccountRoute(d.repositorioUsuario)
+        controladorUsuario(d.servicioUsuario)
+        controladorContrasena(d.servicioContrasena)
+        controladorOnboarding(d.servicioOnboarding)
+        controladorAdminUsuario(d.servicioAdminUsuario)
 
-        meRoutes(d.repositorioUsuario, d.repositorioPerfil, d.repositorioObjetivo)
-        profileRoutes(d.repositorioOnboarding)
-        onboardingRoutes(d.repositorioPerfil, d.repositorioObjetivo)
+        // Pendientes de migrar (ver documentacion/PLAN_REFACTORIZACION.md)
         recordatorioRoutes(d.repositorioRecordatorio)
         ConsentRoutes(d.repositorioConsentimiento, d.repositorioTextoConsentimiento)
         billingRoutes(d.servicioFacturacion, d.repositorioSuscripcion)
         syncRoutes(d.repositorioSincronizacion)
-
-        AdminUserCreateRoutes(d.repositorioAdminUsuario)
-        adminRoutes(d.repositorioAdminUsuario)
         skillRoutes(d.repositorioCargoSkill, d.cache)
         legalRoutes(d.repositorioTextoConsentimiento)
         adminAiRoutes(d.servicioGeneracionPreguntas)

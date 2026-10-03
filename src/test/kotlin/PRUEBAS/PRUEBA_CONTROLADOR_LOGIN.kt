@@ -1,32 +1,19 @@
 package PRUEBAS
 
-import CONFIGURACION.configurarErrores
-import CONTROLADORES.controladorLogin
 import INTEGRACIONES.ClienteGoogleIdentidad
 import INTEGRACIONES.IdentidadGoogle
+import ESQUEMAS.SolicitudRegistro
 import PRUEBAS.DOBLES.GoogleEnMemoria
-import SERVICIOS.ServicioLogin
+import PRUEBAS.DOBLES.SistemaPrueba
 import com.auth0.jwt.JWT
-import data.repository.usuarios.UserRepository
-import data.tables.usuarios.UsuarioTable
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respondError
+import MODELOS.TablaUsuario
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.install
-import io.ktor.server.auth.Authentication
-import io.ktor.server.auth.OAuthServerSettings
-import io.ktor.server.auth.oauth
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.async
@@ -35,10 +22,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import models.RegisterReq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-import services.AuthTestDb
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,43 +32,19 @@ import kotlin.test.assertNull
 /** Contrato HTTP de /auth/login, /auth/google, /auth/refresh y /auth/logout contra H2. */
 class PruebaControladorLogin {
     private val json = Json { ignoreUnknownKeys = true }
-    private lateinit var usuarios: UserRepository
-    private lateinit var servicioLogin: ServicioLogin
+    private lateinit var sistema: SistemaPrueba
 
     @BeforeTest
     fun preparar() {
-        AuthTestDb.connect()
-        usuarios = UserRepository()
         val google = GoogleEnMemoria(
             mapOf("token-valido" to IdentidadGoogle("sub-ana", "ana@gmail.com", correoVerificado = true))
         )
-        servicioLogin = AuthTestDb.servicioLogin(usuarios, google)
-        runBlocking { AuthTestDb.service(usuarios).register(RegisterReq("ana@ejemplo.com", "Clave-segura-1")) }
+        sistema = SistemaPrueba(google)
+        runBlocking { sistema.usuario.registrar(SolicitudRegistro("ana@ejemplo.com", "Clave-segura-1")) }
     }
 
     private fun ApplicationTestBuilder.montarApp() {
-        application {
-            install(ContentNegotiation) { json() }
-            configurarErrores()
-            install(Authentication) {
-                // Proveedor OAuth de mentira: solo para que authenticate("google-oauth") exista
-                oauth("google-oauth") {
-                    urlProvider = { "http://localhost/auth/google/callback" }
-                    providerLookup = {
-                        OAuthServerSettings.OAuth2ServerSettings(
-                            name = "google",
-                            authorizeUrl = "http://localhost/authorize",
-                            accessTokenUrl = "http://localhost/token",
-                            requestMethod = HttpMethod.Post,
-                            clientId = "test",
-                            clientSecret = "test"
-                        )
-                    }
-                    client = HttpClient(MockEngine { respondError(HttpStatusCode.InternalServerError) })
-                }
-            }
-            routing { controladorLogin(servicioLogin) }
-        }
+        application { sistema.montar(this) }
     }
 
     private suspend fun ApplicationTestBuilder.postJson(ruta: String, cuerpo: String): HttpResponse =
@@ -129,7 +90,7 @@ class PruebaControladorLogin {
         assertEquals(HttpStatusCode.BadRequest, malformado.status)
         assertEquals("invalid_json", campo(malformado.bodyAsText(), "error"))
 
-        transaction { UsuarioTable.update({ UsuarioTable.correo eq "ana@ejemplo.com" }) { it[estado] = "inactivo" } }
+        transaction { TablaUsuario.update({ TablaUsuario.correo eq "ana@ejemplo.com" }) { it[estado] = "inactivo" } }
         val inactiva = login()
         assertEquals(HttpStatusCode.Forbidden, inactiva.status)
         assertEquals("inactive_user", campo(inactiva.bodyAsText(), "error"))
@@ -170,7 +131,7 @@ class PruebaControladorLogin {
     @Test
     fun `refresh conserva el rol admin`() = testApplication {
         montarApp()
-        runBlocking { usuarios.updateRol(usuarios.findByEmail("ana@ejemplo.com")!!.id, "admin") }
+        runBlocking { sistema.usuarios.actualizarRol(sistema.usuarios.buscarPorCorreo("ana@ejemplo.com")!!.id, "admin") }
         val refreshToken = campo(login().bodyAsText(), "refreshToken")!!
 
         val nuevoAcceso = campo(refresh(refreshToken).bodyAsText(), "accessToken")

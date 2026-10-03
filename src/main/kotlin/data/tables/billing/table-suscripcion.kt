@@ -3,7 +3,7 @@ package data.tables.billing
 
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.javatime.timestamp
-import data.tables.usuarios.UsuarioTable
+import MODELOS.TablaUsuario
 
 /**
  * Tabla SUSCRIPCION
@@ -23,7 +23,7 @@ import data.tables.usuarios.UsuarioTable
 object SuscripcionTable : UUIDTable("suscripcion", "suscripcion_id") {
 
     // FK al usuario
-    val usuarioId = reference("usuario_id", UsuarioTable.usuarioId)
+    val usuarioId = reference("usuario_id", TablaUsuario.usuarioId)
 
     // Plan del usuario: "free", "premium_mensual", etc.
     val plan = varchar("plan", length = 100)

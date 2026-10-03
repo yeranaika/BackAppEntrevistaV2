@@ -1,6 +1,5 @@
 package MODELOS
 
-import data.tables.usuarios.UsuarioTable
 import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.Table
 
@@ -11,7 +10,7 @@ object TablaCuentaOAuth : Table(name = "app.oauth_account") {
     val correo = varchar("email", 320).nullable()
     val correoVerificado = bool("email_verified").default(false)
     val usuarioId = uuid("usuario_id")
-        .references(UsuarioTable.usuarioId, onDelete = ReferenceOption.CASCADE)
+        .references(TablaUsuario.usuarioId, onDelete = ReferenceOption.CASCADE)
 
     init { index(true, proveedor, subject) }
     override val primaryKey = PrimaryKey(oauthId)

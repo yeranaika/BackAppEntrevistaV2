@@ -1,7 +1,25 @@
 package CONFIGURACION
 
-import data.repository.AppAndroid.OnboardingRepository
-import data.repository.admin.AdminUserRepository
+import INTEGRACIONES.ClienteCorreoSmtp
+import INTEGRACIONES.ClienteGoogleIdentidad
+import INTEGRACIONES.EnviadorCorreo
+import MODELOS.RepositorioCuentaOAuth
+import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioObjetivoCarrera
+import MODELOS.RepositorioObjetivoCarreraExposed
+import MODELOS.RepositorioPerfil
+import MODELOS.RepositorioPerfilExposed
+import MODELOS.RepositorioRecuperacionContrasena
+import MODELOS.RepositorioRecuperacionContrasenaExposed
+import MODELOS.RepositorioRefreshToken
+import MODELOS.RepositorioRefreshTokenExposed
+import MODELOS.RepositorioUsuarioExposed
+import SERVICIOS.ServicioAdminUsuario
+import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioLogin
+import SERVICIOS.ServicioOnboarding
+import SERVICIOS.ServicioToken
+import SERVICIOS.ServicioUsuario
 import data.repository.billing.SuscripcionRepository
 import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
@@ -9,24 +27,14 @@ import data.repository.skills.CargoSkillRepository
 import data.repository.sync.SyncRepository
 import data.repository.usuarios.ConsentTextRepository
 import data.repository.usuarios.ConsentimientoRepository
-import data.repository.usuarios.ObjetivoCarreraRepository
-import data.repository.usuarios.PasswordResetRepository
-import data.repository.usuarios.ProfileRepository
 import data.repository.usuarios.RecordatorioPreferenciaRepository
-import data.repository.usuarios.UserRepository
-import INTEGRACIONES.ClienteGoogleIdentidad
-import MODELOS.LectorUsuarioSesionExposed
-import MODELOS.RepositorioCuentaOAuth
-import MODELOS.RepositorioCuentaOAuthExposed
-import MODELOS.RepositorioRefreshToken
-import MODELOS.RepositorioRefreshTokenExposed
-import SERVICIOS.ServicioLogin
-import SERVICIOS.ServicioToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import org.jetbrains.exposed.sql.Database
 import security.billing.GooglePlayBillingService
 import services.AiQuestionGeneratorService
-import services.AuthService
-import services.EmailService
 import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.JobMarketClient
@@ -41,21 +49,22 @@ class ContenedorDependencias(
     db: Database
 ) : AutoCloseable {
 
+    /** Tareas que no deben bloquear la respuesta HTTP (ej: enviar correos). Se cancelan al apagar. */
+    private val tareasSegundoPlano = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     // ---------- Repositorios ----------
-    val repositorioUsuario = UserRepository()
-    val repositorioPerfil = ProfileRepository()
-    val repositorioObjetivo = ObjetivoCarreraRepository()
-    val repositorioOnboarding = OnboardingRepository()
-    val lectorUsuarioSesion = LectorUsuarioSesionExposed(repositorioUsuario)
+    // Una sola instancia sirve a RepositorioUsuario y a LectorUsuarioSesion.
+    val repositorioUsuario = RepositorioUsuarioExposed()
+    val repositorioPerfil: RepositorioPerfil = RepositorioPerfilExposed()
+    val repositorioObjetivo: RepositorioObjetivoCarrera = RepositorioObjetivoCarreraExposed()
+    val repositorioRecuperacion: RepositorioRecuperacionContrasena = RepositorioRecuperacionContrasenaExposed()
     val repositorioRefreshToken: RepositorioRefreshToken = RepositorioRefreshTokenExposed()
     val repositorioCuentaOAuth: RepositorioCuentaOAuth = RepositorioCuentaOAuthExposed()
-    val repositorioRecuperacion = PasswordResetRepository(repositorioUsuario)
     val repositorioConsentimiento = ConsentimientoRepository()
     val repositorioTextoConsentimiento = ConsentTextRepository(db)
     val repositorioRecordatorio = RecordatorioPreferenciaRepository()
     val repositorioSuscripcion = SuscripcionRepository()
     val repositorioSincronizacion = SyncRepository()
-    val repositorioAdminUsuario = AdminUserRepository(db)
     val repositorioMercadoSkill = SkillMarketRepository(db)
     val repositorioCargo = CargoRepository(db)
     val repositorioCargoSkill = CargoSkillRepository(db)
@@ -67,13 +76,7 @@ class ContenedorDependencias(
         password = configuracion.redis.contrasena
     )
 
-    val servicioCorreo = EmailService(
-        smtpHost = configuracion.correo.hostSmtp,
-        smtpPort = configuracion.correo.puertoSmtp,
-        username = configuracion.correo.usuario,
-        password = configuracion.correo.contrasena,
-        fromEmail = configuracion.correo.usuario
-    )
+    val enviadorCorreo: EnviadorCorreo = ClienteCorreoSmtp(configuracion.correo)
 
     val clienteMercadoLaboral = JobMarketClient(
         rapidApiKey = configuracion.mercadoLaboral.apiKey,
@@ -87,7 +90,6 @@ class ContenedorDependencias(
     )
 
     val servicioFacturacion = GooglePlayBillingService(
-        userRepo = repositorioUsuario,
         suscripcionRepo = repositorioSuscripcion,
         packageName = configuracion.googlePlay.paquete,
         serviceAccountJsonBase64 = configuracion.googlePlay.cuentaServicioJsonBase64,
@@ -99,20 +101,42 @@ class ContenedorDependencias(
     // ---------- Servicios de negocio ----------
     val servicioToken = ServicioToken(
         repositorio = repositorioRefreshToken,
-        usuarios = lectorUsuarioSesion,
+        usuarios = repositorioUsuario,
         jwt = configuracion.jwt
     )
 
     val servicioLogin = ServicioLogin(
-        usuarios = lectorUsuarioSesion,
+        usuarios = repositorioUsuario,
         cuentasOAuth = repositorioCuentaOAuth,
         verificadorGoogle = verificadorGoogle,
         tokens = servicioToken
     )
 
-    val servicioAuth = AuthService(
-        users = repositorioUsuario,
-        profiles = repositorioPerfil,
+    val servicioUsuario = ServicioUsuario(
+        usuarios = repositorioUsuario,
+        perfiles = repositorioPerfil,
+        objetivos = repositorioObjetivo,
+        tokens = servicioToken
+    )
+
+    val servicioOnboarding = ServicioOnboarding(
+        perfiles = repositorioPerfil,
+        objetivos = repositorioObjetivo
+    )
+
+    val servicioContrasena = ServicioContrasena(
+        lectorUsuarios = repositorioUsuario,
+        usuarios = repositorioUsuario,
+        cuentasOAuth = repositorioCuentaOAuth,
+        codigos = repositorioRecuperacion,
+        correo = enviadorCorreo,
+        tokens = servicioToken,
+        tareasSegundoPlano = tareasSegundoPlano
+    )
+
+    val servicioAdminUsuario = ServicioAdminUsuario(
+        usuarios = repositorioUsuario,
+        contrasenas = servicioContrasena,
         tokens = servicioToken
     )
 
@@ -133,6 +157,7 @@ class ContenedorDependencias(
     }
 
     override fun close() {
+        tareasSegundoPlano.cancel()
         workerTendencias.stop()
         clienteMercadoLaboral.close()
         servicioGeneracionPreguntas.close()

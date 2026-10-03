@@ -2,14 +2,12 @@ package MODELOS
 
 import UTILIDADES.generarHashContrasena
 import UTILIDADES.transaccion
-import data.tables.usuarios.UsuarioTable
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
 private const val PROVEEDOR_GOOGLE = "google"
-private const val IDIOMA_POR_DEFECTO = "es"
 
 interface RepositorioCuentaOAuth {
     /** Devuelve el usuario vinculado a la cuenta de Google; lo enlaza por correo o lo crea si no existe. */
@@ -50,24 +48,25 @@ class RepositorioCuentaOAuthExposed : RepositorioCuentaOAuth {
     }
 
     private fun buscarUsuarioPorCorreo(correo: String): UUID? =
-        UsuarioTable
+        TablaUsuario
             .selectAll()
-            .where { UsuarioTable.correo eq correo }
+            .where { TablaUsuario.correo eq correo }
             .limit(1)
             .firstOrNull()
-            ?.get(UsuarioTable.usuarioId)
+            ?.get(TablaUsuario.usuarioId)
 
     private fun crearUsuarioGoogle(correo: String): UUID {
         val id = UUID.randomUUID()
-        UsuarioTable.insert {
+        TablaUsuario.insert {
             it[usuarioId] = id
-            it[UsuarioTable.correo] = correo
+            it[TablaUsuario.correo] = correo
             it[nombre] = correo.substringBefore("@")
             // La columna es NOT NULL; una contraseña aleatoria que nadie conoce impide el login local.
             it[contrasenaHash] = generarHashContrasena(UUID.randomUUID().toString())
             it[idioma] = IDIOMA_POR_DEFECTO
             it[estado] = ESTADO_ACTIVO
             it[rol] = ROL_USUARIO
+            it[origenRegistro] = ORIGEN_GOOGLE
         }
         return id
     }

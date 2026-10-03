@@ -1,12 +1,11 @@
 package routes.market
 
-import ERRORES.ErrorValidacion
 import MIDDLEWARES.soloAdmin
+import UTILIDADES.uuidDeParametro
 import data.models.market.*
 import data.repository.market.CargoRepository
 import data.repository.market.SkillMarketRepository
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -92,11 +91,4 @@ fun Route.marketRoutes(
             }
         }
     }
-}
-
-private fun ApplicationCall.uuidDeParametro(nombre: String): UUID {
-    val valor = parameters[nombre]
-    if (valor.isNullOrBlank()) throw ErrorValidacion("id_requerido", "Falta el parámetro $nombre")
-    return runCatching { UUID.fromString(valor) }
-        .getOrElse { throw ErrorValidacion("id_invalido", "Formato de UUID inválido") }
 }

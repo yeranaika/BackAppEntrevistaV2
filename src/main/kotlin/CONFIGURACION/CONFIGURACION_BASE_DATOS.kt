@@ -3,9 +3,9 @@ package CONFIGURACION
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import data.tables.usuarios.ConsentimientoTable
-import data.tables.usuarios.ObjetivoCarreraTable
-import data.tables.usuarios.ProfileTable
-import data.tables.usuarios.UsuarioTable
+import MODELOS.TablaObjetivoCarrera
+import MODELOS.TablaPerfil
+import MODELOS.TablaUsuario
 import io.ktor.server.application.*
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -35,10 +35,10 @@ fun Application.configurarBaseDatos(config: ConfiguracionBaseDatos): Database {
     // diferencias entre las tablas Exposed y el SQL (ver PLAN_REFACTORIZACION, Fase 0).
     transaction(db) {
         SchemaUtils.createMissingTablesAndColumns(
-            UsuarioTable,
+            TablaUsuario,
             ConsentimientoTable,
-            ProfileTable,
-            ObjetivoCarreraTable
+            TablaPerfil,
+            TablaObjetivoCarrera
         )
     }
     log.info("Base de datos conectada (pool máximo ${config.tamanoMaximoPool})")

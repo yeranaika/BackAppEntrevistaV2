@@ -3,7 +3,6 @@ package security.billing
 import com.google.auth.oauth2.GoogleCredentials
 import data.models.billing.VerifyPurchaseReq
 import data.repository.billing.SuscripcionRepository
-import data.repository.usuarios.UserRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -36,7 +35,6 @@ data class BillingResult(
 
 class GooglePlayBillingService(
     private val httpClient: HttpClient,
-    private val userRepo: UserRepository,
     private val suscripcionRepo: SuscripcionRepository,
     private val packageName: String,
     serviceAccountJsonBase64: String,
@@ -59,7 +57,6 @@ class GooglePlayBillingService(
         }
 
     constructor(
-        userRepo: UserRepository,
         suscripcionRepo: SuscripcionRepository,
         packageName: String,
         serviceAccountJsonBase64: String,
@@ -74,7 +71,6 @@ class GooglePlayBillingService(
                 )
             }
         },
-        userRepo,
         suscripcionRepo,
         packageName,
         serviceAccountJsonBase64,
