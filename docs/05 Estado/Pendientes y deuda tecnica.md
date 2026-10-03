@@ -9,7 +9,7 @@ actualizado: 2026-10-03
 Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al terminarlo, moverlo a [[Estado del proyecto]].
 
 ## Alta
-- [ ] **Probar la colección de Postman contra el servidor** (`GENERAR_DOCUMENTACION.py --probar`). Quedó pendiente porque Docker estaba cerrado.
+- [x] **Probar la colección de Postman contra el servidor** (2026-10-03): 78 de 78 requests OK; se corrigió el `area` de los ejemplos.
 - [ ] **Límite por IP en Redis**: hoy vive en memoria de cada instancia; con varias instancias se puede superar.
 - [ ] **Tope mensual de evaluaciones con IA por usuario** premium (hoy sin límite; cada reporte cuesta tokens).
 - [ ] **Apagado ordenado**: un reporte o correo en curso se corta si el servidor se detiene (cola de trabajos o espera al cerrar).
