@@ -1,6 +1,7 @@
 package CONTROLADORES
 
 import SERVICIOS.ServicioReporteEntrevista
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aReporte
@@ -30,7 +31,7 @@ fun Route.controladorFeedback(servicio: ServicioReporteEntrevista) {
                 val sesionId = call.uuidDeParametro("id")
                 val reporte = servicio.reintentar(usuario, sesionId)
                 val (sesion, _) = servicio.obtener(usuario, sesionId)
-                call.respond(HttpStatusCode.Accepted, sesion.aReporte(reporte))
+                call.responderConMensaje(sesion.aReporte(reporte), "Reporte solicitado de nuevo; estará listo en unos momentos", HttpStatusCode.Accepted)
             }
         }
 

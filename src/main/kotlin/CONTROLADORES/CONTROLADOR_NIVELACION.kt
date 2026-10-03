@@ -10,6 +10,7 @@ import SERVICIOS.RespuestaPrueba
 import SERVICIOS.ServicioNivelacion
 import SERVICIOS.ServicioTestNivelacion
 import UTILIDADES.booleanoDeConsulta
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeConsulta
 import UTILIDADES.uuidDeParametro
@@ -40,7 +41,11 @@ fun Route.controladorNivelacion(servicio: ServicioNivelacion, tests: ServicioTes
         route("/api/v1/nivelacion") {
             post {
                 val s = call.receive<SolicitudIniciarNivelacion>()
-                call.respond(HttpStatusCode.Created, servicio.iniciar(call.usuarioIdDesdeJwt(), s.cargoId, s.cargo).aRespuesta(null))
+                call.responderConMensaje(
+                    servicio.iniciar(call.usuarioIdDesdeJwt(), s.cargoId, s.cargo).aRespuesta(null),
+                    "Nivelación iniciada",
+                    HttpStatusCode.Created
+                )
             }
 
             get("/resultado") {
@@ -56,7 +61,7 @@ fun Route.controladorNivelacion(servicio: ServicioNivelacion, tests: ServicioTes
             post("/{id}/respuestas") {
                 val respuestas = call.receive<SolicitudResponderVarias>().respuestas.map { RespuestaPrueba(it.preguntaId, it.opcionId, it.texto) }
                 val (intento, resultado) = servicio.responder(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), respuestas)
-                call.respond(intento.aRespuesta(resultado))
+                call.responderConMensaje(intento.aRespuesta(resultado), "Nivelación terminada; revisa tu nivel y tus brechas")
             }
         }
 
@@ -68,7 +73,11 @@ fun Route.controladorNivelacion(servicio: ServicioNivelacion, tests: ServicioTes
     route("/api/v1/admin/tests-nivelacion") {
         soloAdmin {
             post {
-                call.respond(HttpStatusCode.Created, tests.crear(call.receive<SolicitudTestNivelacion>().aDatos()).aRespuesta())
+                call.responderConMensaje(
+                    tests.crear(call.receive<SolicitudTestNivelacion>().aDatos()).aRespuesta(),
+                    "Test de nivelación creado",
+                    HttpStatusCode.Created
+                )
             }
 
             get {
@@ -80,7 +89,10 @@ fun Route.controladorNivelacion(servicio: ServicioNivelacion, tests: ServicioTes
                 get { call.respond(tests.obtener(call.uuidDeParametro("id")).aRespuesta()) }
 
                 put {
-                    call.respond(tests.actualizar(call.uuidDeParametro("id"), call.receive<SolicitudTestNivelacion>().aDatos()).aRespuesta())
+                    call.responderConMensaje(
+                        tests.actualizar(call.uuidDeParametro("id"), call.receive<SolicitudTestNivelacion>().aDatos()).aRespuesta(),
+                        "Test de nivelación actualizado"
+                    )
                 }
 
                 delete {

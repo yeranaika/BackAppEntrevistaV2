@@ -11,6 +11,7 @@ import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioPregunta
 import UTILIDADES.booleanoDeConsulta
 import UTILIDADES.enteroDeConsulta
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aRespuesta
@@ -43,7 +44,7 @@ fun Route.controladorPregunta(servicio: ServicioPregunta, generacion: ServicioGe
         soloAdmin {
             post {
                 val pregunta = servicio.crear(call.receive<SolicitudPregunta>())
-                call.respond(HttpStatusCode.Created, pregunta.aRespuestaAdmin())
+                call.responderConMensaje(pregunta.aRespuestaAdmin(), "Pregunta creada y aprobada", HttpStatusCode.Created)
             }
 
             get {
@@ -59,22 +60,22 @@ fun Route.controladorPregunta(servicio: ServicioPregunta, generacion: ServicioGe
 
                 put {
                     val pregunta = servicio.editar(call.uuidDeParametro("id"), call.receive<SolicitudPregunta>())
-                    call.respond(pregunta.aRespuestaAdmin())
+                    call.responderConMensaje(pregunta.aRespuestaAdmin(), "Pregunta actualizada; queda pendiente de aprobación")
                 }
 
                 patch("/aprobar") {
-                    call.respond(servicio.aprobar(call.uuidDeParametro("id"), call.usuarioIdDesdeJwt()).aRespuestaAdmin())
+                    call.responderConMensaje(servicio.aprobar(call.uuidDeParametro("id"), call.usuarioIdDesdeJwt()).aRespuestaAdmin(), "Pregunta aprobada")
                 }
 
                 patch("/rechazar") {
                     val solicitud = call.receive<SolicitudRechazo>()
                     val pregunta = servicio.rechazar(call.uuidDeParametro("id"), solicitud.motivo, call.usuarioIdDesdeJwt())
-                    call.respond(pregunta.aRespuestaAdmin())
+                    call.responderConMensaje(pregunta.aRespuestaAdmin(), "Pregunta rechazada")
                 }
 
                 delete {
                     servicio.eliminar(call.uuidDeParametro("id"))
-                    call.respond(RespuestaOk())
+                    call.respond(RespuestaOk("Pregunta eliminada"))
                 }
             }
         }
@@ -96,13 +97,14 @@ fun Route.controladorPregunta(servicio: ServicioPregunta, generacion: ServicioGe
 
 private suspend fun RoutingContext.generarConIa(generacion: ServicioGeneracionPregunta) {
     val creadas = generacion.generar(call.receive<SolicitudGenerarPreguntas>())
-    call.respond(
-        HttpStatusCode.Created,
+    call.responderConMensaje(
         RespuestaGenerarPreguntas(
             preguntasGeneradas = creadas.size,
             preguntasConError = 0,
             preguntas = creadas.map { it.aRespuesta() }
-        )
+        ),
+        "Preguntas generadas: ${creadas.size}. Quedan pendientes de aprobación",
+        HttpStatusCode.Created
     )
 }
 

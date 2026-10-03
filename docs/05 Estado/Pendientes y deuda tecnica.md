@@ -9,11 +9,8 @@ actualizado: 2026-10-03
 Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al terminarlo, moverlo a [[Estado del proyecto]].
 
 ## Alta
-- [ ] **Mensajes de éxito claros** (pedido del equipo, 2026-10-03). Hoy los errores explican qué pasó, pero varias
-  respuestas OK llegan vacías: `RespuestaOk(ok = true)` se serializa como `{}` porque `encodeDefaults = false` omite el
-  valor por defecto. Afecta `POST /auth/logout`, `PUT /me`, `PUT /me/perfil`, `DELETE /me/objetivo` y
-  `DELETE /api/v1/admin/preguntas/{id}`. Propuesta: responder `{"ok": true, "mensaje": "…"}` (o el recurso actualizado)
-  sin romper a Android, y revisar el resto de respuestas de éxito.
+- [x] **Mensajes de éxito claros** (2026-10-03, rama `refactor/mensajes-exito`): todo éxito de escritura trae
+  `mensaje`; las 5 respuestas que llegaban `{}` ahora responden `{"ok": true, "mensaje": "…"}`.
 - [x] **Probar la colección de Postman contra el servidor** (2026-10-03): 78 de 78 requests OK; se corrigió el `area` de los ejemplos.
 - [ ] **Límite por IP en Redis**: hoy vive en memoria de cada instancia; con varias instancias se puede superar.
 - [ ] **Tope mensual de evaluaciones con IA por usuario** premium (hoy sin límite; cada reporte cuesta tokens).

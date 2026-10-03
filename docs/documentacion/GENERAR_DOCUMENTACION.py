@@ -344,6 +344,9 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
 
 # ─── Colección Postman v2.1 ──────────────────────────────────────────────────
 
+# Toda respuesta 2xx de estos métodos trae `mensaje` (salvo 204, que no tiene cuerpo).
+METODOS_ESCRITURA = {"POST", "PUT", "PATCH", "DELETE"}
+
 def item_postman(r):
     ruta = r["ruta"].lstrip("/")
     url = {"raw": "{{baseUrl}}/" + ruta, "host": ["{{baseUrl}}"], "path": ruta.split("/")}
@@ -359,10 +362,18 @@ def item_postman(r):
         peticion["header"].append({"key": "Content-Type", "value": "application/json"})
         peticion["body"] = {"mode": "raw", "raw": json.dumps(r["body"], ensure_ascii=False, indent=2), "options": {"raw": {"language": "json"}}}
     item = {"name": r["nombre"], "request": peticion}
+    lineas = []
     if r["guarda"]:
         lineas = ["if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {", "    const j = pm.response.json();"]
         lineas += [f"    pm.collectionVariables.set(\"{var}\", {js});" for var, (js, _) in r["guarda"].items()]
         lineas.append("}")
+    if r["metodo"] in METODOS_ESCRITURA:
+        lineas += [
+            "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+            "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+            "}",
+        ]
+    if lineas:
         item["event"] = [{"listen": "test", "script": {"type": "text/javascript", "exec": lineas}}]
     return item
 
@@ -437,6 +448,16 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 500 | Error inesperado (`error_interno`); el detalle queda en el log, nunca en la respuesta |
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
+
+### Respuestas de éxito
+Toda respuesta exitosa de un `POST`, `PUT`, `PATCH` o `DELETE` trae `mensaje`: un texto en español para mostrarle al
+usuario. Si la operación devuelve un recurso, `mensaje` va como un campo más junto a los datos (no los envuelve):
+```json
+{ "id": "…", "estado": "aprobada", "enunciado": "…", "mensaje": "Pregunta creada y aprobada" }
+```
+Si no hay recurso que devolver, la respuesta es `{ "ok": true, "mensaje": "Perfil actualizado" }`. Las que Android ya
+leía como `message` (contraseñas, borrar cuenta, admin de usuarios) traen los dos campos con el mismo texto.
+Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay entrevista en curso) y no trae cuerpo.
 
 ### Convenciones
 - **Fechas**: ISO-8601 en UTC (`2026-10-03T14:05:00Z`); fechas sin hora `YYYY-MM-DD`.
@@ -536,6 +557,10 @@ def probar(url_base, correo, contrasena, correo_admin, contrasena_admin):
                 estado, texto = e.code, e.read().decode()
             ejecutadas += 1
             ok = estado in r["espera"]
+            if ok and r["metodo"] in METODOS_ESCRITURA and 200 <= estado < 300 and estado != 204:
+                ok = bool(texto) and bool(json.loads(texto).get("mensaje"))
+                if not ok:
+                    texto = "sin mensaje de éxito: " + texto
             print(f"  [{'OK' if ok else 'FALLA'}] {estado} {r['metodo']:6} {r['ruta']:55} {carpeta} · {r['nombre']}")
             if not ok:
                 fallas.append(f"{r['nombre']}: {estado} {texto[:200]}")

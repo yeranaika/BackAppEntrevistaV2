@@ -204,6 +204,9 @@
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
                   "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -254,6 +257,9 @@
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
                   "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -303,6 +309,9 @@
                   "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"adminToken\", j.accessToken);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -353,6 +362,9 @@
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
                   "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -392,7 +404,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Login con Google (web)",
@@ -455,7 +480,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Restablecer con código",
@@ -490,7 +528,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Cambiar contraseña",
@@ -522,7 +573,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -590,7 +654,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Mi perfil",
@@ -640,7 +717,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Eliminar mi cuenta",
@@ -671,7 +761,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -709,7 +812,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Onboarding",
@@ -740,7 +856,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Ver onboarding",
@@ -825,7 +954,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Borrar objetivo",
@@ -843,7 +985,20 @@
               ]
             },
             "description": "Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto)."
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -916,7 +1071,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Mi consentimiento",
@@ -954,7 +1122,20 @@
               ]
             },
             "description": ""
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "EULA vigente",
@@ -1091,7 +1272,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1129,7 +1323,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Ver preferencias",
@@ -1224,6 +1431,9 @@
                   "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"codigoPremium\", j.code);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -1261,7 +1471,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Verificar compra de Google Play",
@@ -1294,7 +1517,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1354,6 +1590,9 @@
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"cargoId\", j.cargo.cargoId);",
                   "    pm.collectionVariables.set(\"nombreCargo\", j.cargo.nombre);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -1524,7 +1763,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Regenerar requisitos de un cargo (admin)",
@@ -1555,7 +1807,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Regenerar requisitos de todos los cargos (admin)",
@@ -1585,7 +1850,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1645,6 +1923,9 @@
                   "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"preguntaId\", j.id);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -1693,7 +1974,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Crear pregunta abierta (admin)",
@@ -1737,7 +2031,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Crear pregunta de comportamiento (admin)",
@@ -1781,7 +2088,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Listar preguntas (admin)",
@@ -1892,7 +2212,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Editar pregunta (admin)",
@@ -1937,7 +2270,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Borrar pregunta (admin)",
@@ -1968,7 +2314,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Rechazar pregunta (admin)",
@@ -2014,7 +2373,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Generar preguntas con IA (admin)",
@@ -2059,7 +2431,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Preguntas para usuarios",
@@ -2137,6 +2522,9 @@
                   "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"sesionId\", j.sesionId);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -2232,7 +2620,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Enviar métricas de video",
@@ -2267,7 +2668,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Detalle de la entrevista",
@@ -2308,7 +2722,20 @@
               ]
             },
             "description": "Requiere al menos una respuesta. Lanza en segundo plano el reporte de feedback."
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Historial de entrevistas",
@@ -2358,7 +2785,20 @@
               ]
             },
             "description": "Solo una entrevista en curso (`409 entrevista_no_activa` si ya terminó)."
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -2407,7 +2847,20 @@
               ]
             },
             "description": "Solo si terminó con error (hasta 3 intentos). `409 reporte_no_reintentable`."
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Mis reportes",
@@ -2497,6 +2950,9 @@
                   "    pm.collectionVariables.set(\"practicaId\", j.sesionId);",
                   "    pm.collectionVariables.set(\"preguntaPracticaId\", j.preguntas[0].preguntaId);",
                   "    pm.collectionVariables.set(\"opcionPracticaId\", (j.preguntas[0].opciones && j.preguntas[0].opciones.length) ? j.preguntas[0].opciones[0].opcionId : '');",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -2536,7 +2992,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Detalle de la práctica",
@@ -2577,7 +3046,20 @@
               ]
             },
             "description": "Promedio de lo respondido; suma puntaje a cada skill."
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Mis prácticas",
@@ -2650,7 +3132,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Evaluar texto (freemium)",
@@ -2684,7 +3179,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -2735,6 +3243,9 @@
                   "    pm.collectionVariables.set(\"intentoId\", j.intentoId);",
                   "    pm.collectionVariables.set(\"preguntaNivelacionId\", j.preguntas[0].preguntaId);",
                   "    pm.collectionVariables.set(\"opcionNivelacionId\", (j.preguntas[0].opciones && j.preguntas[0].opciones.length) ? j.preguntas[0].opciones[0].opcionId : '');",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -2794,7 +3305,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Último resultado",
@@ -2894,6 +3418,9 @@
                   "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
                   "    const j = pm.response.json();",
                   "    pm.collectionVariables.set(\"testNivelacionId\", j.testId);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -3010,7 +3537,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Desactivar test",
@@ -3041,7 +3581,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -3092,6 +3645,9 @@
                   "    pm.collectionVariables.set(\"pruebaId\", j.pruebaId);",
                   "    pm.collectionVariables.set(\"preguntaAppId\", j.preguntas[0].preguntaId);",
                   "    pm.collectionVariables.set(\"opcionAppId\", (j.preguntas[0].configRespuesta.opciones || [{id: ''}])[0].id);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
                   "}"
                 ]
               }
@@ -3130,7 +3686,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Historial de intentos",
@@ -3225,7 +3794,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Cambiar rol",
@@ -3269,7 +3851,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Restablecer contraseña",
@@ -3313,7 +3908,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Desactivar usuario",
@@ -3342,7 +3950,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Reactivar usuario",
@@ -3372,7 +3993,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -3413,7 +4047,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -3505,7 +4152,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Publicar texto de consentimiento (alias)",
@@ -3548,7 +4208,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Generar preguntas con IA (alias)",
@@ -3593,7 +4266,20 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Callback de Google (web)",

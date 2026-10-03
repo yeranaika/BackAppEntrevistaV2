@@ -10,6 +10,7 @@ import INTEGRACIONES.DOCUMENTO_TERMINOS
 import INTEGRACIONES.FuenteDocumentosLegales
 import MIDDLEWARES.soloAdmin
 import SERVICIOS.ServicioConsentimiento
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aDocumentoLegal
 import VISTAS.aRespuesta
@@ -42,7 +43,11 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
         soloAdmin {
             post("/text") {
                 val solicitud = call.receive<SolicitudPublicarTexto>()
-                call.respond(HttpStatusCode.Created, servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aRespuestaTexto())
+                call.responderConMensaje(
+                    servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aRespuestaTexto(),
+                    "Texto legal publicado (versión ${solicitud.version})",
+                    HttpStatusCode.Created
+                )
             }
         }
     }
@@ -52,7 +57,11 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
             post {
                 val solicitud = call.receive<SolicitudConsentimiento>()
                 val consentimiento = servicio.otorgar(call.usuarioIdDesdeJwt(), solicitud.version, solicitud.alcances, call.request.origin.remoteHost)
-                call.respond(HttpStatusCode.Created, consentimiento.aRespuesta(servicio.alcancesComoMapa(consentimiento)))
+                call.responderConMensaje(
+                    consentimiento.aRespuesta(servicio.alcancesComoMapa(consentimiento)),
+                    "Consentimiento registrado",
+                    HttpStatusCode.Created
+                )
             }
 
             get("/latest") {
@@ -63,7 +72,7 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
 
             post("/revoke") {
                 servicio.revocar(call.usuarioIdDesdeJwt())
-                call.respond(RespuestaRevocacion(revoked = true))
+                call.responderConMensaje(RespuestaRevocacion(revoked = true), "Consentimiento revocado")
             }
         }
     }
@@ -89,7 +98,11 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
             soloAdmin {
                 post("/eula") {
                     val solicitud = call.receive<SolicitudPublicarTexto>()
-                    call.respond(HttpStatusCode.Created, servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aDocumentoLegal())
+                    call.responderConMensaje(
+                        servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aDocumentoLegal(),
+                        "EULA publicada (versión ${solicitud.version})",
+                        HttpStatusCode.Created
+                    )
                 }
             }
         }

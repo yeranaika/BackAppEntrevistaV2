@@ -18,6 +18,7 @@ import SERVICIOS.RespuestaOfflineEntrada
 import SERVICIOS.RespuestaPrueba
 import SERVICIOS.ServicioPractica
 import SERVICIOS.ServicioPruebasApp
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aCorreccion
@@ -45,7 +46,7 @@ fun Route.controladorPractica(servicio: ServicioPractica, pruebas: ServicioPrueb
             post {
                 val s = call.receive<SolicitudIniciarPractica>()
                 val pedido = PedidoPractica(s.skillId, s.cargoId, s.cargo, s.categoria, s.modo, s.nivel, s.cantidadPreguntas)
-                call.respond(HttpStatusCode.Created, servicio.iniciar(call.usuarioIdDesdeJwt(), pedido).aRespuesta())
+                call.responderConMensaje(servicio.iniciar(call.usuarioIdDesdeJwt(), pedido).aRespuesta(), "Práctica iniciada", HttpStatusCode.Created)
             }
 
             get {
@@ -63,11 +64,11 @@ fun Route.controladorPractica(servicio: ServicioPractica, pruebas: ServicioPrueb
                     val sesionId = call.uuidDeParametro("id")
                     val respuesta = servicio.responder(usuario, sesionId, RespuestaPrueba(s.preguntaId, s.opcionId, s.texto, s.tiempoRespuestaMs))
                     val pregunta = servicio.obtener(usuario, sesionId).preguntas.first { it.id == respuesta.preguntaServidaId }
-                    call.respond(respuesta.aCorreccion(pregunta))
+                    call.responderConMensaje(respuesta.aCorreccion(pregunta), "Respuesta guardada")
                 }
 
                 post("/finalizar") {
-                    call.respond(servicio.finalizar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta())
+                    call.responderConMensaje(servicio.finalizar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta(), "Práctica finalizada")
                 }
             }
         }
@@ -79,7 +80,10 @@ fun Route.controladorPractica(servicio: ServicioPractica, pruebas: ServicioPrueb
         post("/api/v1/sync/attempts") {
             val lote = call.receive<SolicitudSincronizacion>().intentos.map { it.aEntrada() }
             val ids = servicio.sincronizarOffline(call.usuarioIdDesdeJwt(), lote)
-            call.respond(RespuestaSincronizacionApp(true, ids.size, ids.map { (local, servidor) -> IdSincronizado(local, servidor.toString()) }))
+            call.responderConMensaje(
+                RespuestaSincronizacionApp(true, ids.size, ids.map { (local, servidor) -> IdSincronizado(local, servidor.toString()) }),
+                "Intentos sincronizados: ${ids.size}"
+            )
         }
 
         post("/api/v1/practice/evaluate-freemium") {
@@ -91,7 +95,10 @@ fun Route.controladorPractica(servicio: ServicioPractica, pruebas: ServicioPrueb
                 throw ErrorValidacion("palabras_clave_invalidas", "Se admiten hasta $PALABRAS_CLAVE_MAXIMAS palabras clave")
             }
             val e = evaluador.evaluar(s.userText, s.idealText, s.expectedKeywords.filter { it.isNotBlank() })
-            call.respond(RespuestaEvaluacionFreemium(e.puntaje, e.coberturaPalabrasClave, e.similitud, e.palabrasEncontradas, e.palabrasFaltantes, e.feedback))
+            call.responderConMensaje(
+                RespuestaEvaluacionFreemium(e.puntaje, e.coberturaPalabrasClave, e.similitud, e.palabrasEncontradas, e.palabrasFaltantes, e.feedback),
+                "Respuesta evaluada"
+            )
         }
     }
 }

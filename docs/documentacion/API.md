@@ -39,6 +39,16 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
 
+### Respuestas de éxito
+Toda respuesta exitosa de un `POST`, `PUT`, `PATCH` o `DELETE` trae `mensaje`: un texto en español para mostrarle al
+usuario. Si la operación devuelve un recurso, `mensaje` va como un campo más junto a los datos (no los envuelve):
+```json
+{ "id": "…", "estado": "aprobada", "enunciado": "…", "mensaje": "Pregunta creada y aprobada" }
+```
+Si no hay recurso que devolver, la respuesta es `{ "ok": true, "mensaje": "Perfil actualizado" }`. Las que Android ya
+leía como `message` (contraseñas, borrar cuenta, admin de usuarios) traen los dos campos con el mismo texto.
+Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay entrevista en curso) y no trae cuerpo.
+
 ### Convenciones
 - **Fechas**: ISO-8601 en UTC (`2026-10-03T14:05:00Z`); fechas sin hora `YYYY-MM-DD`.
 - **Ids**: UUID. Un id mal formado en la ruta responde `400 id_invalido`.

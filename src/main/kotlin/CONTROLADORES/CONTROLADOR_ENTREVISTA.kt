@@ -11,6 +11,7 @@ import SERVICIOS.PedidoEntrevista
 import SERVICIOS.RespuestaUsuario
 import SERVICIOS.ServicioEntrevista
 import UTILIDADES.enteroDeConsulta
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aRespuesta
@@ -41,7 +42,7 @@ fun Route.controladorEntrevista(servicio: ServicioEntrevista) {
             post {
                 val solicitud = call.receive<SolicitudIniciarEntrevista>()
                 val pedido = PedidoEntrevista(solicitud.cargoId, solicitud.cargo, solicitud.nivel, solicitud.cantidadPreguntas)
-                call.respond(HttpStatusCode.Created, servicio.iniciar(call.usuarioIdDesdeJwt(), pedido).aRespuesta())
+                call.responderConMensaje(servicio.iniciar(call.usuarioIdDesdeJwt(), pedido).aRespuesta(), "Entrevista iniciada", HttpStatusCode.Created)
             }
 
             get {
@@ -73,21 +74,24 @@ fun Route.controladorEntrevista(servicio: ServicioEntrevista) {
                         opcionId = solicitud.opcionId,
                         videoClipUrl = solicitud.videoClipUrl
                     )
-                    call.respond(servicio.responder(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), respuesta).aRespuesta())
+                    call.responderConMensaje(servicio.responder(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), respuesta).aRespuesta(), "Respuesta guardada")
                 }
 
                 post("/metricas") {
                     val lote = call.receive<SolicitudMetricasVideo>().metricas.map { it.aModelo() }
                     val insertadas = servicio.registrarMetricas(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), lote)
-                    call.respond(HttpStatusCode.Created, RespuestaMetricasRegistradas(insertadas))
+                    call.responderConMensaje(RespuestaMetricasRegistradas(insertadas), "Métricas de video registradas: $insertadas", HttpStatusCode.Created)
                 }
 
                 post("/finalizar") {
-                    call.respond(servicio.finalizar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta())
+                    call.responderConMensaje(
+                        servicio.finalizar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta(),
+                        "Entrevista finalizada. El reporte de feedback se está generando"
+                    )
                 }
 
                 post("/cancelar") {
-                    call.respond(servicio.cancelar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta())
+                    call.responderConMensaje(servicio.cancelar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta(), "Entrevista cancelada")
                 }
             }
         }

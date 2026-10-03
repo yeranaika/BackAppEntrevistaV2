@@ -162,7 +162,9 @@ class PruebaControladorLogin {
         montarApp()
         val token = campo(login().bodyAsText(), "refreshToken")!!
 
-        assertEquals(HttpStatusCode.OK, postJson("/auth/logout", """{"refreshToken":"$token"}""").status)
+        val salida = postJson("/auth/logout", """{"refreshToken":"$token"}""")
+        assertEquals(HttpStatusCode.OK, salida.status)
+        assertEquals("Sesión cerrada", campo(salida.bodyAsText(), "mensaje"))
         assertEquals(HttpStatusCode.OK, postJson("/auth/logout", """{"refreshToken":"$token"}""").status)
         assertEquals(HttpStatusCode.Unauthorized, refresh(token).status)
     }

@@ -98,6 +98,7 @@ class PruebaControladorPregunta {
         assertEquals(HttpStatusCode.Created, creada.status)
         val id = creada.objeto().texto("id")!!
         assertEquals("aprobada", creada.objeto().texto("estado"))
+        assertEquals("Pregunta creada y aprobada", creada.objeto().texto("mensaje"))
 
         val lista = enviar("GET", "$base?estado=aprobada&tipo=opcion_multiple", token = admin).objeto()
         assertEquals("1", lista.texto("total"))
@@ -109,7 +110,9 @@ class PruebaControladorPregunta {
         assertEquals("Muy fácil", rechazada.texto("motivoRechazo"))
         assertEquals("aprobada", enviar("PATCH", "$base/$id/aprobar", token = admin).objeto().texto("estado"))
 
-        assertEquals(HttpStatusCode.OK, enviar("DELETE", "$base/$id", token = admin).status)
+        val eliminada = enviar("DELETE", "$base/$id", token = admin)
+        assertEquals(HttpStatusCode.OK, eliminada.status)
+        assertEquals("Pregunta eliminada", eliminada.objeto().texto("mensaje"))
         assertEquals("pregunta_no_encontrada", enviar("GET", "$base/$id", token = admin).objeto().texto("error"))
     }
 
