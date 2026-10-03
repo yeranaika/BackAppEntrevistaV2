@@ -62,6 +62,6 @@ serialización, CORS, errores, límites, monitoreo, base de datos y seguridad �
 ## Contratos que no se pueden romper
 La app Android usa rutas y nombres de campos antiguos (`/api/prueba-practica/*`, `/auth/*`, `/billing/*` en snake_case,
 errores de registro con `{"error": "..."}`). Están cubiertos por pruebas que usan **copias de los DTO de la app**.
-Ver [[Guia para agentes]] y `../documentacion/API.md`.
+Ver [[Guia para agentes]] y [[API]].
 
 Relacionado: [[Modelo de datos]] · [[Flujos de negocio]] · [[Decisiones]]

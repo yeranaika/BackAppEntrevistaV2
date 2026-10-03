@@ -53,7 +53,7 @@ Evita que una práctica fácil suba el nivel. El nivel del perfil no se cambia: 
 ## D12 · La app no graba video: las preguntas `simulacion_video` se le muestran como abiertas (2026-10, fase 5)
 
 ## D13 · Documentación generada desde una sola definición (2026-10)
-`documentacion/GENERAR_DOCUMENTACION.py` produce `API.md` y la colección de Postman; el catálogo de errores se lee del código.
+`docs/documentacion/GENERAR_DOCUMENTACION.py` produce `API.md` y la colección de Postman; el catálogo de errores se lee del código.
 
 ## D14 · Alcance del trabajo: solo backend (2026-10)
 La app Android es solo referencia del contrato; no se proponen ni hacen cambios en ella desde este repositorio.

@@ -7,7 +7,7 @@
 | [postman/EntrevistaAPP_local.postman_environment.json](postman/EntrevistaAPP_local.postman_environment.json) | Entorno local (URL, correo y contraseña de prueba). |
 | [GENERAR_DOCUMENTACION.py](GENERAR_DOCUMENTACION.py) | Genera los tres archivos anteriores desde una sola definición. |
 
-La documentación interna del proyecto (plan de refactorización, borradores de PR) está en [`../docs`](../docs).
+Esta carpeta es parte de la bóveda de Obsidian de [`docs/`](..) (empieza por `docs/00 Inicio.md`), donde está el contexto del proyecto.
 
 ## Usar la colección en Postman
 
@@ -47,7 +47,7 @@ Al agregar o cambiar un endpoint, editar la lista `CARPETAS` (método, ruta, aut
 qué variables guarda) y regenerar:
 
 ```bash
-python documentacion/GENERAR_DOCUMENTACION.py
+python docs/documentacion/GENERAR_DOCUMENTACION.py
 ```
 
 El catálogo de códigos de error se arma leyendo el código fuente, así que siempre está al día.
@@ -55,5 +55,5 @@ El catálogo de códigos de error se arma leyendo el código fuente, así que si
 Para comprobar que la colección funciona contra un servidor (recorre las requests en orden, salvo las marcadas ⚠️):
 
 ```bash
-python documentacion/GENERAR_DOCUMENTACION.py --probar http://localhost:8080 usuario@ejemplo.com Clave-segura-1 admin@ejemplo.com Clave-segura-1
+python docs/documentacion/GENERAR_DOCUMENTACION.py --probar http://localhost:8080 usuario@ejemplo.com Clave-segura-1 admin@ejemplo.com Clave-segura-1
 ```

@@ -40,7 +40,7 @@ pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
 Utilidades comunes en `UTILIDAD_E2E.ps1`. Los `.ps1` deben guardarse **UTF-8 con BOM**. En PowerShell usar `${VAR}?x` (no `$VAR?x`).
 
 ## 3. Colección de Postman
-`python documentacion/GENERAR_DOCUMENTACION.py --probar <url> <correo> <clave> <correoAdmin> <claveAdmin>` recorre la
+`python docs/documentacion/GENERAR_DOCUMENTACION.py --probar <url> <correo> <clave> <correoAdmin> <claveAdmin>` recorre la
 colección contra un servidor. → [[Postman y documentacion de la API]]
 
 ## Prueba de mutación (recomendada en reglas críticas)

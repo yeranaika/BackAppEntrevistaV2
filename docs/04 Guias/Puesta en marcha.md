@@ -49,7 +49,7 @@ for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -
 ./gradlew test                                                       # ~260 pruebas
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_7_FEEDBACK.ps1 -UrlBase http://127.0.0.1:8080
 ```
-Y en Postman: importar `documentacion/postman/` → [[Postman y documentacion de la API]].
+Y en Postman: importar `docs/documentacion/postman/` → [[Postman y documentacion de la API]].
 
 ## Primer usuario admin
 Registrarse (Postman *Registrar usuario* o la app) y luego:

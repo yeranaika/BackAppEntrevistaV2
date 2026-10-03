@@ -24,7 +24,7 @@ Este backend lo trabajan **varios agentes** (y personas) en paralelo. Leer esta 
 | **No usar el servidor del puerto 8080** si es el del desarrollador; levantar otro en **8093** para probar | No interferir |
 | **Limpiar los datos de prueba** que crees (usuarios `e2e_*`, cargos, preguntas, códigos) | BD compartida en local |
 | **Respaldo antes de migrar** la BD local (`pg_dump -n app`) y migraciones idempotentes | Datos del desarrollador |
-| No editar a mano `documentacion/API.md` ni la colección de Postman: regenerarlas | Se desincronizan |
+| No editar a mano `docs/documentacion/API.md` ni la colección de Postman: regenerarlas | Se desincronizan |
 | No guardar secretos en el código ni en la bóveda; `.env` nunca al repo | Seguridad |
 | No hacer `push`, PR, borrar ramas ni otras acciones visibles sin que la persona lo pida | Son irreversibles o públicas |
 | Si Docker está cerrado, **no** encenderlo por tu cuenta: avisar | Es el entorno de la persona |
@@ -47,7 +47,7 @@ Este backend lo trabajan **varios agentes** (y personas) en paralelo. Leer esta 
 ./gradlew test
 ./gradlew run --args="-P:ktor.deployment.port=8093"
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_N_*.ps1 -UrlBase http://127.0.0.1:8093
-python documentacion/GENERAR_DOCUMENTACION.py
+python docs/documentacion/GENERAR_DOCUMENTACION.py
 docker exec Entrevista_APP pg_dump -U root -d DBentrevista -n app > respaldo.sql
 ```
 

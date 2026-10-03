@@ -25,7 +25,7 @@ Los servicios lanzan errores de `ERRORES/ERRORES_APLICACION.kt`; **nunca** códi
 | cualquier otra excepción | 500 `error_interno` | Se registra con traza; al cliente sin detalles |
 
 Cuerpo: `{"error": "<codigo_snake_case>", "mensaje": "<texto en español>", "message": "<igual>"}`.
-El código es **estable** (lo usa la app); el mensaje es para mostrar. Catálogo completo de códigos en `../documentacion/API.md`.
+El código es **estable** (lo usa la app); el mensaje es para mostrar. Catálogo completo de códigos en [[API]].
 
 ## Resiliencia de integraciones
 `UTILIDADES/UTILIDAD_RESILIENCIA.kt` → `PoliticaResiliencia`: **timeout por intento**, **reintentos con espera

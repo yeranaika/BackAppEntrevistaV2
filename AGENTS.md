@@ -12,5 +12,5 @@ Reglas que nunca se rompen:
 - Alcance: **solo backend**. La app Android (`EntrevistaAPPAndroid`) es solo referencia de su contrato JSON, que no se puede romper.
 - No llamar al LLM real, a las APIs de empleo ni mandar correos sin que la persona lo pida.
 - No usar el servidor del puerto 8080 del desarrollador: levantar otro en 8093 para probar. Limpiar los datos de prueba.
-- `./gradlew test` completo en verde antes de cerrar una tarea; documentación de la API regenerada con `python documentacion/GENERAR_DOCUMENTACION.py`.
+- `./gradlew test` completo en verde antes de cerrar una tarea; documentación de la API regenerada con `python docs/documentacion/GENERAR_DOCUMENTACION.py`.
 - No hacer push, PR ni acciones irreversibles sin pedido explícito.

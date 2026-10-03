@@ -1,6 +1,6 @@
 # API de EntrevistaAPP
 
-> Archivo generado por `documentacion/GENERAR_DOCUMENTACION.py`. No editar a mano: cambiar la definición y volver a generar.
+> Archivo generado por `docs/documentacion/GENERAR_DOCUMENTACION.py`. No editar a mano: cambiar la definición y volver a generar.
 
 Backend Kotlin + Ktor. Todas las respuestas son JSON en UTF-8. La colección de Postman con los mismos endpoints está en
 [`postman/`](postman/) (ver [README](README.md)).
@@ -1356,7 +1356,145 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 0 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 138 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
+| 400 | `alcance_invalido` | Hay alcances con nombre vacío o demasiado largo |
+| 400 | `alcances_requeridos` | Indica qué alcances aceptas o rechazas |
+| 400 | `area_invalida` | El área es obligatoria y de hasta … caracteres |
+| 400 | `cantidad_invalida` | La entrevista debe tener entre … y … preguntas |
+| 400 | `cargo_id_invalido` | El id del cargo no es válido |
+| 400 | `cargo_invalido` | El cargo admite hasta … caracteres |
+| 400 | `cargo_requerido` | Indica el cargo o define tu objetivo en el onboarding |
+| 400 | `categoria_invalida` | Categoría debe ser tecnica o blanda |
+| 400 | `codigo_invalido` | Código inválido o expirado |
+| 400 | `codigo_invalido_o_expirado` | El código no existe, venció o ya se usó |
+| 400 | `compra_incompleta` | Faltan el producto o el token de compra |
+| 400 | `compra_invalida` | Compra no válida o no activa |
+| 400 | `contexto_requerido` | Indica el cargo o la skill que evalúa la pregunta |
+| 400 | `contrasena_actual_incorrecta` | La contraseña actual es incorrecta |
+| 400 | `contrasena_repetida` | La nueva contraseña debe ser distinta de la actual |
+| 400 | `cuenta_google` | Esta cuenta fue creada con Google. No puedes cambiar la contraseña aquí. |
+| 400 | `debe_haber_una_correcta` | Debe haber exactamente una opción correcta |
+| 400 | `dia_invalido` | Día no válido: … |
+| 400 | `dias_invalidos` | days no puede ser negativo |
+| 400 | `dias_requeridos` | Elige al menos un día |
+| 400 | `duracion_requerida` | Define days > 0 o expires_at |
+| 400 | `enunciado_invalido` | El enunciado es obligatorio (hasta … caracteres) |
+| 400 | `enunciado_requerido` | El enunciado es obligatorio |
+| 400 | `estado_invalido` | Estado debe ser pendiente, aprobada o rechazada |
+| 400 | `etiqueta_invalida` | label no puede superar … caracteres |
+| 400 | `expiracion_invalida` | expires_at debe venir en ISO-8601 (ej: 2026-01-31T23:59:59Z) |
+| 400 | `expresion_invalida` | La expresión debe ser una de: … |
+| 400 | `genero_invalido` | Género no válido |
+| 400 | `hora_invalida` | La hora debe tener formato HH:mm (00:00 a 23:59) |
+| 400 | `id_invalido` | Formato de UUID inválido |
+| 400 | `id_local_invalido` | localAttemptId es obligatorio (hasta … caracteres) |
+| 400 | `id_local_repetido` | Hay intentos repetidos en el lote |
+| 400 | `id_requerido` | Falta el parámetro … |
+| 400 | `idioma_invalido` | Idioma no soportado |
+| 400 | `invalid_uuid` | Identificador con formato inválido |
+| 400 | `licencia_invalida` | licenseType debe ser PROM, INST o GOOG |
+| 400 | `limite_invalido` | El límite debe estar entre 1 y … |
+| 400 | `lote_invalido` | Envía entre 1 y … métricas por solicitud |
+| 400 | `max_usos_invalido` | max_uses debe ser al menos 1 |
+| 400 | `metrica_fuera_de_rango` | Los puntajes de video van de 0 a 100 |
+| 400 | `metrica_invalida` | timestampMs no puede ser negativo |
+| 400 | `missing_fields` | El título y el cuerpo son obligatorios |
+| 400 | `missing_refresh` | Falta el refresh token |
+| 400 | `modelo_invalido` | Modelo no soportado: usa … |
+| 400 | `modo_invalido` | El modo debe ser opcion_multiple, abierta_texto o mixto |
+| 400 | `motivo_invalido` | El motivo no puede superar … caracteres |
+| 400 | `motivo_requerido` | Indica por qué se rechaza la pregunta |
+| 400 | `must_type_eliminar` | Escribe \"…\" para confirmar |
+| 400 | `nivel_experiencia_invalido` | Nivel de experiencia no válido |
+| 400 | `nivel_invalido` | El nivel debe ser junior, semisenior o senior |
+| 400 | `no_puede_desactivarse` | No puedes desactivar tu propia cuenta |
+| 400 | `no_puede_quitarse_admin` | No puedes quitarte el rol de administrador a ti mismo |
+| 400 | `nombre_cargo_invalido` | El cargo no puede superar … caracteres |
+| 400 | `nombre_cargo_requerido` | El cargo es obligatorio |
+| 400 | `nombre_invalido` | El nombre es obligatorio y de hasta … caracteres |
+| 400 | `nothing_to_update` | No se envió ningún dato para actualizar |
+| 400 | `opcion_duplicada` | Hay opciones repetidas |
+| 400 | `opcion_invalida` | Elige una de las opciones de la pregunta |
+| 400 | `opcion_vacia` | Todas las opciones necesitan texto |
+| 400 | `opciones_invalidas` | Una pregunta de opción múltiple lleva entre … y … opciones |
+| 400 | `opciones_no_permitidas` | Solo las preguntas de opción múltiple llevan opciones |
+| 400 | `orden_invalido` | El orden de las respuestas debe ser único y desde 1 |
+| 400 | `pagina_invalida` | La página empieza en 1 |
+| 400 | `palabras_clave_invalidas` | Se admiten hasta … palabras clave |
+| 400 | `parametro_invalido` | El parámetro … debe ser un número |
+| 400 | `password_too_long` | La contraseña no puede superar … caracteres |
+| 400 | `pregunta_no_aprobada` | Solo se pueden usar preguntas aprobadas (…) |
+| 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
+| 400 | `pregunta_repetida` | Cada pregunta se responde una sola vez |
+| 400 | `pregunta_sesion_id_invalido` | El id de la pregunta no es válido |
+| 400 | `respuesta_ideal_o_rubrica_requerida` | Indica una respuesta ideal o una rúbrica para evaluarla |
+| 400 | `respuesta_muy_larga` | La respuesta admite hasta … caracteres |
+| 400 | `respuesta_requerida` | Escribe tu respuesta |
+| 400 | `respuestas_invalidas` | Cada intento lleva entre 1 y … respuestas |
+| 400 | `rol_invalido` | El rol debe ser 'user' o 'admin' |
+| 400 | `sector_invalido` | El sector no puede superar … caracteres |
+| 400 | `sin_respuestas` | Responde al menos una pregunta |
+| 400 | `skill_id_invalido` | El id de la skill no es válido |
+| 400 | `skill_no_encontrada` | La skill del intento … no existe |
+| 400 | `tamano_invalido` | El tamaño de página debe estar entre 1 y … |
+| 400 | `telefono_invalido` | El teléfono no tiene un formato válido |
+| 400 | `texto_muy_largo` | Los textos admiten hasta … caracteres |
+| 400 | `tiempo_invalido` | El tiempo de respuesta debe estar entre 0 y 1 hora |
+| 400 | `tipo_invalido` | Tipo debe ser opcion_multiple, abierta_texto o simulacion_video |
+| 400 | `tipo_practica_invalido` | El tipo de práctica es obligatorio y de hasta … caracteres |
+| 400 | `tipo_prueba_no_soportado` | El tipo de prueba debe ser ENT (entrevista), PR o BL (práctica) o NV (nivelación) |
+| 400 | `titulo_invalido` | El título es obligatorio (hasta … caracteres) |
+| 400 | `version_invalida` | La versión es obligatoria y de hasta … caracteres |
+| 400 | `version_requerida` | La versión es obligatoria |
+| 400 | `video_url_invalida` | El clip debe ser una URL https de hasta … caracteres |
+| 401 | `bad_credentials` | Correo o contraseña incorrectos |
+| 401 | `google_email_not_verified` | El correo de Google no está verificado |
+| 401 | `google_exchange_failed` | Google no entregó tokens para el código recibido |
+| 401 | `invalid_google_token` | El token de Google no es válido |
+| 401 | `invalid_refresh` | El refresh token no es válido o ya expiró |
+| 401 | `invalid_token` | El token no trae subject |
+| 401 | `missing_id_token` | La respuesta de Google no trae id_token |
+| 401 | `unauthorized` | Falta el token de acceso |
+| 403 | `inactive_user` | La cuenta no está activa |
+| 404 | `cargo_no_encontrado` | El cargo no existe |
+| 404 | `cargo_not_found` | No se encontró el cargo especificado |
+| 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |
+| 404 | `entrevista_no_encontrada` | La entrevista no existe |
+| 404 | `nivelacion_no_encontrada` | El test de nivelación no existe |
+| 404 | `objetivo_not_found` | El usuario no tiene un objetivo activo |
+| 404 | `onboarding_not_found` | No se encontró información de onboarding |
+| 404 | `practica_no_encontrada` | La práctica no existe |
+| 404 | `pregunta_no_encontrada` | La pregunta no pertenece a esta entrevista |
+| 404 | `profile_not_found` | El usuario aún no tiene perfil |
+| 404 | `prueba_no_encontrada` | La prueba no existe |
+| 404 | `recordatorio_no_configurado` | El usuario no tiene preferencias de recordatorios configuradas |
+| 404 | `reporte_no_disponible` | La entrevista fue cancelada y no tiene reporte |
+| 404 | `skill_no_encontrada` | La skill no existe |
+| 404 | `test_no_encontrado` | El test de nivelación no existe |
+| 404 | `user_not_found` | Usuario no encontrado |
+| 404 | `version_no_encontrada` | No existe esa versión del texto legal |
+| 409 | `cargo_existente` | Ya existe un cargo con ese nombre |
+| 409 | `compra_ya_registrada` | Esta compra ya está asociada a otra cuenta |
+| 409 | `email_in_use` | Ese correo ya está registrado |
+| 409 | `entrevista_en_progreso` | Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra |
+| 409 | `entrevista_no_activa` | La entrevista ya fue finalizada o cancelada |
+| 409 | `entrevista_no_finalizada` | El reporte estará disponible cuando finalices la entrevista |
+| 409 | `nivelacion_finalizada` | Este test de nivelación ya fue respondido |
+| 409 | `practica_no_activa` | La práctica ya fue finalizada o abandonada |
+| 409 | `pregunta_en_uso` | La pregunta ya se usó; recházala en vez de eliminarla |
+| 409 | `pregunta_ya_respondida` | Esa pregunta ya fue respondida |
+| 409 | `preguntas_insuficientes` | Aún no hay suficientes preguntas aprobadas para … (…); prueba con otro nivel o cargo |
+| 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
+| 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
+| 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
+| 502 | `provider_http_error` | El proveedor de IA no respondió |
+| 502 | `provider_invalid_output` | La IA devolvió preguntas que no cumplen las reglas de calidad |
+| 502 | `provider_refusal` | El modelo se negó a generar las preguntas |
+| 502 | `provider_truncated` | La respuesta del proveedor de IA quedó incompleta |
+| 503 | `documento_no_disponible` | El documento legal no está disponible |
+| 503 | `eula_no_disponible` | No hay texto legal publicado ni archivo EULA disponible |
+| 503 | `google_no_disponible` | No se pudo validar el token con Google |
+| 503 | `provider_not_configured` | No hay API key configurada para ese proveedor de IA |

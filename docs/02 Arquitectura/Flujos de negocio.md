@@ -6,7 +6,7 @@ actualizado: 2026-10-03
 
 # Flujos de negocio
 
-Endpoints exactos y bodies en `../documentacion/API.md`. Aquí, **qué pasa y por qué**.
+Endpoints exactos y bodies en [[API]]. Aquí, **qué pasa y por qué**.
 
 ## 1. Cuenta y onboarding
 `POST /auth/register` (o login con Google) → `PUT /perfil/objetivo` con **área, cargo meta y nivel**.

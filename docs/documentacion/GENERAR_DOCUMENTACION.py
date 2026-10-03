@@ -1,8 +1,8 @@
 """
 Genera la documentación de la API (API.md) y la colección y el entorno de Postman desde una sola definición.
 
-    python documentacion/GENERAR_DOCUMENTACION.py
-    python documentacion/GENERAR_DOCUMENTACION.py --probar URL CORREO CONTRASENA CORREO_ADMIN CONTRASENA_ADMIN
+    python docs/documentacion/GENERAR_DOCUMENTACION.py
+    python docs/documentacion/GENERAR_DOCUMENTACION.py --probar URL CORREO CONTRASENA CORREO_ADMIN CONTRASENA_ADMIN
 
 Al agregar o cambiar un endpoint, editar CARPETAS y volver a ejecutar: API.md y Postman quedan iguales.
 
@@ -22,7 +22,7 @@ import uuid
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CARPETA_POSTMAN = os.path.join(CARPETA, "postman")
-CODIGO_FUENTE = os.path.join(CARPETA, "..", "src", "main", "kotlin")
+CODIGO_FUENTE = os.path.join(CARPETA, "..", "..", "src", "main", "kotlin")
 NOMBRE = "EntrevistaAPP API"
 
 # ─── Variables de la colección ───────────────────────────────────────────────
@@ -371,7 +371,7 @@ def coleccion():
         "info": {
             "_postman_id": str(uuid.uuid5(uuid.NAMESPACE_URL, "entrevistaapp-api")),
             "name": NOMBRE,
-            "description": "API del backend de EntrevistaAPP. Documentación completa: documentacion/API.md (generada junto con esta colección).\n\n"
+            "description": "API del backend de EntrevistaAPP. Documentación completa: docs/documentacion/API.md (generada junto con esta colección).\n\n"
                            "1. Importar también el entorno `EntrevistaAPP_local.postman_environment.json` (o cambiar `baseUrl`).\n"
                            "2. Ejecutar **Registrar usuario** o **Login**: los tokens se guardan solos.\n"
                            "3. Para lo de admin, **Login admin** con una cuenta de rol admin.\n"
@@ -398,7 +398,7 @@ def entorno():
 
 INTRODUCCION = """# API de EntrevistaAPP
 
-> Archivo generado por `documentacion/GENERAR_DOCUMENTACION.py`. No editar a mano: cambiar la definición y volver a generar.
+> Archivo generado por `docs/documentacion/GENERAR_DOCUMENTACION.py`. No editar a mano: cambiar la definición y volver a generar.
 
 Backend Kotlin + Ktor. Todas las respuestas son JSON en UTF-8. La colección de Postman con los mismos endpoints está en
 [`postman/`](postman/) (ver [README](README.md)).

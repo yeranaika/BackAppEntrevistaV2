@@ -22,8 +22,8 @@ Ejemplo: `GET /api/v1/me/estadisticas`.
 7. **Pruebas** — `PRUEBA_SERVICIO_*` (reglas, errores, concurrencia si aplica) y `PRUEBA_CONTROLADOR_*` (status, JSON, 401/403/404).
    `./gradlew test` completo en verde.
 8. **E2E** — agregar verificaciones al script de la fase o uno nuevo en `PRUEBAS_E2E/` (UTF-8 con BOM; limpia sus datos).
-9. **Documentación** — agregar la request en `CARPETAS` de `documentacion/GENERAR_DOCUMENTACION.py` y ejecutar
-   `python documentacion/GENERAR_DOCUMENTACION.py` (actualiza `API.md` y Postman). → [[Postman y documentacion de la API]]
+9. **Documentación** — agregar la request en `CARPETAS` de `docs/documentacion/GENERAR_DOCUMENTACION.py` y ejecutar
+   `python docs/documentacion/GENERAR_DOCUMENTACION.py` (actualiza `API.md` y Postman). → [[Postman y documentacion de la API]]
 10. **Bóveda** — si cambia un flujo, una decisión o el estado: actualizar [[Flujos de negocio]], [[Decisiones]], [[Estado del proyecto]].
 
 > [!warning] Contrato de la app Android

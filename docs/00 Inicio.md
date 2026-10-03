@@ -62,7 +62,7 @@ con **tests de nivelación**, **práctica guiada** y **feedback** automático (m
 - [[Riesgos]]
 
 ## Otros documentos del repositorio
-- `../documentacion/API.md` — referencia de todos los endpoints (generada) y `../documentacion/postman/` — colección de Postman.
+- [[API]] — referencia de todos los endpoints (generada) y `docs/documentacion/postman/` — colección de Postman.
 - [[PLAN_REFACTORIZACION]] — plan y bitácora detallada de las fases 0–7.
 - `legal/` — EULA, términos y privacidad (**los lee el servidor**: no mover).
 - `pull-requests/` — borradores de descripción de PR.

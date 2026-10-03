@@ -76,12 +76,12 @@ Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend
 
 ## 📖 Documentación de la API y Postman
 
-Toda la documentación de la API está en [`documentacion/`](documentacion/):
+Toda la documentación de la API está en [`docs/documentacion/`](docs/documentacion/):
 
-- [`documentacion/API.md`](documentacion/API.md): referencia completa (autenticación, formato de error, cada endpoint con su body de ejemplo y el catálogo de códigos de error).
-- [`documentacion/postman/`](documentacion/postman/): colección y entorno de Postman, listos para importar. Cómo usarlos: [`documentacion/README.md`](documentacion/README.md).
+- [`docs/documentacion/API.md`](docs/documentacion/API.md): referencia completa (autenticación, formato de error, cada endpoint con su body de ejemplo y el catálogo de códigos de error).
+- [`docs/documentacion/postman/`](docs/documentacion/postman/): colección y entorno de Postman, listos para importar. Cómo usarlos: [`docs/documentacion/README.md`](docs/documentacion/README.md).
 
-Ambos se generan desde una sola definición con `python documentacion/GENERAR_DOCUMENTACION.py`, así que no se desincronizan.
+Ambos se generan desde una sola definición con `python docs/documentacion/GENERAR_DOCUMENTACION.py`, así que no se desincronizan.
 **Contexto del proyecto (para devs y agentes):** [`docs/`](docs/) es una bóveda de Obsidian con la visión, el alcance,
 la arquitectura, una nota por tecnología, guías (puesta en marcha, convenciones, cómo agregar un endpoint), el estado y las
 decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes de IA leen además [`AGENTS.md`](AGENTS.md).

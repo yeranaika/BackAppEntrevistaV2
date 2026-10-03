@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "21e1fcd6-d4b7-574e-8369-e04dc06f3424",
     "name": "EntrevistaAPP API",
-    "description": "API del backend de EntrevistaAPP. Documentación completa: documentacion/API.md (generada junto con esta colección).\n\n1. Importar también el entorno `EntrevistaAPP_local.postman_environment.json` (o cambiar `baseUrl`).\n2. Ejecutar **Registrar usuario** o **Login**: los tokens se guardan solos.\n3. Para lo de admin, **Login admin** con una cuenta de rol admin.\nLas carpetas están en el orden del flujo: cada request guarda los ids que usa la siguiente.\n⚠️ = cuesta dinero, consume cuota de APIs externas, manda correos o borra datos.",
+    "description": "API del backend de EntrevistaAPP. Documentación completa: docs/documentacion/API.md (generada junto con esta colección).\n\n1. Importar también el entorno `EntrevistaAPP_local.postman_environment.json` (o cambiar `baseUrl`).\n2. Ejecutar **Registrar usuario** o **Login**: los tokens se guardan solos.\n3. Para lo de admin, **Login admin** con una cuenta de rol admin.\nLas carpetas están en el orden del flujo: cada request guarda los ids que usa la siguiente.\n⚠️ = cuesta dinero, consume cuota de APIs externas, manda correos o borra datos.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
