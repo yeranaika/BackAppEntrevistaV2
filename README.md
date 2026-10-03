@@ -82,7 +82,9 @@ Toda la documentación de la API está en [`documentacion/`](documentacion/):
 - [`documentacion/postman/`](documentacion/postman/): colección y entorno de Postman, listos para importar. Cómo usarlos: [`documentacion/README.md`](documentacion/README.md).
 
 Ambos se generan desde una sola definición con `python documentacion/GENERAR_DOCUMENTACION.py`, así que no se desincronizan.
-El plan de refactorización y otros documentos internos están en [`docs/`](docs/).
+**Contexto del proyecto (para devs y agentes):** [`docs/`](docs/) es una bóveda de Obsidian con la visión, el alcance,
+la arquitectura, una nota por tecnología, guías (puesta en marcha, convenciones, cómo agregar un endpoint), el estado y las
+decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes de IA leen además [`AGENTS.md`](AGENTS.md).
 
 ---
 
