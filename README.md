@@ -63,6 +63,7 @@ pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplicada
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una generación real (cuesta)
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1  # requiere migrations/015 y Redis; -ConLimites prueba el límite por IP
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_5_ENTREVISTA.ps1    # requiere migrations/016; arma su propio banco de preguntas
 ```
 La Fase 4 usa también el contenedor `Entrevista_Redis`, no llama a las APIs de empleo ni publica versiones del EULA,
 y la sección de compras de Google Play necesita `GOOGLE_PLAY_BILLING_MOCK=true`. `-ConLimites` deja la IP sin poder
@@ -241,6 +242,30 @@ Fuentes en orden: JSearch → Remotive → Arbeitnow → dataset de contingencia
 
 ---
 
+### 13. Simulación de entrevista (`/api/v1/entrevistas`)
+| Método | Ruta | Auth | Descripción | Body (JSON) |
+|---|---|---|---|---|
+| `POST` | `/api/v1/entrevistas` | `Bearer JWT` | Inicia una entrevista (8 preguntas por defecto, 3–15). Sin cargo usa el objetivo del onboarding; sin nivel, el del perfil. | `{"cargoId"? \| "cargo"?, "nivel"?, "cantidadPreguntas"?}` |
+| `GET` | `/api/v1/entrevistas` | `Bearer JWT` | Historial paginado (`?pagina`, `?tamano`). | - |
+| `GET` | `/api/v1/entrevistas/actual` | `Bearer JWT` | Entrevista en curso (`204` si no hay). | - |
+| `GET` | `/api/v1/entrevistas/{id}` | `Bearer JWT` | Detalle con preguntas y respuestas; la corrección solo se muestra al terminar. | - |
+| `GET` | `/api/v1/entrevistas/{id}/siguiente` | `Bearer JWT` | Primera pregunta sin responder (`204` si no quedan). | - |
+| `POST` | `/api/v1/entrevistas/{id}/respuestas` | `Bearer JWT` | Responde una pregunta (una sola vez). | `{"preguntaSesionId", "texto"? \| "opcionId"? \| "videoClipUrl"?}` |
+| `POST` | `/api/v1/entrevistas/{id}/metricas` | `Bearer JWT` | Lote de métricas de video (1–300, puntajes 0–100). | `{"metricas": [{"timestampMs", "contactoVisual"?, "postura"?, "confianza"?, "gestos"?, "expresion"?}]}` |
+| `POST` | `/api/v1/entrevistas/{id}/finalizar` | `Bearer JWT` | Cierra la entrevista (al menos 1 respuesta) y lanza el reporte en segundo plano. | - |
+| `POST` | `/api/v1/entrevistas/{id}/cancelar` | `Bearer JWT` | Cancela la entrevista en curso. | - |
+
+- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.
+- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; evita repetir las de las últimas 3 entrevistas.
+- Cada pregunta guarda un snapshot (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.
+- Las entrevistas de otro usuario responden `404`.
+
+**App Android (`/api/prueba-practica`, mismo servicio por debajo):** `POST /front` con `tipoPrueba` `ENT` crea la entrevista con el JSON
+de siempre; `POST /{pruebaId}/respuestas` guarda todas las respuestas y la finaliza. La opción múltiple se corrige al instante;
+las respuestas abiertas quedan para el reporte de feedback (Fase 7). Los tipos `PR`, `NV` y `BL` llegan en la Fase 6.
+
+---
+
 ## ⚙️ Variables de entorno de integraciones
 | Variable | Uso |
 |---|---|
@@ -250,7 +275,7 @@ Fuentes en orden: JSearch → Remotive → Arbeitnow → dataset de contingencia
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` y `migrations/015` sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014`, `015` y `016` (idempotentes) sobre una BD existente:
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
 ```

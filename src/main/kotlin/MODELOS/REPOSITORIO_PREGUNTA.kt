@@ -8,6 +8,8 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -24,6 +26,9 @@ interface RepositorioPregunta {
 
     /** Preguntas al azar que cumplen el filtro (para servirlas a usuarios). */
     suspend fun listarAlAzar(filtro: FiltroPreguntas, cantidad: Int): List<Pregunta>
+
+    /** Preguntas APROBADAS al azar según el criterio (para armar una sesión de entrevista). */
+    suspend fun seleccionarAprobadas(criterio: CriterioSeleccionPreguntas, cantidad: Int): List<Pregunta>
 
     /** Reemplaza enunciado, rúbrica y opciones; la pregunta vuelve a revisión. false si no existe. */
     suspend fun reemplazarContenido(id: UUID, contenido: ContenidoPregunta): Boolean
@@ -55,6 +60,26 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
 
     override suspend fun listarAlAzar(filtro: FiltroPreguntas, cantidad: Int): List<Pregunta> = transaccion {
         conOpciones(consulta(filtro).orderBy(Random()).limit(cantidad).toList())
+    }
+
+    override suspend fun seleccionarAprobadas(criterio: CriterioSeleccionPreguntas, cantidad: Int): List<Pregunta> = transaccion {
+        if (cantidad <= 0) return@transaccion emptyList()
+        val condiciones = listOfNotNull(
+            TablaPregunta.estado eq EstadoPregunta.APROBADA.valorBd,
+            TablaPregunta.nivelDificultad eq criterio.nivel.valorBd,
+            TablaPregunta.categoriaHabilidad eq criterio.categoria.valorBd,
+            criterio.cargoId?.let { TablaPregunta.cargoId eq it },
+            criterio.skillIds.takeIf { it.isNotEmpty() }?.let { TablaPregunta.skillId inList it },
+            if (criterio.soloSinCargo) TablaPregunta.cargoId.isNull() else null,
+            if (criterio.soloSinSkill) TablaPregunta.skillId.isNull() else null,
+            criterio.excluir.takeIf { it.isNotEmpty() }?.let { TablaPregunta.preguntaId notInList it }
+        )
+        val filas = TablaPregunta.selectAll()
+            .where { condiciones.reduce<Op<Boolean>, Op<Boolean>> { a, b -> a and b } }
+            .orderBy(Random())
+            .limit(cantidad)
+            .toList()
+        conOpciones(filas)
     }
 
     override suspend fun reemplazarContenido(id: UUID, contenido: ContenidoPregunta): Boolean = transaccion {

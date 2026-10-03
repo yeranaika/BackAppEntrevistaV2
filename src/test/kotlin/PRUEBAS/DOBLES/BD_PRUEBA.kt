@@ -8,6 +8,8 @@ import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorMercado
 import CONTROLADORES.controladorRecordatorio
+import CONTROLADORES.controladorEntrevista
+import CONTROLADORES.controladorPruebaPractica
 import CONTROLADORES.controladorSalud
 import CONTROLADORES.controladorSuscripcion
 import CONTROLADORES.controladorContrasena
@@ -66,6 +68,13 @@ import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import com.auth0.jwt.JWT
+import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioSesionEntrevistaExposed
+import MODELOS.TablaMetricaVideo
+import MODELOS.TablaSesionEntrevista
+import MODELOS.TablaSesionPreguntaRespuesta
+import SERVICIOS.SelectorPreguntasEntrevista
+import SERVICIOS.ServicioEntrevista
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondError
@@ -104,7 +113,8 @@ object BdPrueba {
             listOf(
                 TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena,
                 TablaCargo, TablaSkill, TablaSkillTendencia, TablaCargoSkill, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa,
-                TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion
+                TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion,
+                TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo
             )
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
@@ -123,7 +133,9 @@ class SistemaPrueba(
     /** Por defecto holgados para que las pruebas no choquen con el límite; se bajan para probarlo. */
     private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000),
     val clienteMercado: ClienteMercadoLaboralFalso = ClienteMercadoLaboralFalso(emptyMap()),
-    val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso()
+    val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso(),
+    val procesadorEntrevista: ProcesadorEntrevistaGrabador = ProcesadorEntrevistaGrabador(),
+    val reloj: RelojAjustable = RelojAjustable()
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -162,6 +174,20 @@ class SistemaPrueba(
     val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
     val suscripciones = RepositorioSuscripcionExposed()
     val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras)
+
+    val sesionesEntrevista = RepositorioSesionEntrevistaExposed()
+    val metricasVideo = RepositorioMetricaVideoExposed()
+    val entrevista = ServicioEntrevista(
+        sesiones = sesionesEntrevista,
+        metricas = metricasVideo,
+        selector = SelectorPreguntasEntrevista(preguntas, mercadoRepo),
+        mercado = mercadoRepo,
+        perfiles = perfiles,
+        objetivos = objetivos,
+        procesador = procesadorEntrevista,
+        tareasSegundoPlano = CoroutineScope(Dispatchers.Unconfined),
+        reloj = reloj
+    )
 
     /** Inserta un cargo y una skill en el catálogo y devuelve sus ids. */
     fun crearCatalogo(nombreCargo: String = "Backend Developer", nombreSkill: String = "Kotlin"): Pair<UUID, UUID> {
@@ -213,6 +239,8 @@ class SistemaPrueba(
             controladorRecordatorio(recordatorio)
             controladorSuscripcion(suscripcion)
             controladorSalud()
+            controladorEntrevista(entrevista)
+            controladorPruebaPractica(entrevista)
         }
     }
 }

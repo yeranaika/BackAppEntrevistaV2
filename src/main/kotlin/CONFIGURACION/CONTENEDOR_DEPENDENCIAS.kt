@@ -48,6 +48,11 @@ import SERVICIOS.ServicioSuscripcion
 import SERVICIOS.ServicioTendenciasSkill
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
+import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioSesionEntrevistaExposed
+import SERVICIOS.ProcesadorEntrevistaSinReporte
+import SERVICIOS.SelectorPreguntasEntrevista
+import SERVICIOS.ServicioEntrevista
 import SERVICIOS.TareaSincronizacionMercado
 import data.repository.sync.SyncRepository
 import kotlinx.coroutines.CoroutineScope
@@ -152,6 +157,17 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val servicioRecordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
 
     val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras)
+
+    val servicioEntrevista = ServicioEntrevista(
+        sesiones = RepositorioSesionEntrevistaExposed(),
+        metricas = RepositorioMetricaVideoExposed(),
+        selector = SelectorPreguntasEntrevista(repositorioPregunta, repositorioMercado),
+        mercado = repositorioMercado,
+        perfiles = repositorioPerfil,
+        objetivos = repositorioObjetivo,
+        procesador = ProcesadorEntrevistaSinReporte(),
+        tareasSegundoPlano = tareasSegundoPlano
+    )
 
     private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)
 

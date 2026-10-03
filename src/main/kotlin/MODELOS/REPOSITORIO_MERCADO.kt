@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.max
+import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
@@ -16,6 +17,7 @@ import java.util.UUID
 interface LectorMercado {
     suspend fun listarCargosActivos(): List<Cargo>
     suspend fun buscarCargo(id: UUID): Cargo?
+    /** Sin distinguir mayúsculas ni espacios en los extremos. */
     suspend fun buscarCargoPorNombre(nombre: String): Cargo?
     suspend fun listarRequisitos(cargoId: UUID): List<RequisitoCargo>
     suspend fun listarSkillsActivas(): List<Skill>
@@ -59,7 +61,7 @@ class RepositorioMercadoExposed : LectorMercado, EscritorMercado {
     }
 
     override suspend fun buscarCargoPorNombre(nombre: String): Cargo? = transaccion {
-        TablaCargo.selectAll().where { TablaCargo.nombre eq nombre }.limit(1).firstOrNull()?.aCargo()
+        TablaCargo.selectAll().where { TablaCargo.nombre.lowerCase() eq nombre.trim().lowercase() }.limit(1).firstOrNull()?.aCargo()
     }
 
     override suspend fun listarRequisitos(cargoId: UUID): List<RequisitoCargo> = transaccion {

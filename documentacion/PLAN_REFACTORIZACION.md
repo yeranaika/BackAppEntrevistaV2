@@ -207,8 +207,27 @@ Resultado (`INTEGRACIONES/`):
 - Unificar `/market/cargos` y `/api/v1/cargos` (hoy duplicados con y sin cache).
 - Pruebas con dobles: proveedor caído, timeout, respuesta mal formada.
 
-## Fase 5 — Creación de entrevista (Flujo 3: simulación)
-**Hoy:** las tablas existen (`sesion_entrevista`, `sesion_pregunta_respuesta`, `metrica_video`) pero **no hay código**.
+## Fase 5 — Creación de entrevista (Flujo 3: simulación) ✅ (rama `refactor/fase-5-entrevista`)
+**Estado:** completada. 211 pruebas en verde + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_5_ENTREVISTA.ps1` (50/50) contra Postgres real;
+regresión E2E de las fases 1–4 en verde. Migración `016` aplicada a la BD local.
+
+Hecho:
+- `/api/v1/entrevistas` (iniciar, historial, actual, detalle, siguiente, responder, métricas en lote, finalizar, cancelar) y el adaptador
+  `/api/prueba-practica/front` + `/{id}/respuestas` para la pantalla de entrevista de Android (ENT/MIX/SIM), sobre el mismo `ServicioEntrevista`.
+- `SelectorPreguntasEntrevista`: 60 % técnicas / 40 % blandas, cargo → skills del cargo → generales, sin repetir las últimas 3 sesiones.
+- Snapshot completo por pregunta (migración `016`: tipo, categoría, skill, opciones, opción elegida, fecha de respuesta).
+- Una sola sesión en curso: bloqueo del usuario en la transacción + índice único parcial; abandonadas > 2 h se cancelan solas.
+- Respuestas todo-o-nada con bloqueo de la sesión; opción múltiple corregida al instante; corrección oculta hasta finalizar.
+- `ProcesadorEntrevistaFinalizada` (en segundo plano al finalizar): por ahora solo registra; la Fase 7 genera el reporte.
+- La búsqueda de cargo por nombre ya no distingue mayúsculas (Android envía `metaCargo` escrito por el usuario).
+
+Decisiones:
+- La app Android no graba audio ni video: las preguntas `simulacion_video` se le muestran como abiertas de texto.
+- Un cargo fuera del catálogo se puede practicar: usa preguntas técnicas de cualquier skill sin cargo asignado (el banco no admite
+  preguntas sin cargo ni skill, así que no existen técnicas "generales" puras).
+- El puntaje que muestra la app es "correctas / preguntas de alternativas"; las abiertas se evalúan en la Fase 7.
+
+Plan original:
 
 Resultado:
 - `CONTROLADOR_ENTREVISTA`: iniciar sesión (cargo + nivel), obtener siguiente pregunta, enviar respuesta (transcripción / URL del clip), enviar métricas de video en lote, finalizar o cancelar.

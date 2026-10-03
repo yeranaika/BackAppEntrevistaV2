@@ -628,7 +628,8 @@ CREATE TABLE IF NOT EXISTS sesion_entrevista (
 CREATE INDEX IF NOT EXISTS idx_sesion_usuario
     ON sesion_entrevista(usuario_id, estado, fecha_inicio DESC)
     INCLUDE (sesion_id, cargo_objetivo, nivel_dificultad, cargo_id);
-CREATE INDEX IF NOT EXISTS idx_sesion_activa
+-- Un usuario tiene como máximo una sesión en progreso
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sesion_activa_unica
     ON sesion_entrevista(usuario_id) WHERE estado = 'en_progreso';
 
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -651,9 +652,19 @@ CREATE TABLE IF NOT EXISTS sesion_pregunta_respuesta (
     feedback_ia_blando   JSONB,
     -- Puntaje combinado de esta respuesta (0-100)
     puntaje_respuesta    NUMERIC(5,2),
-    orden                SMALLINT  NOT NULL
+    orden                SMALLINT  NOT NULL,
+    -- Snapshot del tipo, categoría, skill y opciones: editar el banco no cambia una sesión rendida
+    tipo_pregunta        VARCHAR(20),
+    categoria_habilidad  VARCHAR(10),
+    skill_id             UUID      REFERENCES skill(skill_id) ON DELETE SET NULL,
+    -- [{ "id": "...", "texto": "...", "es_correcta": true }]
+    opciones_snap        JSONB,
+    -- Sin FK: apunta al snapshot
+    opcion_elegida_id    UUID,
+    -- NULL = todavía sin responder
+    fecha_respuesta      TIMESTAMPTZ
 );
-CREATE INDEX IF NOT EXISTS idx_spr_sesion
+CREATE UNIQUE INDEX IF NOT EXISTS idx_spr_sesion_orden
     ON sesion_pregunta_respuesta(sesion_id, orden);
 
 -- ──────────────────────────────────────────────────────────────────────────────

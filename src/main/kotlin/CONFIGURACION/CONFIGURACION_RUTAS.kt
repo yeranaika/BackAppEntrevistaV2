@@ -3,10 +3,12 @@ package CONFIGURACION
 import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorContrasena
+import CONTROLADORES.controladorEntrevista
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorMercado
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorPruebaPractica
 import CONTROLADORES.controladorRecordatorio
 import CONTROLADORES.controladorSalud
 import CONTROLADORES.controladorSuscripcion
@@ -35,6 +37,10 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
 
         // Mercado laboral: cargos, skills y tendencias
         controladorMercado(d.servicioMercado, d.servicioTendencias)
+
+        // Simulación de entrevista (API por sesión y contrato de la app Android)
+        controladorEntrevista(d.servicioEntrevista)
+        controladorPruebaPractica(d.servicioEntrevista)
 
         // Pendiente de migrar con la práctica (Fase 6)
         syncRoutes(d.repositorioSincronizacion)
