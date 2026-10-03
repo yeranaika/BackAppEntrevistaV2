@@ -1,0 +1,3623 @@
+{
+  "info": {
+    "_postman_id": "21e1fcd6-d4b7-574e-8369-e04dc06f3424",
+    "name": "EntrevistaAPP API",
+    "description": "API del backend de EntrevistaAPP. Documentación completa: documentacion/API.md (generada junto con esta colección).\n\n1. Importar también el entorno `EntrevistaAPP_local.postman_environment.json` (o cambiar `baseUrl`).\n2. Ejecutar **Registrar usuario** o **Login**: los tokens se guardan solos.\n3. Para lo de admin, **Login admin** con una cuenta de rol admin.\nLas carpetas están en el orden del flujo: cada request guarda los ids que usa la siguiente.\n⚠️ = cuesta dinero, consume cuota de APIs externas, manda correos o borra datos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "correo",
+      "value": "usuario.prueba@ejemplo.com"
+    },
+    {
+      "key": "contrasena",
+      "value": "Clave-segura-1"
+    },
+    {
+      "key": "correoAdmin",
+      "value": "admin@ejemplo.com"
+    },
+    {
+      "key": "contrasenaAdmin",
+      "value": "Clave-segura-1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": ""
+    },
+    {
+      "key": "cargoId",
+      "value": ""
+    },
+    {
+      "key": "nombreCargo",
+      "value": ""
+    },
+    {
+      "key": "skillId",
+      "value": ""
+    },
+    {
+      "key": "preguntaId",
+      "value": ""
+    },
+    {
+      "key": "sesionId",
+      "value": ""
+    },
+    {
+      "key": "preguntaSesionId",
+      "value": ""
+    },
+    {
+      "key": "opcionId",
+      "value": ""
+    },
+    {
+      "key": "practicaId",
+      "value": ""
+    },
+    {
+      "key": "preguntaPracticaId",
+      "value": ""
+    },
+    {
+      "key": "opcionPracticaId",
+      "value": ""
+    },
+    {
+      "key": "intentoId",
+      "value": ""
+    },
+    {
+      "key": "preguntaNivelacionId",
+      "value": ""
+    },
+    {
+      "key": "opcionNivelacionId",
+      "value": ""
+    },
+    {
+      "key": "testNivelacionId",
+      "value": ""
+    },
+    {
+      "key": "pruebaId",
+      "value": ""
+    },
+    {
+      "key": "preguntaAppId",
+      "value": ""
+    },
+    {
+      "key": "opcionAppId",
+      "value": ""
+    },
+    {
+      "key": "versionConsentimiento",
+      "value": ""
+    },
+    {
+      "key": "codigoPremium",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 · Sistema",
+      "description": "Estado del servicio.",
+      "item": [
+        {
+          "name": "Salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Responde `OK` si la base de datos responde y `503 db_no_disponible` si no. Lo usa el supervisor / balanceador.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 · Autenticación",
+      "description": "Registro, login con correo o Google, rotación y cierre de sesión. Los requests de login guardan `accessToken` y `refreshToken` automáticamente.",
+      "item": [
+        {
+          "name": "Registrar usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Crea la cuenta (contraseña Argon2id, mínimo 8 caracteres) y devuelve tokens.\nErrores con el formato antiguo que lee Android: `409 {\"error\":\"email_in_use\"}`, `422 {\"error\":\"invalid_country\"|\"invalid_birthdate\"}`.\nLímite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{correo}}\",\n  \"password\": \"{{contrasena}}\",\n  \"nombre\": \"Usuario Prueba\",\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"backend\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).\n`401 bad_credentials`; tras 5 contraseñas incorrectas el correo queda bloqueado 15 min → `429 demasiados_intentos`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{correo}}\",\n  \"password\": \"{{contrasena}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Igual que Login, pero guarda el token en `adminToken`. La cuenta debe tener rol `admin` (se asigna desde Administración de usuarios o en la BD).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{correoAdmin}}\",\n  \"password\": \"{{contrasenaAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"adminToken\", j.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rota el refresh token (el anterior deja de servir). Reusar uno ya rotado revoca todas las sesiones del usuario → `401`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", j.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login con Google (Android)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google"
+              ]
+            },
+            "description": "Recibe el `idToken` que obtiene la app con Google Sign-In y devuelve los tokens de la API.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"<id token de Google>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login con Google (web)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/google/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google",
+                "start"
+              ]
+            },
+            "description": "Redirige al consentimiento de Google; al volver (`/auth/google/callback`) entrega los tokens. Abrir en el navegador, no en Postman.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Contraseña",
+      "description": "Recuperación por código enviado al correo y cambio desde el perfil.",
+      "item": [
+        {
+          "name": "Olvidé mi contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "⚠️ Envía un correo real. Responde lo mismo exista o no la cuenta. Límite: 5 cada 15 min por IP.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Restablecer con código",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Valida el código de 6 dígitos (15 min, intentos limitados) y cambia la contraseña; cierra las demás sesiones.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"codigo\": \"123456\",\n  \"nuevaContrasena\": \"Otra-clave-segura-2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cambiar contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasenaActual\": \"{{contrasena}}\",\n  \"nuevaContrasena\": \"{{contrasena}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Cuenta y perfil",
+      "description": "",
+      "item": [
+        {
+          "name": "Mi cuenta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Cuenta + perfil + cargo meta. Guarda `usuarioId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"usuarioId\", j.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar cuenta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Prueba\",\n  \"idioma\": \"es\",\n  \"telefono\": \"+56912345678\",\n  \"fechaNacimiento\": \"1998-05-20\",\n  \"genero\": \"otro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mi perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me/perfil",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "perfil"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Actualizar perfil",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/perfil",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "perfil"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"backend\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Conseguir mi primer trabajo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar mi cuenta",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cuenta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cuenta"
+              ]
+            },
+            "description": "⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{\"confirmar\": \"eliminar\"}`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmar\": \"eliminar\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Onboarding y objetivo",
+      "description": "",
+      "item": [
+        {
+          "name": "Onboarding (Android)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/perfil/objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfil",
+                "objetivo"
+              ]
+            },
+            "description": "Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": \"backend\",\n  \"metaCargo\": \"Backend Developer\",\n  \"nivel\": \"jr\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": \"backend\",\n  \"nivelExperiencia\": \"junior\",\n  \"nombreCargo\": \"Backend Developer\",\n  \"descripcionObjetivo\": \"Primer empleo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ver onboarding",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Estado del onboarding",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mi objetivo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me/objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "objetivo"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Cambiar objetivo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "objetivo"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCargo\": \"Backend Developer\",\n  \"sector\": \"tecnologia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Borrar objetivo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me/objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "objetivo"
+              ]
+            },
+            "description": "Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Consentimientos y documentos legales",
+      "description": "",
+      "item": [
+        {
+          "name": "Texto vigente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consent/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consent",
+                "current"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"versionConsentimiento\", j.version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aceptar consentimiento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/consent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consent"
+              ]
+            },
+            "description": "`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"{{versionConsentimiento}}\",\n  \"alcances\": {\n    \"uso_datos\": true,\n    \"ia_entrenamiento\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mi consentimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me/consent/latest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consent",
+                "latest"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Revocar consentimiento",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me/consent/revoke",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consent",
+                "revoke"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "EULA vigente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/legal/eula",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "legal",
+                "eula"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Versiones del EULA",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/legal/versions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "legal",
+                "versions"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Términos de servicio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/legal/terms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "legal",
+                "terms"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Política de privacidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/legal/privacy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "legal",
+                "privacy"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Publicar versión del EULA (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/legal/admin/eula",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "legal",
+                "admin",
+                "eula"
+              ]
+            },
+            "description": "⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"2.0.0\",\n  \"title\": \"EULA\",\n  \"body\": \"Texto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · Recordatorios",
+      "description": "",
+      "item": [
+        {
+          "name": "Guardar preferencias",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recordatorios/preferencias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recordatorios",
+                "preferencias"
+              ]
+            },
+            "description": "Días `LUN..DOM` (también acepta nombres completos), hora `HH:mm`, `tipoPractica` hasta 32 caracteres.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diasSemana\": [\n    \"LUN\",\n    \"MIE\",\n    \"VIE\"\n  ],\n  \"hora\": \"20:30\",\n  \"tipoPractica\": \"entrevista\",\n  \"habilitado\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ver preferencias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recordatorios/preferencias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recordatorios",
+                "preferencias"
+              ]
+            },
+            "description": "`404 recordatorio_no_configurado` si nunca se guardaron."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · Suscripción (billing)",
+      "description": "JSON en snake_case (contrato de Android).",
+      "item": [
+        {
+          "name": "Estado de la suscripción",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/billing/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Crear código premium (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/admin/codes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "admin",
+                "codes"
+              ]
+            },
+            "description": "`license_type`: PROM, INST o GOOG.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"days\": 30,\n  \"label\": \"postman\",\n  \"max_uses\": 1,\n  \"license_type\": \"PROM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"codigoPremium\", j.code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Canjear código",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/code/redeem",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "code",
+                "redeem"
+              ]
+            },
+            "description": "Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{codigoPremium}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Verificar compra de Google Play",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/google/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "google",
+                "verify"
+              ]
+            },
+            "description": "Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"premium_mensual\",\n  \"purchase_token\": \"<token de Google Play>\",\n  \"purchase_time\": 1735689600000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 · Mercado laboral",
+      "description": "Catálogo público de cargos y skills (caché Redis: cargos 6 h, matriz 12 h; crear un cargo invalida la caché). Las tendencias se sincronizan solas cada 7 días desde JSearch → Remotive → Arbeitnow → dataset de contingencia. La administración es solo para admin.",
+      "item": [
+        {
+          "name": "Crear cargo (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/market/cargos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "market",
+                "cargos"
+              ]
+            },
+            "description": "Con `autoGenerateSkills: true` arma los requisitos desde las APIs de empleo (⚠️ consume cuota).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cargo Postman {{$timestamp}}\",\n  \"area\": \"backend\",\n  \"descripcion\": \"Creado desde Postman\",\n  \"nivelBase\": \"junior\",\n  \"autoGenerateSkills\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"cargoId\", j.cargo.cargoId);",
+                  "    pm.collectionVariables.set(\"nombreCargo\", j.cargo.nombre);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cargos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cargos"
+              ]
+            },
+            "description": "Alias antiguo: `GET /market/cargos`.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Matriz de skills del cargo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cargos/{{cargoId}}/skills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cargos",
+                "{{cargoId}}",
+                "skills"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Skills en tendencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/skills/trending?categoria=tecnica&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "skills",
+                "trending"
+              ],
+              "query": [
+                {
+                  "key": "categoria",
+                  "value": "tecnica"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Skills por demanda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/market/skills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "market",
+                "skills"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"skillId\", j.length ? j[0].skillId : '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de una skill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/market/skills/{{skillId}}/tendencias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "market",
+                "skills",
+                "{{skillId}}",
+                "tendencias"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Sincronizar tendencias (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/market/sync-trends",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "market",
+                "sync-trends"
+              ]
+            },
+            "description": "⚠️ Llama a las APIs de empleo (consume cuota). Corre sola cada 7 días.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Regenerar requisitos de un cargo (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/market/cargos/{{cargoId}}/generate-requirements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "market",
+                "cargos",
+                "{{cargoId}}",
+                "generate-requirements"
+              ]
+            },
+            "description": "⚠️ Consume cuota de las APIs de empleo. `POST /admin/market/cargos/generate-all` hace lo mismo con todos.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Regenerar requisitos de todos los cargos (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/market/cargos/generate-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "market",
+                "cargos",
+                "generate-all"
+              ]
+            },
+            "description": "⚠️ Consume cuota de las APIs de empleo por cada cargo.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 · Banco de preguntas",
+      "description": "Administración (solo admin) y lectura para usuarios.",
+      "item": [
+        {
+          "name": "Crear pregunta de alternativas (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas"
+              ]
+            },
+            "description": "Nace aprobada. Opción múltiple: 2 a 6 opciones y exactamente una correcta. Requiere `cargoId` o `skillId`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"opcion_multiple\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"¿Qué hace la palabra clave suspend en Kotlin? {{$timestamp}}\",\n  \"opciones\": [\n    {\n      \"texto\": \"Permite suspender sin bloquear el hilo\",\n      \"esCorrecta\": true,\n      \"explicacion\": \"Las corrutinas se suspenden sin bloquear\"\n    },\n    {\n      \"texto\": \"Crea un hilo nuevo\"\n    },\n    {\n      \"texto\": \"Bloquea el hilo actual\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"preguntaId\", j.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear otra pregunta de alternativas (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"opcion_multiple\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"¿Qué diferencia a val de var? {{$timestamp}}\",\n  \"opciones\": [\n    {\n      \"texto\": \"val no se puede reasignar\",\n      \"esCorrecta\": true\n    },\n    {\n      \"texto\": \"No hay diferencia\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear pregunta abierta (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas"
+              ]
+            },
+            "description": "Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Explica qué es una corrutina {{$timestamp}}\",\n  \"respuestaIdeal\": \"Una corrutina se suspende sin bloquear el hilo y se reanuda después.\",\n  \"rubrica\": {\n    \"criterios\": [\n      \"explica_suspension\"\n    ],\n    \"palabras_clave\": [\n      \"corrutina\",\n      \"hilo\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear pregunta de comportamiento (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"blanda\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Cuéntame de un conflicto en tu equipo {{$timestamp}}\",\n  \"respuestaIdeal\": \"Situación, tarea, acción y resultado del conflicto.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar preguntas (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas?estado=aprobada&cargoId={{cargoId}}&pagina=1&tamano=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "aprobada"
+                },
+                {
+                  "key": "cargoId",
+                  "value": "{{cargoId}}"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "tamano",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver pregunta (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Aprobar pregunta (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}/aprobar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}",
+                "aprobar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Editar pregunta (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}"
+              ]
+            },
+            "description": "Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"opcion_multiple\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"¿Para qué sirve suspend en Kotlin?\",\n  \"opciones\": [\n    {\n      \"texto\": \"Suspender sin bloquear el hilo\",\n      \"esCorrecta\": true\n    },\n    {\n      \"texto\": \"Crear un hilo\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Borrar pregunta (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}"
+              ]
+            },
+            "description": "Solo si nunca se usó en una prueba; si no, conviene rechazarla.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rechazar pregunta (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}/rechazar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}",
+                "rechazar"
+              ]
+            },
+            "description": "Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita (vuelve a pendiente) y `DELETE` borra si nunca se usó.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Muy fácil\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Generar preguntas con IA (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/generar-ia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "generar-ia"
+              ]
+            },
+            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargo_id\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidad\": 2,\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"modelo\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preguntas para usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/preguntas?cargoId={{cargoId}}&cantidad=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "preguntas"
+              ],
+              "query": [
+                {
+                  "key": "cargoId",
+                  "value": "{{cargoId}}"
+                },
+                {
+                  "key": "cantidad",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Solo aprobadas y sin la solución."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 · Entrevista",
+      "description": "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.",
+      "item": [
+        {
+          "name": "Iniciar entrevista",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas"
+              ]
+            },
+            "description": "Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidadPreguntas\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"sesionId\", j.sesionId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Entrevista en curso",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/actual",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "actual"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Siguiente pregunta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/siguiente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "siguiente"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"preguntaSesionId\", j.preguntaSesionId);",
+                  "    pm.collectionVariables.set(\"opcionId\", (j.opciones && j.opciones.length) ? j.opciones[0].opcionId : '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Responder pregunta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/respuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "respuestas"
+              ]
+            },
+            "description": "En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preguntaSesionId\": \"{{preguntaSesionId}}\",\n  \"opcionId\": \"{{opcionId}}\",\n  \"texto\": \"Una corrutina se suspende sin bloquear el hilo.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Enviar métricas de video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/metricas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "metricas"
+              ]
+            },
+            "description": "Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"metricas\": [\n    {\n      \"timestampMs\": 0,\n      \"contactoVisual\": 80.5,\n      \"postura\": 70,\n      \"confianza\": 65,\n      \"expresion\": \"seguro\"\n    },\n    {\n      \"timestampMs\": 500,\n      \"contactoVisual\": 78,\n      \"postura\": 72,\n      \"confianza\": 66,\n      \"gestos\": {\n        \"toca_cara\": false\n      },\n      \"expresion\": \"neutral\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Detalle de la entrevista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}"
+              ]
+            },
+            "description": "La corrección se muestra recién al terminar."
+          }
+        },
+        {
+          "name": "Finalizar entrevista",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/finalizar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "finalizar"
+              ]
+            },
+            "description": "Requiere al menos una respuesta. Lanza en segundo plano el reporte de feedback."
+          }
+        },
+        {
+          "name": "Historial de entrevistas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas?pagina=1&tamano=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "tamano",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Cancelar entrevista",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "cancelar"
+              ]
+            },
+            "description": "Solo una entrevista en curso (`409 entrevista_no_activa` si ya terminó)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 · Feedback",
+      "description": "Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.\n\n- **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.\n- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si la IA falla se usa el freemium: el reporte siempre sale.\n- Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.",
+      "item": [
+        {
+          "name": "Reporte de la entrevista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/reporte",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "reporte"
+              ]
+            },
+            "description": "`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar."
+          }
+        },
+        {
+          "name": "Reintentar reporte",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/entrevistas/{{sesionId}}/reporte/reintentar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entrevistas",
+                "{{sesionId}}",
+                "reporte",
+                "reintentar"
+              ]
+            },
+            "description": "Solo si terminó con error (hasta 3 intentos). `409 reporte_no_reintentable`."
+          }
+        },
+        {
+          "name": "Mis reportes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reportes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reportes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mi progreso por skill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "progreso"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 · Práctica",
+      "description": "Rondas de preguntas escritas (sin video) con feedback inmediato.\n\n- Alternativas: se corrigen contra la opción correcta y devuelven su explicación. Abiertas: motor freemium; cuentan como correctas desde 60 puntos.\n- Una práctica en curso a la vez: empezar otra abandona la anterior.\n- Suma puntaje a cada skill en el progreso, pero no cambia su nivel (eso lo decide la nivelación).",
+      "item": [
+        {
+          "name": "Iniciar práctica",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practicas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practicas"
+              ]
+            },
+            "description": "Con `skillId` practica esa skill; si no, el cargo. `modo`: opcion_multiple | abierta_texto | mixto. Empezar otra abandona la anterior.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"modo\": \"mixto\",\n  \"nivel\": \"junior\",\n  \"cantidadPreguntas\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"practicaId\", j.sesionId);",
+                  "    pm.collectionVariables.set(\"preguntaPracticaId\", j.preguntas[0].preguntaId);",
+                  "    pm.collectionVariables.set(\"opcionPracticaId\", (j.preguntas[0].opciones && j.preguntas[0].opciones.length) ? j.preguntas[0].opciones[0].opcionId : '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Responder (feedback inmediato)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practicas/{{practicaId}}/respuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practicas",
+                "{{practicaId}}",
+                "respuestas"
+              ]
+            },
+            "description": "Devuelve si es correcta, el puntaje (0-100), la opción correcta, la respuesta ideal y el feedback.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preguntaId\": \"{{preguntaPracticaId}}\",\n  \"opcionId\": \"{{opcionPracticaId}}\",\n  \"texto\": \"Una corrutina se suspende sin bloquear el hilo.\",\n  \"tiempoRespuestaMs\": 4000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Detalle de la práctica",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practicas/{{practicaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practicas",
+                "{{practicaId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Finalizar práctica",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practicas/{{practicaId}}/finalizar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practicas",
+                "{{practicaId}}",
+                "finalizar"
+              ]
+            },
+            "description": "Promedio de lo respondido; suma puntaje a cada skill."
+          }
+        },
+        {
+          "name": "Mis prácticas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practicas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practicas"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Historial de todas las pruebas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pruebas/historial",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pruebas",
+                "historial"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sincronizar intentos offline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sync/attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sync",
+                "attempts"
+              ]
+            },
+            "description": "Idempotente por `localAttemptId`. Requiere un `skillId` existente (si no hay skills, `400 skill_no_encontrada`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attempts\": [\n    {\n      \"localAttemptId\": \"local-{{$timestamp}}\",\n      \"skillId\": \"{{skillId}}\",\n      \"modo\": \"abierta_texto\",\n      \"categoria\": \"tecnica\",\n      \"nivelPreguntas\": \"junior\",\n      \"fechaCreacionIso\": \"2026-01-15T10:00:00Z\",\n      \"respuestas\": [\n        {\n          \"preguntaId\": \"pregunta-offline-1\",\n          \"enunciado\": \"¿Qué es Kotlin?\",\n          \"respuestaTexto\": \"Un lenguaje\",\n          \"esCorrecta\": true,\n          \"puntaje\": 8,\n          \"orden\": 1\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Evaluar texto (freemium)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/evaluate-freemium",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "evaluate-freemium"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userText\": \"Un deadlock bloquea procesos\",\n  \"idealText\": \"Un deadlock bloquea procesos que esperan recursos\",\n  \"expectedKeywords\": [\n    \"deadlock\",\n    \"recursos\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 · Nivelación",
+      "description": "Test para saber el nivel actual y las brechas contra el cargo.\n\n- **Nivel**: se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida.\n- **Brecha**: por cada skill evaluada contra el nivel que pide el cargo; prioridad alta si faltan 2 niveles o la skill es obligatoria.\n- No cambia el nivel del perfil: se informa como nivel sugerido.",
+      "item": [
+        {
+          "name": "Iniciar nivelación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nivelacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nivelacion"
+              ]
+            },
+            "description": "Usa el test del admin para el cargo o 3 técnicas por nivel desde el banco. `409 preguntas_insuficientes`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"intentoId\", j.intentoId);",
+                  "    pm.collectionVariables.set(\"preguntaNivelacionId\", j.preguntas[0].preguntaId);",
+                  "    pm.collectionVariables.set(\"opcionNivelacionId\", (j.preguntas[0].opciones && j.preguntas[0].opciones.length) ? j.preguntas[0].opciones[0].opcionId : '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de la nivelación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nivelacion/{{intentoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nivelacion",
+                "{{intentoId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Rendir nivelación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nivelacion/{{intentoId}}/respuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nivelacion",
+                "{{intentoId}}",
+                "respuestas"
+              ]
+            },
+            "description": "Se rinde una sola vez. Las no respondidas cuentan 0. Devuelve nivel global, brechas y skills que cumple.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"respuestas\": [\n    {\n      \"preguntaId\": \"{{preguntaNivelacionId}}\",\n      \"opcionId\": \"{{opcionNivelacionId}}\",\n      \"texto\": \"Una corrutina se suspende sin bloquear el hilo.\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Último resultado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nivelacion/resultado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nivelacion",
+                "resultado"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mis niveles por skill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/niveles-skill",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "niveles-skill"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 · Tests de nivelación (admin)",
+      "description": "",
+      "item": [
+        {
+          "name": "Crear test de nivelación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/tests-nivelacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "tests-nivelacion"
+              ]
+            },
+            "description": "3 a 30 preguntas aprobadas, distintas y sin video (reemplaza los ids de ejemplo). `nivelObjetivo` por defecto `mixto`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Nivelación Postman {{$timestamp}}\",\n  \"cargoId\": \"{{cargoId}}\",\n  \"area\": \"backend\",\n  \"preguntasIds\": [\n    \"{{preguntaId}}\",\n    \"{{preguntaId}}\",\n    \"{{preguntaId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"testNivelacionId\", j.testId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar tests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/tests-nivelacion?activo=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "tests-nivelacion"
+              ],
+              "query": [
+                {
+                  "key": "activo",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/tests-nivelacion/{{testNivelacionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "tests-nivelacion",
+                "{{testNivelacionId}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Editar test",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/tests-nivelacion/{{testNivelacionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "tests-nivelacion",
+                "{{testNivelacionId}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Nivelación Postman (editada)\",\n  \"cargoId\": \"{{cargoId}}\",\n  \"area\": \"backend\",\n  \"nivelObjetivo\": \"mixto\",\n  \"preguntasIds\": [\n    \"<id de pregunta 1>\",\n    \"<id de pregunta 2>\",\n    \"<id de pregunta 3>\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar test",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/tests-nivelacion/{{testNivelacionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "tests-nivelacion",
+                "{{testNivelacionId}}"
+              ]
+            },
+            "description": "Baja lógica. `GET` y `PUT /api/v1/admin/tests-nivelacion/{id}` para ver y editar.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 · App Android (/api/prueba-practica)",
+      "description": "Contrato que ya usa la app: crea y rinde cada prueba de una vez.",
+      "item": [
+        {
+          "name": "Crear práctica (PR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-practica/front",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-practica",
+                "front"
+              ]
+            },
+            "description": "`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sector\": \"backend\",\n  \"nivel\": \"jr\",\n  \"metaCargo\": \"{{nombreCargo}}\",\n  \"tipoPrueba\": \"PR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"pruebaId\", j.pruebaId);",
+                  "    pm.collectionVariables.set(\"preguntaAppId\", j.preguntas[0].preguntaId);",
+                  "    pm.collectionVariables.set(\"opcionAppId\", (j.preguntas[0].configRespuesta.opciones || [{id: ''}])[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar respuestas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-practica/{{pruebaId}}/respuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-practica",
+                "{{pruebaId}}",
+                "respuestas"
+              ]
+            },
+            "description": "Acepta `respuestaTexto` (práctica, nivelación) y `respuestaAbierta` (entrevista). Las que vienen en blanco se omiten.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pruebaId\": \"{{pruebaId}}\",\n  \"respuestas\": [\n    {\n      \"preguntaId\": \"{{preguntaAppId}}\",\n      \"opcionesSeleccionadas\": [\n        \"{{opcionAppId}}\"\n      ],\n      \"respuestaTexto\": \"Mi respuesta\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Historial de intentos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/prueba-practica/intentos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prueba-practica",
+                "intentos"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 · Administración de usuarios",
+      "description": "Solo admin.",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios"
+              ]
+            },
+            "description": "Alias antiguo: `POST /admin/users`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"creado.{{$timestamp}}@ejemplo.com\",\n  \"contrasena\": \"Clave-segura-1\",\n  \"nombre\": \"Creado por admin\",\n  \"rol\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cambiar rol",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/rol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios",
+                "{{usuarioId}}",
+                "rol"
+              ]
+            },
+            "description": "`user` | `admin`. Un admin no puede quitarse el rol a sí mismo.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nuevoRol\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Restablecer contraseña",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios",
+                "{{usuarioId}}",
+                "password"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nuevaContrasena\": \"Clave-segura-1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desactivar usuario",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "⚠️ No borra: desactiva y cierra sus sesiones. `PATCH /admin/usuarios/{id}/activar` lo reactiva.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{usuarioId}}/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "usuarios",
+                "{{usuarioId}}",
+                "activar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 · Cierre de sesión",
+      "description": "",
+      "item": [
+        {
+          "name": "Cerrar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revoca el refresh token.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 · Rutas antiguas (alias)",
+      "description": "Rutas que siguen funcionando por compatibilidad con el panel y la app anteriores. Para código nuevo, usar las de las carpetas anteriores.",
+      "item": [
+        {
+          "name": "Cargos (alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/market/cargos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "market",
+                "cargos"
+              ]
+            },
+            "description": "Igual que `GET /api/v1/cargos`.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Requisitos del cargo (formato antiguo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/market/cargos/{{cargoId}}/skills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "market",
+                "cargos",
+                "{{cargoId}}",
+                "skills"
+              ]
+            },
+            "description": "Solo la lista de requisitos (la matriz completa está en `GET /api/v1/cargos/{id}/skills`).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear usuario (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Igual que `POST /admin/usuarios`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"alias.{{$timestamp}}@ejemplo.com\",\n  \"contrasena\": \"Clave-segura-1\",\n  \"rol\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Publicar texto de consentimiento (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/consent/text",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "consent",
+                "text"
+              ]
+            },
+            "description": "⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"2.0.0\",\n  \"title\": \"EULA\",\n  \"body\": \"Texto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Generar preguntas con IA (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questions/generate-ai",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questions",
+                "generate-ai"
+              ]
+            },
+            "description": "⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cargo_id\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidad\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Callback de Google (web)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/google/callback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google",
+                "callback"
+              ]
+            },
+            "description": "Lo llama Google al terminar el login web; no se usa desde Postman.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
