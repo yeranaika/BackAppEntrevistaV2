@@ -1,17 +1,15 @@
 package routes
 
 import CONFIGURACION.ContenedorDependencias
+import CONTROLADORES.controladorLogin
 import controllers.authController
 import io.ktor.server.application.Application
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import MIDDLEWARES.AuthCtx
-import MIDDLEWARES.AuthCtxKey
 import routes.admin.AdminUserCreateRoutes
 import routes.admin.adminAiRoutes
 import routes.admin.adminRoutes
-import routes.auth.authRoutes
 import routes.auth.deleteAccountRoute
 import routes.auth.passwordRecoveryRoutes
 import routes.auth.profileRoutes
@@ -27,14 +25,12 @@ import routes.usuario.recordatorios.recordatorioRoutes
 
 /** Monta todas las rutas con las dependencias ya construidas en el contenedor. */
 fun Application.configurarRutas(d: ContenedorDependencias) {
-    val ctx: AuthCtx = attributes[AuthCtxKey]
-
     routing {
         get("/health") { call.respondText("OK") }
 
-        authController(d.servicioAuth, ctx.issuer, ctx.audience, ctx.algorithm)
-        authRoutes(d.repositorioRefreshToken, ctx.issuer, ctx.audience, ctx.algorithm)
-        passwordRecoveryRoutes(d.repositorioRecuperacion, d.servicioCorreo, d.repositorioUsuario, d.repositorioOAuth)
+        controladorLogin(d.servicioLogin)
+        authController(d.servicioAuth)
+        passwordRecoveryRoutes(d.repositorioRecuperacion, d.servicioCorreo, d.repositorioUsuario, d.repositorioCuentaOAuth)
         deleteAccountRoute(d.repositorioUsuario)
 
         meRoutes(d.repositorioUsuario, d.repositorioPerfil, d.repositorioObjetivo)

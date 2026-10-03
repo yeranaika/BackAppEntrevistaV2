@@ -8,13 +8,13 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.AttributeKey
-import security.isAdmin
+import UTILIDADES.esAdmin
 
 private val SoloAdmin = createRouteScopedPlugin("SoloAdmin") {
     on(AuthenticationChecked) { call ->
         // Sin principal, authenticate("auth-jwt") ya responde 401; aquí solo se decide el 403.
         val principal = call.principal<JWTPrincipal>() ?: return@on
-        if (!principal.isAdmin()) {
+        if (!principal.esAdmin()) {
             call.respond(
                 HttpStatusCode.Forbidden,
                 RespuestaError("admin_required", "Se requiere rol de administrador")

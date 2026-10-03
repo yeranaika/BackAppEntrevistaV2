@@ -61,7 +61,23 @@ Tareas originales:
 
 ---
 
-## Fase 1 — Login
+## Fase 1 — Login ✅ (rama `refactor/fase-1-login`)
+**Estado:** completada. 85 pruebas en verde y prueba de humo contra Postgres real.
+
+Hecho:
+- `CONTROLADORES/CONTROLADOR_LOGIN` → `SERVICIOS/SERVICIO_LOGIN` → `SERVICIOS/SERVICIO_TOKEN` → `MODELOS/REPOSITORIO_REFRESH_TOKEN`, `MODELOS/REPOSITORIO_CUENTA_OAUTH`, `MODELOS/LECTOR_USUARIO_SESION` (interfaces + implementación Exposed).
+- `INTEGRACIONES/CLIENTE_GOOGLE_IDENTIDAD` detrás de `VerificadorIdentidadGoogle`; distingue token inválido (401) de Google caído (503).
+- `UTILIDADES/`: contraseñas, JWT del request y transacciones en el pool de IO.
+- Eliminados `routes/auth/{Refresh,Logout,RefreshSupport,authRoutes}`, `security/{Jwt,RefreshTokens}`, `AuthCtx` y la dependencia `ktor-client-logging-jvm:0.55.0`.
+
+Corregido:
+- El refresh perdía el rol admin; ahora relee rol y estado del usuario en cada renovación.
+- Dos refresh simultáneos con el mismo token podían ganar ambos; la revocación ahora es atómica.
+- Reutilizar un refresh ya rotado revoca todas las sesiones del usuario (detección de robo).
+- Login con Google emitía siempre rol `user` y dejaba entrar a cuentas inactivas.
+- El login revelaba "cuenta inactiva" sin contraseña correcta y respondía más rápido si el correo no existía.
+
+Tareas originales:
 **Hoy:** repartido entre `AuthController`, `RefreshRoutes`, `LogoutRoutes`, `RefreshSupport`, `RefreshTokens.kt` (en la raíz), `security/Jwt.kt`, `AuthMiddleware`.
 
 | Endpoint | Se mantiene |

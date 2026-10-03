@@ -1,4 +1,4 @@
-package security
+package UTILIDADES
 
 import de.mkammerer.argon2.Argon2Factory
 import at.favre.lib.crypto.bcrypt.BCrypt
@@ -11,20 +11,20 @@ private const val ARGON2_PARALELISMO = 1
 private val argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id)
 
 /** Único algoritmo para guardar contraseñas nuevas: Argon2id. */
-fun hashPassword(plain: String): String =
-    argon2.hash(ARGON2_ITERACIONES, ARGON2_MEMORIA_KIB, ARGON2_PARALELISMO, plain.toCharArray())
+fun generarHashContrasena(contrasena: String): String =
+    argon2.hash(ARGON2_ITERACIONES, ARGON2_MEMORIA_KIB, ARGON2_PARALELISMO, contrasena.toCharArray())
 
-private fun isArgon2Hash(hash: String): Boolean = hash.startsWith("\$argon2")
+private fun esHashArgon2(hash: String): Boolean = hash.startsWith("\$argon2")
 
-private fun isBcryptHash(hash: String): Boolean =
+private fun esHashBcrypt(hash: String): Boolean =
     hash.startsWith("\$2a$") || hash.startsWith("\$2b$") || hash.startsWith("\$2y$")
 
 /**
  * Verifica contra Argon2id, o BCrypt para hashes guardados antes de unificar el algoritmo.
  * Cualquier otro formato se rechaza: nunca se compara texto plano.
  */
-fun verifyPassword(plain: String, hash: String): Boolean = when {
-    isArgon2Hash(hash) -> argon2.verify(hash, plain.toCharArray())
-    isBcryptHash(hash) -> BCrypt.verifyer().verify(plain.toCharArray(), hash.toCharArray()).verified
+fun verificarContrasena(contrasena: String, hash: String): Boolean = when {
+    esHashArgon2(hash) -> argon2.verify(hash, contrasena.toCharArray())
+    esHashBcrypt(hash) -> BCrypt.verifyer().verify(contrasena.toCharArray(), hash.toCharArray()).verified
     else -> false
 }

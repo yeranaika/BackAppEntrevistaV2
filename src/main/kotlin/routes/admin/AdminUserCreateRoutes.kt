@@ -9,7 +9,7 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import security.isAdmin
+import UTILIDADES.esAdmin
 
 fun Route.AdminUserCreateRoutes(repo: AdminUserRepository) {
     authenticate("auth-jwt") {
@@ -17,7 +17,7 @@ fun Route.AdminUserCreateRoutes(repo: AdminUserRepository) {
             val principal = call.principal<JWTPrincipal>()
                 ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
-            if (!principal.isAdmin())
+            if (!principal.esAdmin())
                 return@post call.respond(HttpStatusCode.Forbidden, "Solo admin")
 
             val body = runCatching { call.receive<AdminCreateUserReq>() }

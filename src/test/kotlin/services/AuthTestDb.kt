@@ -1,26 +1,32 @@
 package services
 
+import CONFIGURACION.ConfiguracionJwt
+import INTEGRACIONES.VerificadorIdentidadGoogle
+import MODELOS.LectorUsuarioSesionExposed
+import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioRefreshTokenExposed
+import MODELOS.TablaCuentaOAuth
+import MODELOS.TablaRefreshToken
+import PRUEBAS.DOBLES.GoogleEnMemoria
+import SERVICIOS.ServicioLogin
+import SERVICIOS.ServicioToken
 import com.auth0.jwt.algorithms.Algorithm
 import data.repository.usuarios.ProfileRepository
-import data.repository.usuarios.RefreshTokenRepository
 import data.repository.usuarios.UserRepository
-import data.repository.usuarios.UsuariosOAuthRepositoryImpl
-import data.tables.usuarios.OauthAccountTable
 import data.tables.usuarios.ProfileTable
-import data.tables.usuarios.RefreshTokenTable
 import data.tables.usuarios.UsuarioTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import security.auth.GoogleTokenVerifier
 import java.util.UUID
 
-/** BD H2 en memoria (modo PostgreSQL) con las tablas que usa AuthService. Una nueva por test. */
+/** BD H2 en memoria (modo PostgreSQL) con las tablas de usuarios y sesión. Una nueva por test. */
 object AuthTestDb {
     const val ISSUER = "test-issuer"
     const val AUDIENCE = "test-audience"
-    val algorithm: Algorithm = Algorithm.HMAC512("test-secret")
+    val jwt = ConfiguracionJwt(emisor = ISSUER, audiencia = AUDIENCE, secreto = "test-secret")
+    val algorithm: Algorithm get() = jwt.algoritmo
 
     fun connect(): Database {
         val db = Database.connect(
@@ -34,17 +40,28 @@ object AuthTestDb {
         transaction(db) {
             // Una tabla por llamada: en H2 crear UsuarioTable junto a la tabla que la referencia
             // repite el ALTER ... ADD CONSTRAINT usuario_correo_unique
-            listOf(UsuarioTable, ProfileTable, RefreshTokenTable, OauthAccountTable)
+            listOf(UsuarioTable, ProfileTable, TablaRefreshToken, TablaCuentaOAuth)
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
         return db
     }
 
+    fun servicioToken(users: UserRepository = UserRepository()) =
+        ServicioToken(RepositorioRefreshTokenExposed(), LectorUsuarioSesionExposed(users), jwt)
+
     fun service(users: UserRepository = UserRepository()) = AuthService(
         users = users,
         profiles = ProfileRepository(),
-        refreshRepo = RefreshTokenRepository(),
-        oauthRepo = UsuariosOAuthRepositoryImpl(),
-        googleVerifier = GoogleTokenVerifier("test-client-id")
+        tokens = servicioToken(users)
+    )
+
+    fun servicioLogin(
+        users: UserRepository = UserRepository(),
+        google: VerificadorIdentidadGoogle = GoogleEnMemoria()
+    ) = ServicioLogin(
+        usuarios = LectorUsuarioSesionExposed(users),
+        cuentasOAuth = RepositorioCuentaOAuthExposed(),
+        verificadorGoogle = google,
+        tokens = servicioToken(users)
     )
 }

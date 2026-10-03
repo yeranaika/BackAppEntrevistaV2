@@ -8,7 +8,7 @@ import data.models.auth.ResetPasswordRes
 import data.models.auth.ChangePasswordReq
 import data.repository.usuarios.PasswordResetRepository
 import data.repository.usuarios.UserRepository
-import data.repository.usuarios.UsuariosOAuthRepository
+import MODELOS.RepositorioCuentaOAuth
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -16,7 +16,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
-import security.hashPassword
+import UTILIDADES.generarHashContrasena
 import services.EmailService
 import java.util.UUID
 
@@ -24,7 +24,7 @@ fun Route.passwordRecoveryRoutes(
     passwordResetRepo: PasswordResetRepository,
     emailService: EmailService,
     users: UserRepository,
-    oauthRepo: UsuariosOAuthRepository
+    oauthRepo: RepositorioCuentaOAuth
 ) {
     // ============================
     // POST /auth/forgot-password
@@ -58,7 +58,7 @@ fun Route.passwordRecoveryRoutes(
                 )
             }
 
-            if (oauthRepo.isGoogleUser(resetInfo.userId)) {
+            if (oauthRepo.esUsuarioGoogle(resetInfo.userId)) {
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
                     ForgotPasswordRes(
@@ -145,7 +145,7 @@ fun Route.passwordRecoveryRoutes(
                 )
             }
 
-            if (oauthRepo.isGoogleUser(usuarioId)) {
+            if (oauthRepo.esUsuarioGoogle(usuarioId)) {
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
                     ResetPasswordRes(
@@ -155,7 +155,7 @@ fun Route.passwordRecoveryRoutes(
                 )
             }
 
-            val updated = users.updatePasswordHash(usuarioId, hashPassword(nuevaContrasena))
+            val updated = users.updatePasswordHash(usuarioId, generarHashContrasena(nuevaContrasena))
 
             if (updated == 0) {
                 return@post call.respond(
@@ -229,7 +229,7 @@ fun Route.passwordRecoveryRoutes(
 
             try {
                 // No dejamos cambiar pass si es usuario Google
-                if (oauthRepo.isGoogleUser(usuarioId)) {
+                if (oauthRepo.esUsuarioGoogle(usuarioId)) {
                     return@post call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf(
@@ -239,7 +239,7 @@ fun Route.passwordRecoveryRoutes(
                     )
                 }
 
-                val updated = users.updatePasswordHash(usuarioId, hashPassword(nuevaContrasena))
+                val updated = users.updatePasswordHash(usuarioId, generarHashContrasena(nuevaContrasena))
 
                 if (updated == 0) {
                     return@post call.respond(

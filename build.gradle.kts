@@ -50,7 +50,6 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:3.+")
     implementation("io.ktor:ktor-client-content-negotiation:3.+")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.+")
-    implementation("io.ktor:ktor-client-logging-jvm:0.55.0")
 
     // Opción A (simple, recomendada por Google) para validar ID tokens:
     implementation("com.google.api-client:google-api-client:2.+")

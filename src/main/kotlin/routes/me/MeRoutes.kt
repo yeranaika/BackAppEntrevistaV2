@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import ESQUEMAS.RespuestaError
 import ESQUEMAS.RespuestaOk
-import security.userIdFromJwt
+import UTILIDADES.usuarioIdDesdeJwt
 
 // ---------- DTOs ----------
 @Serializable
@@ -130,7 +130,7 @@ fun Route.meRoutes(
 
             // GET /me
             get {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val u = users.findById(uid)
                     ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("user_not_found"))
 
@@ -171,7 +171,7 @@ fun Route.meRoutes(
 
             // GET /me/perfil
             get("/perfil") {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val p = profiles.findByUser(uid)
                     ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("profile_not_found"))
 
@@ -188,7 +188,7 @@ fun Route.meRoutes(
 
             // PUT /me/perfil
             put("/perfil") {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val req = runCatching { call.receive<PutPerfilReq>() }.getOrElse {
                     return@put call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 }
@@ -227,7 +227,7 @@ fun Route.meRoutes(
 
             // GET /me/objetivo
             get("/objetivo") {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val obj = objetivos.findByUser(uid)
                     ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("objetivo_not_found"))
 
@@ -242,7 +242,7 @@ fun Route.meRoutes(
 
             // PUT /me/objetivo
             put("/objetivo") {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val req = runCatching { call.receive<PutObjetivoReq>() }.getOrElse {
                     return@put call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 }
@@ -266,7 +266,7 @@ fun Route.meRoutes(
             }
 
             delete("/objetivo") {
-                val uid = call.userIdFromJwt()
+                val uid = call.usuarioIdDesdeJwt()
                 val deleted = objetivos.delete(uid)
 
                 if (deleted == 0) {

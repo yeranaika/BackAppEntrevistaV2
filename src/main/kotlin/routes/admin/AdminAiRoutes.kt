@@ -12,7 +12,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import security.isAdmin
+import UTILIDADES.esAdmin
 import services.ai.AiPersistenceException
 import services.ai.AiProviderHttpException
 import services.ai.AiProviderInvalidOutputException
@@ -31,7 +31,7 @@ fun Route.adminAiRoutes(aiService: AiQuestionGenerationUseCase) {
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@post call.respond(HttpStatusCode.Unauthorized, AiErrorRes("unauthorized"))
 
-                if (!principal.isAdmin()) {
+                if (!principal.esAdmin()) {
                     return@post call.respond(HttpStatusCode.Forbidden, AiErrorRes("forbidden"))
                 }
 

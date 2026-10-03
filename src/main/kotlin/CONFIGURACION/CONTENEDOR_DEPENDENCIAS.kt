@@ -13,12 +13,16 @@ import data.repository.usuarios.ObjetivoCarreraRepository
 import data.repository.usuarios.PasswordResetRepository
 import data.repository.usuarios.ProfileRepository
 import data.repository.usuarios.RecordatorioPreferenciaRepository
-import data.repository.usuarios.RefreshTokenRepository
 import data.repository.usuarios.UserRepository
-import data.repository.usuarios.UsuariosOAuthRepository
-import data.repository.usuarios.UsuariosOAuthRepositoryImpl
+import INTEGRACIONES.ClienteGoogleIdentidad
+import MODELOS.LectorUsuarioSesionExposed
+import MODELOS.RepositorioCuentaOAuth
+import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioRefreshToken
+import MODELOS.RepositorioRefreshTokenExposed
+import SERVICIOS.ServicioLogin
+import SERVICIOS.ServicioToken
 import org.jetbrains.exposed.sql.Database
-import security.auth.GoogleTokenVerifier
 import security.billing.GooglePlayBillingService
 import services.AiQuestionGeneratorService
 import services.AuthService
@@ -42,8 +46,9 @@ class ContenedorDependencias(
     val repositorioPerfil = ProfileRepository()
     val repositorioObjetivo = ObjetivoCarreraRepository()
     val repositorioOnboarding = OnboardingRepository()
-    val repositorioRefreshToken = RefreshTokenRepository()
-    val repositorioOAuth: UsuariosOAuthRepository = UsuariosOAuthRepositoryImpl()
+    val lectorUsuarioSesion = LectorUsuarioSesionExposed(repositorioUsuario)
+    val repositorioRefreshToken: RepositorioRefreshToken = RepositorioRefreshTokenExposed()
+    val repositorioCuentaOAuth: RepositorioCuentaOAuth = RepositorioCuentaOAuthExposed()
     val repositorioRecuperacion = PasswordResetRepository(repositorioUsuario)
     val repositorioConsentimiento = ConsentimientoRepository()
     val repositorioTextoConsentimiento = ConsentTextRepository(db)
@@ -89,13 +94,26 @@ class ContenedorDependencias(
         useMock = configuracion.googlePlay.esSimulado
     )
 
+    val verificadorGoogle = ClienteGoogleIdentidad(configuracion.google.clientId)
+
     // ---------- Servicios de negocio ----------
+    val servicioToken = ServicioToken(
+        repositorio = repositorioRefreshToken,
+        usuarios = lectorUsuarioSesion,
+        jwt = configuracion.jwt
+    )
+
+    val servicioLogin = ServicioLogin(
+        usuarios = lectorUsuarioSesion,
+        cuentasOAuth = repositorioCuentaOAuth,
+        verificadorGoogle = verificadorGoogle,
+        tokens = servicioToken
+    )
+
     val servicioAuth = AuthService(
         users = repositorioUsuario,
         profiles = repositorioPerfil,
-        refreshRepo = repositorioRefreshToken,
-        oauthRepo = repositorioOAuth,
-        googleVerifier = GoogleTokenVerifier(configuracion.google.clientId)
+        tokens = servicioToken
     )
 
     val generadorSkillsCargo = CargoSkillGeneratorService(

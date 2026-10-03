@@ -6,14 +6,14 @@ import data.tables.usuarios.UsuarioTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import security.hashPassword
+import UTILIDADES.generarHashContrasena
 import java.time.LocalDateTime
 import java.util.UUID
 
 class AdminUserRepository(
     private val db: Database
 ) {
-    private fun hash(password: String): String = hashPassword(password)
+    private fun hash(password: String): String = generarHashContrasena(password)
 
     suspend fun createByAdmin(req: AdminCreateUserReq): AdminCreateUserRes =
         newSuspendedTransaction(db = db) {

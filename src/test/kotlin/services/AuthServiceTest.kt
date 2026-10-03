@@ -2,19 +2,15 @@ package services
 
 import com.auth0.jwt.JWT
 import data.repository.usuarios.UserRepository
-import data.tables.usuarios.RefreshTokenTable
+import MODELOS.TablaRefreshToken
 import data.tables.usuarios.UsuarioTable
 import kotlinx.coroutines.runBlocking
-import models.LoginReq
 import models.RegisterReq
 import models.UpdateProfileReq
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-import services.AuthTestDb.AUDIENCE
-import services.AuthTestDb.ISSUER
-import services.AuthTestDb.algorithm
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.test.BeforeTest
@@ -37,10 +33,7 @@ class AuthServiceTest {
     }
 
     private fun register(email: String = "user@example.com", password: String = "Password123!") =
-        runBlocking { service.register(RegisterReq(email = email, password = password, nombre = "Test"), ISSUER, AUDIENCE, algorithm) }
-
-    private fun login(email: String = "user@example.com", password: String = "Password123!") =
-        runBlocking { service.login(LoginReq(email, password), ISSUER, AUDIENCE, algorithm) }
+        runBlocking { service.register(RegisterReq(email = email, password = password, nombre = "Test")) }
 
     private fun userId(email: String = "user@example.com"): UUID =
         runBlocking { users.findByEmail(email)!!.id }
@@ -50,14 +43,14 @@ class AuthServiceTest {
     @Test
     fun `register crea usuario, normaliza email y emite tokens con rol user`() {
         val tokens = runBlocking {
-            service.register(RegisterReq(email = "  New.User@Example.COM ", password = "Password123!"), ISSUER, AUDIENCE, algorithm)
+            service.register(RegisterReq(email = "  New.User@Example.COM ", password = "Password123!"))
         }
 
-        assertTrue(tokens.accessToken.isNotBlank())
-        assertTrue(tokens.refreshToken.isNotBlank())
-        assertEquals("user", JWT.decode(tokens.accessToken).getClaim("role").asString())
+        assertTrue(tokens.tokenAcceso.isNotBlank())
+        assertTrue(tokens.tokenRefresco.isNotBlank())
+        assertEquals("user", JWT.decode(tokens.tokenAcceso).getClaim("role").asString())
         assertNotNull(runBlocking { users.findByEmail("new.user@example.com") })
-        transaction(db) { assertEquals(1, RefreshTokenTable.selectAll().count()) }
+        transaction(db) { assertEquals(1, TablaRefreshToken.selectAll().count()) }
     }
 
     @Test
@@ -73,14 +66,14 @@ class AuthServiceTest {
     @Test
     fun `register rechaza pais invalido`() {
         assertFailsWith<AuthService.InvalidCountryException> {
-            runBlocking { service.register(RegisterReq("a@example.com", "Password123!", pais = "CHL"), ISSUER, AUDIENCE, algorithm) }
+            runBlocking { service.register(RegisterReq("a@example.com", "Password123!", pais = "CHL")) }
         }
     }
 
     @Test
     fun `register rechaza fecha de nacimiento malformada`() {
         assertFailsWith<AuthService.InvalidBirthdateException> {
-            runBlocking { service.register(RegisterReq("a@example.com", "Password123!", fechaNacimiento = "31-12-2000"), ISSUER, AUDIENCE, algorithm) }
+            runBlocking { service.register(RegisterReq("a@example.com", "Password123!", fechaNacimiento = "31-12-2000")) }
         }
     }
 
@@ -88,56 +81,6 @@ class AuthServiceTest {
     fun `register rechaza email duplicado`() {
         register()
         assertFailsWith<AuthService.EmailInUseException> { register() }
-    }
-
-    // ---------- Login ----------
-
-    @Test
-    fun `login con credenciales validas emite tokens y marca ultimo login`() {
-        register()
-        val tokens = login()
-
-        assertTrue(tokens.accessToken.isNotBlank())
-        assertNotNull(runBlocking { users.findByEmail("user@example.com")!!.fechaUltimoLogin })
-    }
-
-    @Test
-    fun `login de admin emite token con rol admin`() {
-        register(email = "admin@example.com", password = "AdminPassword123")
-        runBlocking { users.updateRol(userId("admin@example.com"), "admin") }
-
-        val tokens = login(email = "admin@example.com", password = "AdminPassword123")
-
-        assertEquals("admin", JWT.decode(tokens.accessToken).getClaim("role").asString())
-    }
-
-    @Test
-    fun `login con password incorrecta lanza bad credentials`() {
-        register()
-        assertFailsWith<AuthService.BadCredentialsException> { login(password = "Incorrecta123") }
-    }
-
-    @Test
-    fun `login con usuario inexistente lanza bad credentials (no revela si existe)`() {
-        assertFailsWith<AuthService.BadCredentialsException> { login(email = "nadie@example.com") }
-    }
-
-    @Test
-    fun `login con usuario inactivo lanza inactive user`() {
-        register()
-        transaction(db) {
-            UsuarioTable.update({ UsuarioTable.correo eq "user@example.com" }) { it[estado] = "inactivo" }
-        }
-        assertFailsWith<AuthService.InactiveUserException> { login() }
-    }
-
-    // ---------- Google ----------
-
-    @Test
-    fun `login con google rechaza idToken malformado sin lanzar error generico`() {
-        assertFailsWith<AuthService.GoogleTokenInvalidException> {
-            runBlocking { service.loginWithGoogle("no-es-un-token", ISSUER, AUDIENCE, algorithm) }
-        }
     }
 
     // ---------- Update de perfil ----------

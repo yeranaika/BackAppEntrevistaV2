@@ -1,7 +1,6 @@
 package data.repository.usuarios
 
 import data.tables.usuarios.PasswordResetTable
-import data.tables.usuarios.OauthAccountTable
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq

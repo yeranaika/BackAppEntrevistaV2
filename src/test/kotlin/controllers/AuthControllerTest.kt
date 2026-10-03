@@ -43,7 +43,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-/** Verifica el contrato HTTP del AuthController: códigos de estado y cuerpos de error. */
+/** Contrato HTTP de registro y PUT /me. El de login está en PRUEBAS/PRUEBA_CONTROLADOR_LOGIN. */
 class AuthControllerTest {
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var users: UserRepository
@@ -64,23 +64,8 @@ class AuthControllerTest {
                     verifier(JWT.require(algorithm).withIssuer(ISSUER).withAudience(AUDIENCE).build())
                     validate { cred -> if (cred.subject != null) JWTPrincipal(cred.payload) else null }
                 }
-                // Proveedor OAuth de mentira: solo para que authenticate("google-oauth") exista
-                oauth("google-oauth") {
-                    urlProvider = { "http://localhost/auth/google/callback" }
-                    providerLookup = {
-                        OAuthServerSettings.OAuth2ServerSettings(
-                            name = "google",
-                            authorizeUrl = "http://localhost/authorize",
-                            accessTokenUrl = "http://localhost/token",
-                            requestMethod = HttpMethod.Post,
-                            clientId = "test",
-                            clientSecret = "test"
-                        )
-                    }
-                    client = HttpClient(MockEngine { respondError(HttpStatusCode.InternalServerError) })
-                }
             }
-            routing { authController(service, ISSUER, AUDIENCE, algorithm) }
+            routing { authController(service) }
         }
     }
 
@@ -126,59 +111,6 @@ class AuthControllerTest {
         val malformed = postJson("/auth/register", """{ esto no es json""")
         assertEquals(HttpStatusCode.BadRequest, malformed.status)
         assertEquals("invalid_json", errorOf(malformed.bodyAsText()))
-    }
-
-    // ---------- Login ----------
-
-    @Test
-    fun `login responde 200, 401 con credenciales malas y 403 con usuario inactivo`() = testApplication {
-        installAuth()
-        registerOk("user@example.com", "Password123!")
-
-        val ok = postJson("/auth/login", """{"email":"user@example.com","password":"Password123!"}""")
-        assertEquals(HttpStatusCode.OK, ok.status)
-
-        val bad = postJson("/auth/login", """{"email":"user@example.com","password":"Incorrecta1"}""")
-        assertEquals(HttpStatusCode.Unauthorized, bad.status)
-        assertEquals("bad_credentials", errorOf(bad.bodyAsText()))
-
-        val wrongType = postJson("/auth/login", """{"email":"user@example.com"}""")
-        assertEquals(HttpStatusCode.BadRequest, wrongType.status)
-        assertEquals("invalid_json", errorOf(wrongType.bodyAsText()))
-
-        val missing = postJson("/auth/login", """{"email":"nadie@example.com","password":"Password123!"}""")
-        assertEquals(HttpStatusCode.Unauthorized, missing.status)
-        assertEquals("bad_credentials", errorOf(missing.bodyAsText()))
-
-        val uid = runBlocking { users.findByEmail("user@example.com")!!.id }
-        transaction {
-            UsuarioTable.update({ UsuarioTable.usuarioId eq uid }) { it[estado] = "inactivo" }
-        }
-        val inactive = postJson("/auth/login", """{"email":"user@example.com","password":"Password123!"}""")
-        assertEquals(HttpStatusCode.Forbidden, inactive.status)
-        assertEquals("inactive_user", errorOf(inactive.bodyAsText()))
-    }
-
-    @Test
-    fun `login del usuario admin entrega un token con rol admin`() = testApplication {
-        installAuth()
-        registerOk("admin@example.com", "AdminPassword123")
-        runBlocking { users.updateRol(users.findByEmail("admin@example.com")!!.id, "admin") }
-
-        val res = postJson("/auth/login", """{"email":"admin@example.com","password":"AdminPassword123"}""")
-        assertEquals(HttpStatusCode.OK, res.status)
-        val token = json.parseToJsonElement(res.bodyAsText()).jsonObject["accessToken"]!!.jsonPrimitive.content
-        assertEquals("admin", JWT.decode(token).getClaim("role").asString())
-    }
-
-    // ---------- Google ----------
-
-    @Test
-    fun `google con idToken invalido responde 401 y no 500`() = testApplication {
-        installAuth()
-        val res = postJson("/auth/google", """{"idToken":"no-es-un-token"}""")
-        assertEquals(HttpStatusCode.Unauthorized, res.status)
-        assertEquals("invalid_google_token", errorOf(res.bodyAsText()))
     }
 
     // ---------- PUT /me ----------

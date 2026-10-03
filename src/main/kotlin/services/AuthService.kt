@@ -1,28 +1,21 @@
 package services
 
 import CONFIGURACION.LARGO_MINIMO_CONTRASENA
-import CONFIGURACION.TTL_TOKEN_ACCESO_SEGUNDOS
-import com.auth0.jwt.algorithms.Algorithm
 import data.repository.usuarios.ProfileRepository
-import data.repository.usuarios.RefreshTokenRepository
 import data.repository.usuarios.UserRepository
-import data.repository.usuarios.UsuariosOAuthRepository
 import models.RegisterReq
-import models.LoginReq
 import models.UpdateProfileReq
-import routes.auth.issueNewRefresh
-import security.auth.GoogleTokenVerifier
-import security.generateRefreshToken
-import security.hashPassword
-import security.issueAccessToken
-import security.verifyPassword
+import UTILIDADES.generarHashContrasena
+import MODELOS.ROL_USUARIO
+import SERVICIOS.ParTokens
+import SERVICIOS.ServicioToken
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /**
- * Lógica de negocio del dominio de autenticación: registro, login (local y Google),
- * y actualización del perfil básico del usuario logueado.
+ * Registro de usuarios y actualización del perfil básico del usuario logueado.
+ * El inicio de sesión vive en SERVICIOS.ServicioLogin.
  *
  * Los controllers son delgados: reciben el request, llaman aquí, y solo traducen
  * el resultado (o la excepción tipada) a una respuesta HTTP.
@@ -30,9 +23,7 @@ import java.util.UUID
 class AuthService(
     private val users: UserRepository,
     private val profiles: ProfileRepository,
-    private val refreshRepo: RefreshTokenRepository,
-    private val oauthRepo: UsuariosOAuthRepository,
-    private val googleVerifier: GoogleTokenVerifier
+    private val tokens: ServicioToken
 ) {
 
     sealed class AuthException(val publicCode: String) : RuntimeException(publicCode)
@@ -41,10 +32,6 @@ class AuthService(
     class InvalidCountryException : AuthException("invalid_country")
     class InvalidBirthdateException : AuthException("invalid_birthdate")
     class EmailInUseException : AuthException("email_in_use")
-    class BadCredentialsException : AuthException("bad_credentials")
-    class InactiveUserException : AuthException("inactive_user")
-    class GoogleTokenInvalidException : AuthException("invalid_google_token")
-    class GoogleEmailNotVerifiedException : AuthException("google_email_not_verified")
     class UserNotFoundException : AuthException("user_not_found")
     class InvalidLanguageException : AuthException("idioma_invalido")
     class InvalidPhoneException : AuthException("telefono_invalido")
@@ -52,8 +39,6 @@ class AuthService(
     class InvalidBirthdateFormatException : AuthException("fecha_nacimiento_invalida")
     class InvalidBirthdateRangeException : AuthException("fecha_nacimiento_fuera_de_rango")
     class NothingToUpdateException : AuthException("nothing_to_update")
-
-    data class TokenResult(val accessToken: String, val refreshToken: String)
 
     private val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
     private val paisRegex = Regex("^[A-Za-z]{2}$")
@@ -64,12 +49,7 @@ class AuthService(
     )
 
     /** Registro local: valida, crea usuario (+ perfil opcional) y emite tokens. */
-    suspend fun register(
-        req: RegisterReq,
-        issuer: String,
-        audience: String,
-        algorithm: Algorithm
-    ): TokenResult {
+    suspend fun register(req: RegisterReq): ParTokens {
         val email = req.email.trim().lowercase()
 
         if (!emailRegex.matches(email)) throw InvalidEmailException()
@@ -87,7 +67,7 @@ class AuthService(
 
         val userId = users.create(
             email = email,
-            hash = hashPassword(req.password),
+            hash = generarHashContrasena(req.password),
             nombre = req.nombre,
             idioma = req.idioma,
             telefono = telefonoLimpio,
@@ -111,53 +91,7 @@ class AuthService(
             )
         }
 
-        return issueTokens(userId, issuer, audience, algorithm, role = "user")
-    }
-
-    /** Login local: valida credenciales y emite tokens. */
-    suspend fun login(
-        req: LoginReq,
-        issuer: String,
-        audience: String,
-        algorithm: Algorithm
-    ): TokenResult {
-        val email = req.email.trim().lowercase()
-
-        val user = users.findByEmail(email) ?: throw BadCredentialsException()
-        if (user.estado != "activo") throw InactiveUserException()
-        if (!verifyPassword(req.password, user.hash)) throw BadCredentialsException()
-
-        users.touchUltimoLogin(user.id)
-
-        return issueTokens(userId = user.id, issuer = issuer, audience = audience, algorithm = algorithm, role = user.rol)
-    }
-
-    /**
-     * Login con Google (idToken verificado del lado del servidor). Si el usuario no existe,
-     * lo autoregistra (lo enlaza o lo crea) — cubre tanto el flujo móvil (POST /auth/google)
-     * como el flujo web (callback OAuth), que comparten esta misma lógica.
-     */
-    suspend fun loginWithGoogle(
-        idToken: String,
-        issuer: String,
-        audience: String,
-        algorithm: Algorithm
-    ): TokenResult {
-        val payload = try {
-            googleVerifier.verify(idToken)
-        } catch (e: Exception) {
-            // El verificador de Google lanza (no solo devuelve null) ante un idToken malformado
-            null
-        } ?: throw GoogleTokenInvalidException()
-
-        val email = payload["email"] as? String
-        val emailVerified = (payload["email_verified"] as? Boolean) ?: false
-        if (!emailVerified || email.isNullOrBlank()) throw GoogleEmailNotVerifiedException()
-
-        // Autoregistro: crea el usuario si no existía, o lo enlaza si ya tenía cuenta local
-        val userId = oauthRepo.linkOrCreateFromGoogle(payload.subject, email)
-
-        return issueTokens(userId, issuer, audience, algorithm, role = "user")
+        return tokens.emitirPar(userId, ROL_USUARIO)
     }
 
     /** Actualiza los datos básicos del usuario logueado (nombre, idioma, teléfono, etc.). */
@@ -202,27 +136,5 @@ class AuthService(
         }
 
         if (touched == 0) throw NothingToUpdateException()
-    }
-
-    private suspend fun issueTokens(
-        userId: UUID,
-        issuer: String,
-        audience: String,
-        algorithm: Algorithm,
-        role: String
-    ): TokenResult {
-        val access = issueAccessToken(
-            subject = userId.toString(),
-            issuer = issuer,
-            audience = audience,
-            algorithm = algorithm,
-            ttlSeconds = TTL_TOKEN_ACCESO_SEGUNDOS,
-            extraClaims = mapOf("role" to role)
-        )
-
-        val refreshPlain = generateRefreshToken()
-        issueNewRefresh(refreshRepo, refreshPlain, userId)
-
-        return TokenResult(accessToken = access, refreshToken = refreshPlain)
     }
 }

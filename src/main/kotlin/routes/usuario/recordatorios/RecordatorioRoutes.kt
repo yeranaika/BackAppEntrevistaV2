@@ -10,7 +10,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
-import security.userIdOrNull   // extensión que ya tienes para sacar el userId del JWT
+import UTILIDADES.usuarioIdDesdeJwt
 import java.util.UUID
 
 @Serializable
@@ -44,13 +44,9 @@ fun Route.recordatorioRoutes(
 
             // GET /recordatorios/preferencias
             get("/preferencias") {
-                val principal = call.principal<JWTPrincipal>()
-                    ?: return@get call.respond(HttpStatusCode.Unauthorized)
+                val userId = call.usuarioIdDesdeJwt()
 
-                val userId = principal.userIdOrNull()
-                    ?: return@get call.respond(HttpStatusCode.Unauthorized)
-
-                val prefs = recordatorioRepo.getByUsuario(UUID.fromString(userId))
+                val prefs = recordatorioRepo.getByUsuario(userId)
 
                 if (prefs == null) {
                     // 404 si aún no tiene nada configurado
@@ -65,16 +61,12 @@ fun Route.recordatorioRoutes(
 
             // PUT /recordatorios/preferencias
             put("/preferencias") {
-                val principal = call.principal<JWTPrincipal>()
-                    ?: return@put call.respond(HttpStatusCode.Unauthorized)
-
-                val userId = principal.userIdOrNull()
-                    ?: return@put call.respond(HttpStatusCode.Unauthorized)
+                val userId = call.usuarioIdDesdeJwt()
 
                 val body = call.receive<PreferenciasRecordatorioReq>()
 
                 val saved = recordatorioRepo.upsert(
-                    UUID.fromString(userId),
+                    userId,
                     RecordatorioPreferencias(
                         diasSemana = body.diasSemana,
                         hora = body.hora,

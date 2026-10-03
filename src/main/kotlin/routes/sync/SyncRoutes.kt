@@ -13,7 +13,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.util.UUID
 
-private fun ApplicationCall.userIdFromJwt(): UUID {
+private fun ApplicationCall.usuarioIdDesdeJwt(): UUID {
     val principal = this.principal<JWTPrincipal>() ?: error("No principal")
     val sub = principal.subject ?: error("No subject")
     return UUID.fromString(sub)
@@ -33,7 +33,7 @@ fun Route.syncRoutes(syncRepo: SyncRepository) {
         // Sincronización de intentos realizados offline (Requiere autenticación)
         authenticate("auth-jwt") {
             post("/sync/attempts") {
-                val userId = call.userIdFromJwt()
+                val userId = call.usuarioIdDesdeJwt()
                 val req = call.receive<SyncAttemptBatchRequest>()
 
                 val mappings = syncRepo.syncOfflineAttempts(userId, req.attempts)

@@ -1,5 +1,6 @@
 package CONFIGURACION
 
+import com.auth0.jwt.algorithms.Algorithm
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.server.application.*
 import io.ktor.util.AttributeKey
@@ -20,7 +21,10 @@ data class ConfiguracionJwt(
     val emisor: String,
     val audiencia: String,
     val secreto: String
-)
+) {
+    /** Mismo algoritmo para firmar (ServicioToken) y verificar (MIDDLEWARE_AUTENTICACION). */
+    val algoritmo: Algorithm by lazy { Algorithm.HMAC512(secreto) }
+}
 
 data class ConfiguracionGoogle(
     val clientId: String,

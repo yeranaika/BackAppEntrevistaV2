@@ -8,7 +8,7 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import security.userIdFromJwt
+import UTILIDADES.usuarioIdDesdeJwt
 
 fun Route.profileRoutes(
     onboardingRepo: OnboardingRepository
@@ -20,7 +20,7 @@ fun Route.profileRoutes(
             val principal = call.principal<JWTPrincipal>()
                 ?: return@put call.respond(HttpStatusCode.Unauthorized)
 
-            val userId = principal.userIdFromJwt()
+            val userId = principal.usuarioIdDesdeJwt()
             val body = call.receive<UpdateObjetivoReq>()
 
             onboardingRepo.guardarObjetivo(

@@ -58,7 +58,7 @@ fun Route.onboardingRoutes(
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
-                val userId = principal.userIdFromJwt()
+                val userId = principal.usuarioIdDesdeJwt()
                 val request = call.receive<OnboardingRequest>()
 
                 // Validar datos
@@ -135,7 +135,7 @@ fun Route.onboardingRoutes(
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@get call.respond(HttpStatusCode.Unauthorized)
 
-                val userId = principal.userIdFromJwt()
+                val userId = principal.usuarioIdDesdeJwt()
 
                 try {
                     val profile = profileRepo.findByUser(userId)
@@ -179,7 +179,7 @@ fun Route.onboardingRoutes(
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@get call.respond(HttpStatusCode.Unauthorized)
 
-                val userId = principal.userIdFromJwt()
+                val userId = principal.usuarioIdDesdeJwt()
 
                 try {
                     val profile = profileRepo.findByUser(userId)
@@ -214,7 +214,7 @@ fun Route.onboardingRoutes(
 }
 
 // Helper para extraer userId del JWT
-private fun JWTPrincipal.userIdFromJwt(): UUID {
+private fun JWTPrincipal.usuarioIdDesdeJwt(): UUID {
     val sub = this.subject ?: error("No subject in JWT")
     return UUID.fromString(sub)
 }

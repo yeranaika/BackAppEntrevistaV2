@@ -15,7 +15,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import security.billing.GooglePlayBillingService
-import security.isAdmin
+import UTILIDADES.esAdmin
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.util.UUID
@@ -161,7 +161,7 @@ fun Route.billingRoutes(
                     ?: return@post call.respond(HttpStatusCode.Unauthorized)
 
                 // ✅ mismo patrón que en AdminUserCreateRoutes
-                if (!principal.isAdmin()) {
+                if (!principal.esAdmin()) {
                     return@post call.respond(HttpStatusCode.Forbidden, "Solo admin")
                 }
 

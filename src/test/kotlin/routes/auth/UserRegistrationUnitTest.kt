@@ -6,8 +6,8 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
-import security.hashPassword
-import security.verifyPassword
+import UTILIDADES.generarHashContrasena
+import UTILIDADES.verificarContrasena
 import java.util.UUID
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -39,7 +39,7 @@ class UserRegistrationUnitTest {
     fun testCreacionUsuarioYVerificacionDeContrasena() = runBlocking {
         val email = "candidato.nuevo@test.com"
         val rawPassword = "MiPasswordSegura123!"
-        val hashed = hashPassword(rawPassword)
+        val hashed = generarHashContrasena(rawPassword)
 
         // 1. Verificar que el correo no existe previamente
         assertFalse(users.existsByEmail(email))
@@ -64,7 +64,7 @@ class UserRegistrationUnitTest {
         assertEquals("activo", userRow.estado)
 
         // 5. Verificar verificación de contraseña
-        assertTrue(verifyPassword(rawPassword, userRow.hash), "La contraseña correcta debe validar exitosamente")
-        assertFalse(verifyPassword("PasswordIncorrecta", userRow.hash), "Una contraseña errónea no debe validar")
+        assertTrue(verificarContrasena(rawPassword, userRow.hash), "La contraseña correcta debe validar exitosamente")
+        assertFalse(verificarContrasena("PasswordIncorrecta", userRow.hash), "Una contraseña errónea no debe validar")
     }
 }
