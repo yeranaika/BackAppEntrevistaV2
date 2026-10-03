@@ -61,6 +61,7 @@ Crean usuarios `e2e_*@prueba.local` y los borran al terminar. Requieren PowerShe
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1                      # contra http://127.0.0.1:8080
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplicada
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una generación real (cuesta)
 ```
 Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend no responde.
 
@@ -187,3 +188,24 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 | `PATCH` | `/admin/usuarios/{usuarioId}/password` | `Bearer JWT (Admin)` | Resetea la contraseña de cualquier usuario. | `{"nuevaContrasena": "..."}` |
 | `DELETE` | `/admin/usuarios/{usuarioId}` | `Bearer JWT (Admin)` | Desactiva (soft delete) un usuario. | - |
 | `POST` | `/admin/consent/text` | `Bearer JWT (Admin)` | Publica una nueva versión del texto legal de consentimiento. | `{"version", "title", "body"}` |
+
+---
+
+### 11. Banco de Preguntas e IA (`/api/v1/admin/preguntas`)
+*(Requiere JWT con rol `admin`. Las preguntas creadas por un admin nacen `aprobada`; las generadas por IA nacen `pendiente`.)*
+
+| Método | Ruta | Descripción | Body (JSON) |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/preguntas` | Crea una pregunta. Opción múltiple: 2–6 opciones y una sola correcta; abierta: `respuestaIdeal` o `rubrica`. | `{"skillId"?, "cargoId"?, "tipo", "categoria", "nivel", "enunciado", "respuestaIdeal"?, "rubrica"?, "opciones"?: [{"texto","esCorrecta","explicacion"?}]}` |
+| `GET` | `/api/v1/admin/preguntas` | Lista paginada. Filtros: `estado`, `tipo`, `categoria`, `nivel`, `skillId`, `cargoId`, `generadaPorIa`, `pagina`, `tamano`. | - |
+| `GET` | `/api/v1/admin/preguntas/{id}` | Detalle completo (incluye solución). | - |
+| `PUT` | `/api/v1/admin/preguntas/{id}` | Reemplaza el contenido; la pregunta vuelve a `pendiente`. | Igual que crear |
+| `PATCH` | `/api/v1/admin/preguntas/{id}/aprobar` | Aprueba (y marca la traza de IA como aprobada). | - |
+| `PATCH` | `/api/v1/admin/preguntas/{id}/rechazar` | Rechaza con motivo obligatorio. | `{"motivo"}` |
+| `DELETE` | `/api/v1/admin/preguntas/{id}` | Borra si nunca se usó (si no, 409 `pregunta_en_uso`). | - |
+| `POST` | `/api/v1/admin/preguntas/generar-ia` | Genera 1–10 preguntas con LLM (también en la ruta antigua `/api/v1/admin/questions/generate-ai`). 404 si el cargo/skill no existe, 503 sin API key, 502 si el LLM responde algo inutilizable. | `{"cargo_id"?, "skill_id"?, "nivel", "cantidad", "tipo", "categoria", "modelo": "gpt-4o-mini" \| "claude-haiku-4-5"}` |
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/preguntas` | `Bearer JWT` | Preguntas **aprobadas** al azar, sin respuesta ideal ni opción correcta. Filtros: `skillId`, `cargoId`, `nivel`, `tipo`, `categoria`, `cantidad` (1–20). |
+

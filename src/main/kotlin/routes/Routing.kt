@@ -5,12 +5,12 @@ import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorOnboarding
+import CONTROLADORES.controladorPregunta
 import CONTROLADORES.controladorUsuario
 import io.ktor.server.application.Application
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import routes.admin.adminAiRoutes
 import routes.billing.billingRoutes
 import routes.consent.ConsentRoutes
 import routes.legal.legalRoutes
@@ -24,12 +24,15 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
     routing {
         get("/health") { call.respondText("OK") }
 
-        // Fases 1 y 2: capas MVC
+        // Fases 1 y 2: login y usuarios
         controladorLogin(d.servicioLogin)
         controladorUsuario(d.servicioUsuario)
         controladorContrasena(d.servicioContrasena)
         controladorOnboarding(d.servicioOnboarding)
         controladorAdminUsuario(d.servicioAdminUsuario)
+
+        // Fase 3: banco de preguntas e IA
+        controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta)
 
         // Pendientes de migrar (ver documentacion/PLAN_REFACTORIZACION.md)
         recordatorioRoutes(d.repositorioRecordatorio)
@@ -38,7 +41,6 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
         syncRoutes(d.repositorioSincronizacion)
         skillRoutes(d.repositorioCargoSkill, d.cache)
         legalRoutes(d.repositorioTextoConsentimiento)
-        adminAiRoutes(d.servicioGeneracionPreguntas)
 
         marketRoutes(
             skillMarketRepository = d.repositorioMercadoSkill,

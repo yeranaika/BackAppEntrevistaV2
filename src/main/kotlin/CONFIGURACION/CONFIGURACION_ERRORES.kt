@@ -6,6 +6,7 @@ import ERRORES.ErrorDemasiadosIntentos
 import ERRORES.ErrorNoAutorizado
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorProhibido
+import ERRORES.ErrorRespuestaExterna
 import ERRORES.ErrorServicioExterno
 import ERRORES.ErrorValidacion
 import ESQUEMAS.RespuestaError
@@ -49,5 +50,6 @@ private fun estadoHttpDe(error: ErrorAplicacion): HttpStatusCode = when (error) 
     is ErrorNoEncontrado -> HttpStatusCode.NotFound
     is ErrorConflicto -> HttpStatusCode.Conflict
     is ErrorDemasiadosIntentos -> HttpStatusCode.TooManyRequests
+    is ErrorRespuestaExterna -> HttpStatusCode.BadGateway
     is ErrorServicioExterno -> HttpStatusCode.ServiceUnavailable
 }

@@ -3,6 +3,13 @@ package CONFIGURACION
 import INTEGRACIONES.ClienteCorreoSmtp
 import INTEGRACIONES.ClienteGoogleIdentidad
 import INTEGRACIONES.EnviadorCorreo
+import INTEGRACIONES.ProveedorAnthropic
+import INTEGRACIONES.ProveedorOpenAi
+import INTEGRACIONES.TipoProveedorIa
+import INTEGRACIONES.crearClienteHttpLlm
+import MODELOS.LectorCatalogoExposed
+import MODELOS.RepositorioGeneracionPreguntaIaExposed
+import MODELOS.RepositorioPreguntaExposed
 import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioCuentaOAuthExposed
 import MODELOS.RepositorioObjetivoCarrera
@@ -16,8 +23,10 @@ import MODELOS.RepositorioRefreshTokenExposed
 import MODELOS.RepositorioUsuarioExposed
 import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioOnboarding
+import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import data.repository.billing.SuscripcionRepository
@@ -34,7 +43,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.jetbrains.exposed.sql.Database
 import security.billing.GooglePlayBillingService
-import services.AiQuestionGeneratorService
 import services.cache.RedisCacheService
 import services.market.CargoSkillGeneratorService
 import services.market.JobMarketClient
@@ -68,6 +76,9 @@ class ContenedorDependencias(
     val repositorioMercadoSkill = SkillMarketRepository(db)
     val repositorioCargo = CargoRepository(db)
     val repositorioCargoSkill = CargoSkillRepository(db)
+    val repositorioPregunta = RepositorioPreguntaExposed()
+    val repositorioGeneracionPregunta = RepositorioGeneracionPreguntaIaExposed()
+    val lectorCatalogo = LectorCatalogoExposed()
 
     // ---------- Integraciones externas ----------
     val cache = RedisCacheService(
@@ -83,10 +94,12 @@ class ContenedorDependencias(
         rapidApiHost = configuracion.mercadoLaboral.apiHost
     )
 
-    // Siempre montado: sin keys responde 503 provider_not_configured.
-    val servicioGeneracionPreguntas = AiQuestionGeneratorService(
-        openAiKey = configuracion.llm.openAiApiKey,
-        anthropicKey = configuracion.llm.anthropicApiKey
+    private val clienteHttpLlm = crearClienteHttpLlm()
+
+    // Siempre montados: sin API key responden 503 provider_not_configured.
+    val proveedoresIa = mapOf(
+        TipoProveedorIa.OPENAI to ProveedorOpenAi(configuracion.llm.openAiApiKey, clienteHttpLlm),
+        TipoProveedorIa.ANTHROPIC to ProveedorAnthropic(configuracion.llm.anthropicApiKey, clienteHttpLlm)
     )
 
     val servicioFacturacion = GooglePlayBillingService(
@@ -140,6 +153,14 @@ class ContenedorDependencias(
         tokens = servicioToken
     )
 
+    val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
+
+    val servicioGeneracionPregunta = ServicioGeneracionPregunta(
+        proveedores = proveedoresIa,
+        repositorio = repositorioGeneracionPregunta,
+        catalogo = lectorCatalogo
+    )
+
     val generadorSkillsCargo = CargoSkillGeneratorService(
         cargoRepository = repositorioCargo,
         skillMarketRepository = repositorioMercadoSkill,
@@ -160,7 +181,7 @@ class ContenedorDependencias(
         tareasSegundoPlano.cancel()
         workerTendencias.stop()
         clienteMercadoLaboral.close()
-        servicioGeneracionPreguntas.close()
+        clienteHttpLlm.close()
         cache.close()
     }
 }

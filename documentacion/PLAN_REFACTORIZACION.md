@@ -136,7 +136,26 @@ Resultado:
   - `forgot-password` revela si un correo está registrado (respuestas distintas).
 - Pruebas: correo duplicado, contraseña débil, perfil inválido, cuenta Google sin contraseña, código expirado.
 
-## Fase 3 — Creación de preguntas
+## Fase 3 — Creación de preguntas ✅ (rama `refactor/fase-3-preguntas`)
+**Estado:** completada. 145 pruebas en verde + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1` (38/38) contra Postgres real,
+verificada con una mutación (detecta si los usuarios ven preguntas no aprobadas). Regresión E2E Fases 1 y 2: 34/34 y 48/48.
+
+Hecho:
+- `CONTROLADOR_PREGUNTA` → `SERVICIO_PREGUNTA` (banco: crear, listar paginado, editar, aprobar, rechazar, eliminar, lectura para usuarios) y `SERVICIO_GENERACION_PREGUNTA` (LLM) → `REPOSITORIO_PREGUNTA`, `REPOSITORIO_GENERACION_PREGUNTA_IA`, `LECTOR_CATALOGO`.
+- `INTEGRACIONES/PROVEEDOR_LLM`: OpenAI y Anthropic detrás de `ProveedorPreguntasIa`; nuevo error de dominio `ErrorRespuestaExterna` (502).
+- `ESQUEMAS/ESQUEMA_RESPUESTA_LLM` (contrato y JSON Schema del LLM) y `SERVICIOS/VALIDADOR_LOTE_PREGUNTA_IA` (reglas STAR, opciones, duplicados).
+- `VISTAS/VISTA_PREGUNTA`: vista admin (con solución) y vista pública (sin respuesta ideal, opción correcta ni explicación).
+- Eliminados `services/ai`, `services/AiQuestionGeneratorService`, `routes/admin/AdminAiRoutes`, `data/{models,repository,tables}/ai`.
+
+Corregido:
+- **El LLM nunca recibía el contexto**: la ruta no pasaba cargo ni skill y el prompt decía "Preguntas generales". Ahora incluye sus nombres.
+- Un `cargo_id`/`skill_id` inexistente pagaba la llamada al LLM y luego fallaba al guardar; ahora responde 404 antes de llamar.
+- Si fallaba la auditoría de una generación fallida, el cliente recibía 500 en vez del error real del proveedor.
+- No existía forma de revisar lo generado por IA ni de crear preguntas manuales; aprobar/rechazar ahora deja constancia en `pregunta_generacion_ia` (estado y quién revisó).
+
+Cambio de contrato (solo panel admin): los errores de validación de `generate-ai` pasan de 422 a 400 y usan el formato único `{error, mensaje}`.
+
+Tareas originales:
 **Hoy:** `AiQuestionGeneratorService` + `services/ai/*` (es la parte más ordenada: ya tiene interfaces). Falta CRUD manual y revisión.
 
 Resultado:

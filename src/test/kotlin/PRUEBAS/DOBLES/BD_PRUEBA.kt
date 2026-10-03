@@ -6,8 +6,16 @@ import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorOnboarding
+import CONTROLADORES.controladorPregunta
 import CONTROLADORES.controladorUsuario
+import INTEGRACIONES.TipoProveedorIa
 import INTEGRACIONES.VerificadorIdentidadGoogle
+import MODELOS.LectorCatalogoExposed
+import MODELOS.RepositorioGeneracionPreguntaIaExposed
+import MODELOS.RepositorioPreguntaExposed
+import MODELOS.TablaGeneracionPreguntaIa
+import MODELOS.TablaOpcionPregunta
+import MODELOS.TablaPregunta
 import MODELOS.RepositorioCuentaOAuthExposed
 import MODELOS.RepositorioObjetivoCarreraExposed
 import MODELOS.RepositorioPerfilExposed
@@ -22,11 +30,15 @@ import MODELOS.TablaRefreshToken
 import MODELOS.TablaUsuario
 import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioOnboarding
+import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import com.auth0.jwt.JWT
+import data.tables.market.CargoTable
+import data.tables.market.SkillTable
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondError
@@ -45,6 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 
@@ -61,7 +74,10 @@ object BdPrueba {
         transaction(db) {
             // Una tabla por llamada: en H2 crear TablaUsuario junto a una tabla que la referencia
             // repite el ALTER ... ADD CONSTRAINT usuario_correo_unique
-            listOf(TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena)
+            listOf(
+                TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena,
+                CargoTable, SkillTable, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa
+            )
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
         return db
@@ -72,7 +88,11 @@ object BdPrueba {
  * Servicios y repositorios reales sobre H2, con correo y Google falsos.
  * Los correos se "envían" en el mismo hilo (Dispatchers.Unconfined) para poder leerlos al instante.
  */
-class SistemaPrueba(google: VerificadorIdentidadGoogle = GoogleEnMemoria()) {
+class SistemaPrueba(
+    google: VerificadorIdentidadGoogle = GoogleEnMemoria(),
+    /** LLM falso: por defecto responde un lote válido de 1 pregunta abierta. */
+    val proveedorIa: ProveedorIaGrabador = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
     val perfiles = RepositorioPerfilExposed()
@@ -90,6 +110,25 @@ class SistemaPrueba(google: VerificadorIdentidadGoogle = GoogleEnMemoria()) {
         usuarios, usuarios, cuentasOAuth, codigos, correo, tokens, CoroutineScope(Dispatchers.Unconfined)
     )
     val admin = ServicioAdminUsuario(usuarios, contrasena, tokens)
+
+    val catalogo = LectorCatalogoExposed()
+    val preguntas = RepositorioPreguntaExposed()
+    val generaciones = RepositorioGeneracionPreguntaIaExposed()
+    val pregunta = ServicioPregunta(preguntas, catalogo)
+    val generacion = ServicioGeneracionPregunta(
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
+    )
+
+    /** Inserta un cargo y una skill en el catálogo y devuelve sus ids. */
+    fun crearCatalogo(nombreCargo: String = "Backend Developer", nombreSkill: String = "Kotlin"): Pair<UUID, UUID> {
+        val cargoId = UUID.randomUUID()
+        val skillId = UUID.randomUUID()
+        transaction(db) {
+            CargoTable.insert { it[CargoTable.cargoId] = cargoId; it[nombre] = nombreCargo; it[area] = "backend" }
+            SkillTable.insert { it[SkillTable.skillId] = skillId; it[nombre] = nombreSkill; it[categoria] = "tecnica"; it[tipoArea] = "backend" }
+        }
+        return cargoId to skillId
+    }
 
     /** Mismos plugins y controladores que producción, con autenticación de prueba. */
     fun montar(app: Application) = with(app) {
@@ -123,6 +162,7 @@ class SistemaPrueba(google: VerificadorIdentidadGoogle = GoogleEnMemoria()) {
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
+            controladorPregunta(pregunta, generacion)
         }
     }
 }

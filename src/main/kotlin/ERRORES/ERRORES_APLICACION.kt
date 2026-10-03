@@ -30,6 +30,9 @@ class ErrorConflicto(codigo: String, mensaje: String = codigo) : ErrorAplicacion
 /** Se superó el límite de intentos (ej: código de recuperación) → 429. */
 class ErrorDemasiadosIntentos(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
 
+/** Un proveedor externo respondió, pero con algo inutilizable (rechazo, respuesta truncada, JSON inválido) → 502. */
+class ErrorRespuestaExterna(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
+
 /** Un proveedor externo (LLM, correo, Google, JSearch…) falló o no está configurado → 503. */
 class ErrorServicioExterno(
     codigo: String,
