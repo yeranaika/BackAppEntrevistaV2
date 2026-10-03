@@ -23,10 +23,7 @@ private suspend fun <T> dbTx(block: suspend Transaction.() -> T): T =
  * - createForEmail(email): crea un registro de reset si el correo existe.
  *   Si el correo NO corresponde a ningún usuario, retorna null.
  *
- * - consume(token, code): valida un reset (token + código) y lo marca como usado.
- *
- * - consumeByEmail(email, code): versión que valida por correo + código,
- *   útil cuando el cliente no maneja el token.
+ * - consumeByEmail(email, code): valida por correo + código y lo marca como usado.
  */
 class PasswordResetRepository(
     private val users: UserRepository = UserRepository(),
@@ -70,31 +67,7 @@ class PasswordResetRepository(
     }
 
     /**
-     * Verifica y CONSUME un reset válido (token + code).
-     */
-    suspend fun consume(token: UUID, code: String): UUID? = dbTx {
-        val row = PasswordResetTable
-            .selectAll()
-            .where {
-                (PasswordResetTable.token eq token) and
-                (PasswordResetTable.code eq code) and
-                (PasswordResetTable.used eq false) and
-                (PasswordResetTable.expiresAt greater Instant.now())
-            }
-            .limit(1)
-            .firstOrNull()
-            ?: return@dbTx null
-
-        PasswordResetTable.update({ PasswordResetTable.token eq token }) {
-            it[used] = true
-        }
-
-        row[PasswordResetTable.usuarioId]
-    }
-
-    /**
-     * Versión pensada para tu API actual:
-     * valida por CORREO + CÓDIGO (sin token), no usado y no expirado.
+     * Valida por CORREO + CÓDIGO, no usado y no expirado.
      *
      * @return userId si está OK y marca como usado, o null si no es válido.
      */

@@ -11,7 +11,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import models.ConfirmarBorradoReq
 import models.DeleteAccountOk
-import models.ErrorRes
+import ESQUEMAS.RespuestaError
 import java.util.UUID
 import kotlinx.serialization.Serializable
 
@@ -44,7 +44,7 @@ fun Route.deleteAccountRoute(usuarioRepo: UserRepository) {
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@delete call.respond(
                         HttpStatusCode.Unauthorized,
-                        ErrorRes("unauthorized")
+                        RespuestaError("unauthorized")
                     )
 
                 val usuarioId = UUID.fromString(principal.payload.subject)
@@ -55,7 +55,7 @@ fun Route.deleteAccountRoute(usuarioRepo: UserRepository) {
                 } catch (_: ContentTransformationException) {
                     return@delete call.respond(
                         HttpStatusCode.BadRequest,
-                        ErrorRes("invalid_json")
+                        RespuestaError("invalid_json")
                     )
                 }
 
@@ -63,7 +63,7 @@ fun Route.deleteAccountRoute(usuarioRepo: UserRepository) {
                 if (body.confirmar.trim().lowercase() != "eliminar") {
                     return@delete call.respond(
                         HttpStatusCode.BadRequest,
-                        ErrorRes("must_type_eliminar")
+                        RespuestaError("must_type_eliminar")
                     )
                 }
 
@@ -74,7 +74,7 @@ fun Route.deleteAccountRoute(usuarioRepo: UserRepository) {
                     // El usuario no existe (podría haber sido eliminado en otra sesión)
                     return@delete call.respond(
                         HttpStatusCode.NotFound,
-                        ErrorRes("user_not_found")
+                        RespuestaError("user_not_found")
                     )
                 }
 
@@ -90,14 +90,14 @@ fun Route.deleteAccountRoute(usuarioRepo: UserRepository) {
                 // UUID inválido en el JWT
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    ErrorRes("invalid_user_id")
+                    RespuestaError("invalid_user_id")
                 )
             } catch (t: Throwable) {
                 // Error inesperado
                 call.application.environment.log.error("Error al eliminar cuenta", t)
                 call.respond(
                     HttpStatusCode.InternalServerError,
-                    ErrorRes("server_error")
+                    RespuestaError("server_error")
                 )
             }
         }

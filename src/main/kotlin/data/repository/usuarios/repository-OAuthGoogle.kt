@@ -1,11 +1,11 @@
 package data.repository.usuarios
 
-import at.favre.lib.crypto.bcrypt.BCrypt
 import data.tables.usuarios.OauthAccountTable
 import data.tables.usuarios.UsuarioTable
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import security.hashPassword
 import java.util.UUID
 
 interface UsuariosOAuthRepository {
@@ -14,10 +14,6 @@ interface UsuariosOAuthRepository {
 }
 
 class UsuariosOAuthRepositoryImpl : UsuariosOAuthRepository {
-
-    // hash para contraseña aleatoria
-    private fun hash(password: String): String =
-        BCrypt.withDefaults().hashToString(12, password.toCharArray())
 
     override suspend fun isGoogleUser(userId: UUID): Boolean = db {
         OauthAccountTable
@@ -51,7 +47,7 @@ class UsuariosOAuthRepositoryImpl : UsuariosOAuthRepository {
 
                 // contraseña random solo para cumplir NOT NULL
                 val randomPassword = UUID.randomUUID().toString()
-                val passwordHash   = hash(randomPassword)
+                val passwordHash   = hashPassword(randomPassword)
 
                 UsuarioTable.insert {
                     it[usuarioId]       = id

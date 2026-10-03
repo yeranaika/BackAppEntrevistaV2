@@ -1,4 +1,4 @@
-﻿package routes.auth
+package routes.auth
 
 import data.repository.usuarios.UserRepository
 import data.tables.usuarios.UsuarioTable

@@ -1,5 +1,7 @@
 package services
 
+import CONFIGURACION.LARGO_MINIMO_CONTRASENA
+import CONFIGURACION.TTL_TOKEN_ACCESO_SEGUNDOS
 import com.auth0.jwt.algorithms.Algorithm
 import data.repository.usuarios.ProfileRepository
 import data.repository.usuarios.RefreshTokenRepository
@@ -60,7 +62,6 @@ class AuthService(
     private val generosValidos = setOf(
         "masculino", "femenino", "no_binario", "otro", "prefiere_no_decirlo"
     )
-    private val accessTokenTtlSeconds = 15 * 60
 
     /** Registro local: valida, crea usuario (+ perfil opcional) y emite tokens. */
     suspend fun register(
@@ -72,7 +73,7 @@ class AuthService(
         val email = req.email.trim().lowercase()
 
         if (!emailRegex.matches(email)) throw InvalidEmailException()
-        if (req.password.length < 8) throw WeakPasswordException()
+        if (req.password.length < LARGO_MINIMO_CONTRASENA) throw WeakPasswordException()
         if (!req.pais.isNullOrBlank() && !paisRegex.matches(req.pais)) throw InvalidCountryException()
         if (users.existsByEmail(email)) throw EmailInUseException()
 
@@ -215,7 +216,7 @@ class AuthService(
             issuer = issuer,
             audience = audience,
             algorithm = algorithm,
-            ttlSeconds = accessTokenTtlSeconds,
+            ttlSeconds = TTL_TOKEN_ACCESO_SEGUNDOS,
             extraClaims = mapOf("role" to role)
         )
 

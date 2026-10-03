@@ -1,4 +1,4 @@
-﻿package routes.legal
+package routes.legal
 
 import data.models.usuarios.CreateConsentTextReq
 import data.repository.usuarios.ConsentTextRepository

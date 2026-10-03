@@ -9,11 +9,11 @@ import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import models.ErrorRes
+import ESQUEMAS.RespuestaError
 import models.GoogleLoginReq
 import models.LoginOk
 import models.LoginReq
-import models.OkRes
+import ESQUEMAS.RespuestaOk
 import models.RegisterReq
 import models.TokenPair
 import models.UpdateProfileReq
@@ -42,32 +42,32 @@ fun Route.authController(
         post("/register") {
             try {
                 val req = call.receiveJsonOrNull<RegisterReq>()
-                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 val tokens = authService.register(req, issuer, audience, algorithm)
                 call.respond(HttpStatusCode.Created, LoginOk(tokens.accessToken, tokens.refreshToken))
             } catch (e: AuthService.EmailInUseException) {
-                call.respond(HttpStatusCode.Conflict, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.Conflict, RespuestaError(e.publicCode))
             } catch (e: AuthService.AuthException) {
-                call.respond(HttpStatusCode.UnprocessableEntity, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.UnprocessableEntity, RespuestaError(e.publicCode))
             } catch (t: Throwable) {
                 call.application.environment.log.error("Register failed", t)
-                call.respond(HttpStatusCode.InternalServerError, ErrorRes("server_error"))
+                call.respond(HttpStatusCode.InternalServerError, RespuestaError("server_error"))
             }
         }
 
         post("/login") {
             try {
                 val req = call.receiveJsonOrNull<LoginReq>()
-                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 val tokens = authService.login(req, issuer, audience, algorithm)
                 call.respond(LoginOk(tokens.accessToken, tokens.refreshToken))
             } catch (e: AuthService.InactiveUserException) {
-                call.respond(HttpStatusCode.Forbidden, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.Forbidden, RespuestaError(e.publicCode))
             } catch (e: AuthService.BadCredentialsException) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.Unauthorized, RespuestaError(e.publicCode))
             } catch (t: Throwable) {
                 call.application.environment.log.error("Login failed", t)
-                call.respond(HttpStatusCode.InternalServerError, ErrorRes("server_error"))
+                call.respond(HttpStatusCode.InternalServerError, RespuestaError("server_error"))
             }
         }
 
@@ -75,16 +75,16 @@ fun Route.authController(
         post("/google") {
             try {
                 val req = call.receiveJsonOrNull<GoogleLoginReq>()
-                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 val tokens = authService.loginWithGoogle(req.idToken, issuer, audience, algorithm)
                 call.respond(HttpStatusCode.OK, LoginOk(tokens.accessToken, tokens.refreshToken))
             } catch (e: AuthService.GoogleTokenInvalidException) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.Unauthorized, RespuestaError(e.publicCode))
             } catch (e: AuthService.GoogleEmailNotVerifiedException) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
+                call.respond(HttpStatusCode.Unauthorized, RespuestaError(e.publicCode))
             } catch (t: Throwable) {
                 call.application.environment.log.error("Google login failed", t)
-                call.respond(HttpStatusCode.InternalServerError, ErrorRes("server_error"))
+                call.respond(HttpStatusCode.InternalServerError, RespuestaError("server_error"))
             }
         }
 
@@ -93,7 +93,7 @@ fun Route.authController(
             route("/google") {
                 get("/start") {
                     // El provider OAuth de Ktor ya hace la redirección; normalmente no se llama directo.
-                    call.respond(HttpStatusCode.BadRequest, ErrorRes("use_configured_oauth_flow"))
+                    call.respond(HttpStatusCode.BadRequest, RespuestaError("use_configured_oauth_flow"))
                 }
 
                 get("/callback") {
@@ -101,13 +101,13 @@ fun Route.authController(
                     val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()
                         ?: run {
                             log.error("OAuth principal NULL → fallo al canjear el 'code' con Google")
-                            return@get call.respond(HttpStatusCode.Unauthorized, ErrorRes("google_exchange_failed"))
+                            return@get call.respond(HttpStatusCode.Unauthorized, RespuestaError("google_exchange_failed"))
                         }
 
                     val idToken = principal.extraParameters["id_token"]
                         ?: run {
                             log.error("Falta id_token en la respuesta de Google")
-                            return@get call.respond(HttpStatusCode.Unauthorized, ErrorRes("missing_id_token"))
+                            return@get call.respond(HttpStatusCode.Unauthorized, RespuestaError("missing_id_token"))
                         }
 
                     try {
@@ -115,12 +115,12 @@ fun Route.authController(
                         // Flujo web: mantiene el formato TokenPair (snake_case) ya usado antes
                         call.respond(TokenPair(access_token = tokens.accessToken, refresh_token = tokens.refreshToken))
                     } catch (e: AuthService.GoogleTokenInvalidException) {
-                        call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
+                        call.respond(HttpStatusCode.Unauthorized, RespuestaError(e.publicCode))
                     } catch (e: AuthService.GoogleEmailNotVerifiedException) {
-                        call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
+                        call.respond(HttpStatusCode.Unauthorized, RespuestaError(e.publicCode))
                     } catch (t: Throwable) {
                         log.error("Error procesando callback Google", t)
-                        call.respond(HttpStatusCode.InternalServerError, ErrorRes("server_error"))
+                        call.respond(HttpStatusCode.InternalServerError, RespuestaError("server_error"))
                     }
                 }
             }
@@ -134,16 +134,16 @@ fun Route.authController(
                 try {
                     val userId = call.userIdFromJwt()
                     val req = call.receiveJsonOrNull<UpdateProfileReq>()
-                        ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                        ?: return@put call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                     authService.updateProfile(userId, req)
-                    call.respond(OkRes())
+                    call.respond(RespuestaOk())
                 } catch (e: AuthService.UserNotFoundException) {
-                    call.respond(HttpStatusCode.NotFound, ErrorRes(e.publicCode))
+                    call.respond(HttpStatusCode.NotFound, RespuestaError(e.publicCode))
                 } catch (e: AuthService.AuthException) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorRes(e.publicCode))
+                    call.respond(HttpStatusCode.BadRequest, RespuestaError(e.publicCode))
                 } catch (t: Throwable) {
                     call.application.environment.log.error("Update profile failed", t)
-                    call.respond(HttpStatusCode.InternalServerError, ErrorRes("server_error"))
+                    call.respond(HttpStatusCode.InternalServerError, RespuestaError("server_error"))
                 }
             }
         }

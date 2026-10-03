@@ -202,31 +202,6 @@
             "description": "Cambio de contraseña con sesión activa (requiere JWT)."
           },
           "response": []
-        },
-        {
-          "name": "POST /auth/request-reset  (dev: devuelve token+code)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"usuario@example.com\"\n}" },
-            "url": { "raw": "{{baseUrl}}/auth/request-reset", "host": ["{{baseUrl}}"], "path": ["auth","request-reset"] },
-            "description": "Solo para desarrollo. Devuelve el token y code en la respuesta (no manda email)."
-          },
-          "response": []
-        },
-        {
-          "name": "POST /auth/confirm-reset  (dev: consume token+code)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"<TOKEN_UUID_DEL_REQUEST_RESET>\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NuevaPassword123\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/auth/confirm-reset", "host": ["{{baseUrl}}"], "path": ["auth","confirm-reset"] },
-            "description": "Solo para desarrollo. Consume el token+code y setea la nueva contraseña."
-          },
-          "response": []
         }
       ]
     },

@@ -1,4 +1,4 @@
-﻿package data.repository.skills
+package data.repository.skills
 
 import data.models.skills.CargoLevelItem
 import data.models.skills.CargoSkillMatrixItem

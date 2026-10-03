@@ -1,4 +1,4 @@
-﻿package data.repository.usuarios
+package data.repository.usuarios
 
 import data.models.usuarios.CreateConsentTextReq
 import org.jetbrains.exposed.sql.*

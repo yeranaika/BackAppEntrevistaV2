@@ -1,13 +1,14 @@
 package routes.auth
 
-import at.favre.lib.crypto.bcrypt.BCrypt
+import CONFIGURACION.LARGO_MINIMO_CONTRASENA
 import data.models.auth.ForgotPasswordReq
 import data.models.auth.ForgotPasswordRes
 import data.models.auth.ResetPasswordReq
 import data.models.auth.ResetPasswordRes
 import data.models.auth.ChangePasswordReq
 import data.repository.usuarios.PasswordResetRepository
-import data.tables.usuarios.UsuarioTable
+import data.repository.usuarios.UserRepository
+import data.repository.usuarios.UsuariosOAuthRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -15,18 +16,15 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
-import org.jetbrains.exposed.sql.update
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import security.hashPassword
 import services.EmailService
 import java.util.UUID
 
 fun Route.passwordRecoveryRoutes(
     passwordResetRepo: PasswordResetRepository,
     emailService: EmailService,
-    db: Database,
-    oauthRepo: data.repository.usuarios.UsuariosOAuthRepository
+    users: UserRepository,
+    oauthRepo: UsuariosOAuthRepository
 ) {
     // ============================
     // POST /auth/forgot-password
@@ -128,10 +126,10 @@ fun Route.passwordRecoveryRoutes(
             )
         }
 
-        if (nuevaContrasena.length < 8) {
+        if (nuevaContrasena.length < LARGO_MINIMO_CONTRASENA) {
             return@post call.respond(
                 HttpStatusCode.BadRequest,
-                mapOf("error" to "La contraseña debe tener al menos 8 caracteres")
+                mapOf("error" to "La contraseña debe tener al menos $LARGO_MINIMO_CONTRASENA caracteres")
             )
         }
 
@@ -157,15 +155,7 @@ fun Route.passwordRecoveryRoutes(
                 )
             }
 
-            val hashedPassword = BCrypt
-                .withDefaults()
-                .hashToString(12, nuevaContrasena.toCharArray())
-
-            val updated = newSuspendedTransaction(db = db) {
-                UsuarioTable.update({ UsuarioTable.usuarioId eq usuarioId }) { st ->
-                    st[UsuarioTable.contrasenaHash] = hashedPassword
-                }
-            }
+            val updated = users.updatePasswordHash(usuarioId, hashPassword(nuevaContrasena))
 
             if (updated == 0) {
                 return@post call.respond(
@@ -230,10 +220,10 @@ fun Route.passwordRecoveryRoutes(
 
             val nuevaContrasena = body.nuevaContrasena
 
-            if (nuevaContrasena.length < 8) {
+            if (nuevaContrasena.length < LARGO_MINIMO_CONTRASENA) {
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf("message" to "La contraseña debe tener al menos 8 caracteres")
+                    mapOf("message" to "La contraseña debe tener al menos $LARGO_MINIMO_CONTRASENA caracteres")
                 )
             }
 
@@ -249,16 +239,7 @@ fun Route.passwordRecoveryRoutes(
                     )
                 }
 
-                // Generamos nuevo hash y actualizamos directo por usuarioId
-                val nuevoHash = BCrypt
-                    .withDefaults()
-                    .hashToString(12, nuevaContrasena.toCharArray())
-
-                val updated = newSuspendedTransaction(db = db) {
-                    UsuarioTable.update({ UsuarioTable.usuarioId eq usuarioId }) { st ->
-                        st[UsuarioTable.contrasenaHash] = nuevoHash
-                    }
-                }
+                val updated = users.updatePasswordHash(usuarioId, hashPassword(nuevaContrasena))
 
                 if (updated == 0) {
                     return@post call.respond(

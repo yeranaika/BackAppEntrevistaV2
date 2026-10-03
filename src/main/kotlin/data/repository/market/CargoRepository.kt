@@ -1,4 +1,4 @@
-﻿package data.repository.market
+package data.repository.market
 
 import data.models.market.CargoDto
 import data.models.market.CargoSkillDetailDto

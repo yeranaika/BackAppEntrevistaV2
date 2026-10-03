@@ -1,4 +1,4 @@
-﻿package routes.legal
+package routes.legal
 
 import java.io.File
 import kotlin.test.Test

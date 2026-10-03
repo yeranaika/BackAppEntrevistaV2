@@ -128,10 +128,6 @@ class UserRepository {
         }
     }
 
-    /** Alias usado por rutas. */
-    suspend fun updatePassword(userId: UUID, newHash: String): Int =
-        updatePasswordHash(userId, newHash)
-
     /** Cambia el rol (user/admin). */
     suspend fun updateRol(userId: UUID, rol: String): Int = dbTx {
         require(rol == "user" || rol == "admin") { "rol inválido" }

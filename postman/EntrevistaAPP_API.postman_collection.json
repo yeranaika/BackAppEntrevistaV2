@@ -196,60 +196,6 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "Request Reset Password (Dev)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"email\": \"usuario@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/auth/request-reset",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"request-reset"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Confirm Reset Password (Dev)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"token\": \"<TOKEN_UUID>\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NuevaPassword123\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/auth/confirm-reset",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"confirm-reset"
-							]
-						}
-					},
-					"response": []
 				}
 			]
 		},
@@ -1779,4 +1725,3 @@
 		}
 	]
 }
-

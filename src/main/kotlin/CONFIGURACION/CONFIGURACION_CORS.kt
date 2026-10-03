@@ -1,10 +1,10 @@
-package plugins
+package CONFIGURACION
 
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.cors.routing.*
 
-fun Application.configureCORS() {
+fun Application.configurarCors() {
     install(CORS) {
         // Permitir el frontend React en desarrollo (múltiples puertos)
         allowHost("localhost:5173")

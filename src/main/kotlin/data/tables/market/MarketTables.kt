@@ -1,4 +1,4 @@
-﻿package data.tables.market
+package data.tables.market
 
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime

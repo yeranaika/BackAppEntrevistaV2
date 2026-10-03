@@ -58,35 +58,6 @@ data class UpdateProfileReq(
 )
 
 @Serializable
-data class ErrorRes(
-    val error: String
-)
-
-@Serializable
-data class OkRes(
-    val ok: Boolean = true
-)
-
-@Serializable
-data class RequestResetReq(
-    val email: String
-)
-
-@Serializable
-data class RequestResetOk(
-    val ok: Boolean = true,
-    val token: String,
-    val code: String
-)
-
-@Serializable
-data class ConfirmResetReq(
-    val token: String,
-    val code: String,
-    val newPassword: String
-)
-
-@Serializable
 data class RefreshReq(
     val refreshToken: String
 )

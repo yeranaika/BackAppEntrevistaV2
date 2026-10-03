@@ -1,4 +1,4 @@
-﻿package data.models.skills
+package data.models.skills
 
 import kotlinx.serialization.Serializable
 

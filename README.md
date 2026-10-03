@@ -76,8 +76,6 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 | `POST` | `/auth/login` | Pública | Inicio de sesión con correo y contraseña. Retorna `accessToken` y `refreshToken`. | `{"email", "password"}` |
 | `POST` | `/auth/refresh` | Pública | Rotación de token: envía `refreshToken` y recibe un nuevo par de tokens. | `{"refreshToken"}` |
 | `POST` | `/auth/logout` | Pública | Cierre de sesión y revocación del `refreshToken`. | `{"refreshToken"}` |
-| `POST` | `/auth/request-reset` | Pública | Genera token de reseteo para desarrollo. | `{"email"}` |
-| `POST` | `/auth/confirm-reset` | Pública | Confirma reseteo en desarrollo con token y nueva contraseña. | `{"token", "code", "newPassword"}` |
 
 ---
 

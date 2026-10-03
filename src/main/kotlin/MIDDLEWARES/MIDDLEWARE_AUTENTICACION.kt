@@ -1,5 +1,4 @@
-// middlewares/AuthMiddleware.kt
-package middlewares
+package MIDDLEWARES
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
@@ -17,7 +16,7 @@ import kotlinx.serialization.json.Json
 
 import io.ktor.server.application.Application
 import io.ktor.util.AttributeKey
-import plugins.settings
+import CONFIGURACION.configuracion
 import io.ktor.client.plugins.logging.*
 
 /**
@@ -34,11 +33,11 @@ val AuthCtxKey = AttributeKey<AuthCtx>("auth-ctx")
 @kotlinx.serialization.Serializable
 data class OAuthSession(val state: String = "")
 
-fun Application.configureSecurity() {
+fun Application.configurarSeguridad() {
     // ---------- Config JWT ----------
-    val s = settings()
-    val algorithm = Algorithm.HMAC512(s.jwtSecret)
-    attributes.put(AuthCtxKey, AuthCtx(s.jwtIssuer, s.jwtAudience, algorithm))
+    val s = configuracion()
+    val algorithm = Algorithm.HMAC512(s.jwt.secreto)
+    attributes.put(AuthCtxKey, AuthCtx(s.jwt.emisor, s.jwt.audiencia, algorithm))
 
     // ---------- Cliente HTTP para el intercambio de tokens con Google ----------
     val oauthHttpClient = HttpClient(CIO) {
@@ -64,8 +63,8 @@ fun Application.configureSecurity() {
             realm = "app-entrevista"
             verifier(
                 JWT.require(algorithm)
-                    .withIssuer(s.jwtIssuer)
-                    .withAudience(s.jwtAudience)
+                    .withIssuer(s.jwt.emisor)
+                    .withAudience(s.jwt.audiencia)
                     .build()
             )
             validate { cred -> if (cred.subject != null) JWTPrincipal(cred.payload) else null }
@@ -74,7 +73,7 @@ fun Application.configureSecurity() {
         // 2) Esquema OAuth de Google (Authorization Code + OIDC) — usado por el flujo web
         oauth("google-oauth") {
             // Debe coincidir EXACTAMENTE con el Redirect URI configurado en Google Cloud
-            val redirectUri = s.googleRedirectUri
+            val redirectUri = s.google.redirectUri
 
             urlProvider = { redirectUri }
 
@@ -84,8 +83,8 @@ fun Application.configureSecurity() {
                     authorizeUrl   = "https://accounts.google.com/o/oauth2/v2/auth",
                     accessTokenUrl = "https://oauth2.googleapis.com/token",
                     requestMethod  = HttpMethod.Post,
-                    clientId       = s.googleClientId,
-                    clientSecret   = s.googleClientSecret,
+                    clientId       = s.google.clientId,
+                    clientSecret   = s.google.clientSecret,
                     // Pedimos OIDC para recibir id_token en el callback
                     defaultScopes  = listOf("openid", "email", "profile")
                 )

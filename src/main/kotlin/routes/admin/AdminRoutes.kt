@@ -54,7 +54,7 @@ fun Route.adminRoutes(adminUserRepo: AdminUserRepository) {
                     val newUser = adminUserRepo.createByAdmin(req)
                     call.respond(HttpStatusCode.Created, newUser)
                 } catch (e: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Solicitud inv�lida"))
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Solicitud inválida"))
                 } catch (e: IllegalStateException) {
                     call.respond(HttpStatusCode.Conflict, ErrorResponse(e.message ?: "Conflicto al crear usuario"))
                 } catch (e: Exception) {
@@ -72,7 +72,7 @@ fun Route.adminRoutes(adminUserRepo: AdminUserRepository) {
                     val usuarioId = try {
                         UUID.fromString(usuarioIdStr)
                     } catch (e: IllegalArgumentException) {
-                        return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("usuarioId inv�lido"))
+                        return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("usuarioId inválido"))
                     }
 
                     val req = call.receive<UpdateRoleRequest>()
@@ -91,7 +91,7 @@ fun Route.adminRoutes(adminUserRepo: AdminUserRepository) {
                         call.respond(HttpStatusCode.InternalServerError, ErrorResponse("No se pudo actualizar el rol"))
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Rol inv�lido"))
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Rol inválido"))
                 } catch (e: Exception) {
                     call.application.environment.log.error("Error al actualizar rol", e)
                     call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Error al actualizar rol"))
@@ -107,7 +107,7 @@ fun Route.adminRoutes(adminUserRepo: AdminUserRepository) {
                     val usuarioId = try {
                         UUID.fromString(usuarioIdStr)
                     } catch (e: IllegalArgumentException) {
-                        return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("usuarioId inv�lido"))
+                        return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("usuarioId inválido"))
                     }
 
                     // Verificar que el usuario existe

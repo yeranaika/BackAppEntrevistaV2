@@ -1,4 +1,4 @@
-﻿package routes.skills
+package routes.skills
 
 import data.models.skills.CargoLevelItem
 import data.models.skills.CargoSkillsMatrixResponse

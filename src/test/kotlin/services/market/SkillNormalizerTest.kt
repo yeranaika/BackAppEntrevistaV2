@@ -1,4 +1,4 @@
-﻿package services.market
+package services.market
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

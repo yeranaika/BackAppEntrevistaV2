@@ -12,6 +12,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import ESQUEMAS.RespuestaError
+import ESQUEMAS.RespuestaOk
 import security.userIdFromJwt
 
 // ---------- DTOs ----------
@@ -64,12 +66,6 @@ data class ObjetivoRes(
     val nombreCargo: String,
     val sector: String?
 )
-
-@Serializable
-data class OkRes(val ok: Boolean = true)
-
-@Serializable
-data class ErrorRes(val error: String)
 
 // ---------- Validaciones ----------
 object Validaciones {
@@ -136,7 +132,7 @@ fun Route.meRoutes(
             get {
                 val uid = call.userIdFromJwt()
                 val u = users.findById(uid)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, ErrorRes("user_not_found"))
+                    ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("user_not_found"))
 
                 val p = profiles.findByUser(uid)
                 val obj = objetivos.findByUser(uid)
@@ -177,7 +173,7 @@ fun Route.meRoutes(
             get("/perfil") {
                 val uid = call.userIdFromJwt()
                 val p = profiles.findByUser(uid)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, ErrorRes("profile_not_found"))
+                    ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("profile_not_found"))
 
                 call.respond(
                     PerfilRes(
@@ -194,7 +190,7 @@ fun Route.meRoutes(
             put("/perfil") {
                 val uid = call.userIdFromJwt()
                 val req = runCatching { call.receive<PutPerfilReq>() }.getOrElse {
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                    return@put call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 }
 
                 val paisNormalizado = req.pais?.uppercase()
@@ -202,19 +198,19 @@ fun Route.meRoutes(
                 val errorNivel = Validaciones.validarNivelExperiencia(req.nivelExperiencia)
                 if (errorNivel != null) {
                     application.log.error("PUT /me/perfil → $errorNivel (nivel='${req.nivelExperiencia}')")
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes(errorNivel))
+                    return@put call.respond(HttpStatusCode.BadRequest, RespuestaError(errorNivel))
                 }
 
                 val errorArea = Validaciones.validarArea(req.area)
                 if (errorArea != null) {
                     application.log.error("PUT /me/perfil → $errorArea (area='${req.area}')")
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes(errorArea))
+                    return@put call.respond(HttpStatusCode.BadRequest, RespuestaError(errorArea))
                 }
 
                 val errorPais = Validaciones.validarPais(paisNormalizado)
                 if (errorPais != null) {
                     application.log.error("PUT /me/perfil → $errorPais (pais='${req.pais}')")
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes(errorPais))
+                    return@put call.respond(HttpStatusCode.BadRequest, RespuestaError(errorPais))
                 }
 
                 profiles.upsert(
@@ -226,14 +222,14 @@ fun Route.meRoutes(
                     flagsAccesibilidad = req.flagsAccesibilidad
                 )
 
-                call.respond(OkRes())
+                call.respond(RespuestaOk())
             }
 
             // GET /me/objetivo
             get("/objetivo") {
                 val uid = call.userIdFromJwt()
                 val obj = objetivos.findByUser(uid)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, ErrorRes("objetivo_not_found"))
+                    ?: return@get call.respond(HttpStatusCode.NotFound, RespuestaError("objetivo_not_found"))
 
                 call.respond(
                     ObjetivoRes(
@@ -248,13 +244,13 @@ fun Route.meRoutes(
             put("/objetivo") {
                 val uid = call.userIdFromJwt()
                 val req = runCatching { call.receive<PutObjetivoReq>() }.getOrElse {
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
+                    return@put call.respond(HttpStatusCode.BadRequest, RespuestaError("invalid_json"))
                 }
 
                 if (req.nombreCargo.isBlank()) {
                     return@put call.respond(
                         HttpStatusCode.BadRequest,
-                        ErrorRes("nombre_cargo_requerido")
+                        RespuestaError("nombre_cargo_requerido")
                     )
                 }
 
@@ -276,11 +272,11 @@ fun Route.meRoutes(
                 if (deleted == 0) {
                     return@delete call.respond(
                         HttpStatusCode.NotFound,
-                        ErrorRes("objetivo_not_found")
+                        RespuestaError("objetivo_not_found")
                     )
                 }
 
-                call.respond(OkRes())
+                call.respond(RespuestaOk())
             }
         }
     }

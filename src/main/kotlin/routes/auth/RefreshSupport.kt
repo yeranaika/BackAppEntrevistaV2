@@ -1,5 +1,6 @@
 package routes.auth
 
+import CONFIGURACION.DIAS_VIGENCIA_REFRESH_TOKEN
 import data.repository.usuarios.RefreshTokenRepository
 import security.hashRefreshToken
 import java.time.Instant
@@ -13,7 +14,7 @@ suspend fun issueNewRefresh(
     userId: UUID
 ) {
     val now = Instant.now()
-    val exp = now.plus(15, ChronoUnit.DAYS)
+    val exp = now.plus(DIAS_VIGENCIA_REFRESH_TOKEN, ChronoUnit.DAYS)
     refreshRepo.insert(
         userId = userId,
         tokenHash = hashRefreshToken(plain),

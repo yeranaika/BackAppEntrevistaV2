@@ -1,4 +1,4 @@
-﻿package services.market
+package services.market
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
