@@ -60,6 +60,7 @@ dependencies {
     // Tests
     testImplementation(libs.ktor.server.test.host) // alias correcto
     testImplementation(libs.kotlin.test.junit)
+    testImplementation("io.ktor:ktor-client-mock:3.3.1")
     testImplementation("com.h2database:h2:2.3.232")
 
     // serialización JSON

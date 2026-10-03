@@ -6,6 +6,11 @@ import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import models.ConfirmResetReq
+import models.ErrorRes
+import models.OkRes
+import models.RequestResetReq
+import models.RequestResetOk
 import security.hashPassword
 import java.util.UUID
 

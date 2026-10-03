@@ -13,9 +13,6 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import security.userIdFromJwt
-import java.time.LocalDate
-import java.time.format.DateTimeParseException
-import java.util.UUID
 
 // ---------- DTOs ----------
 @Serializable
@@ -44,17 +41,6 @@ data class PerfilRes(
     val pais: String? = null,
     val notaObjetivos: String? = null,
     val flagsAccesibilidad: JsonElement? = null
-)
-
-@Serializable
-data class PutMeReq(
-    val nombre: String? = null,
-    val idioma: String? = null,
-
-    // Campos nuevos editables del usuario
-    val telefono: String? = null,
-    val fechaNacimiento: String? = null,  // "YYYY-MM-DD" o null
-    val genero: String? = null
 )
 
 @Serializable
@@ -185,113 +171,7 @@ fun Route.meRoutes(
                 )
             }
 
-            // PUT /me
-            put {
-                val uid = call.userIdFromJwt()
-                val u = users.findById(uid)
-                    ?: return@put call.respond(HttpStatusCode.NotFound, ErrorRes("user_not_found"))
-
-                val req = runCatching { call.receive<PutMeReq>() }.getOrElse {
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
-                }
-
-                // Validar idioma
-                val errorIdioma = Validaciones.validarIdioma(req.idioma)
-                if (errorIdioma != null) {
-                    return@put call.respond(HttpStatusCode.BadRequest, ErrorRes(errorIdioma))
-                }
-
-                // Validar teléfono: CHECK telefono ~ '^\+?[0-9]{7,20}$'
-                val telefonoLimpio = req.telefono?.trim()?.takeIf { it.isNotEmpty() }
-                if (telefonoLimpio != null && !telefonoLimpio.matches(Regex("^\\+?[0-9]{7,20}$"))) {
-                    return@put call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorRes("telefono_invalido")
-                    )
-                }
-
-                // Validar género: CHECK genero IN (...)
-                val generoLimpio = req.genero?.trim()
-                val GENEROS_VALIDOS = setOf(
-                    "masculino",
-                    "femenino",
-                    "no_binario",
-                    "otro",
-                    "prefiere_no_decirlo"
-                )
-                if (generoLimpio != null && generoLimpio !in GENEROS_VALIDOS) {
-                    return@put call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorRes("genero_invalido")
-                    )
-                }
-
-                // Validar + parsear fecha de nacimiento según el CHECK
-                val fechaNacimientoParsed: LocalDate? = if (req.fechaNacimiento != null) {
-                    if (req.fechaNacimiento.isBlank()) {
-                        null  // "" → borrar
-                    } else {
-                        val parsed = try {
-                            LocalDate.parse(req.fechaNacimiento) // "YYYY-MM-DD"
-                        } catch (e: DateTimeParseException) {
-                            return@put call.respond(
-                                HttpStatusCode.BadRequest,
-                                ErrorRes("fecha_nacimiento_invalida")
-                            )
-                        }
-
-                        val minDate = LocalDate.of(1900, 1, 1)
-                        val maxDate = LocalDate.now().minusYears(14)
-                        if (parsed.isBefore(minDate) || parsed.isAfter(maxDate)) {
-                            return@put call.respond(
-                                HttpStatusCode.BadRequest,
-                                ErrorRes("fecha_nacimiento_fuera_de_rango")
-                            )
-                        }
-                        parsed
-                    }
-                } else {
-                    null // campo ausente → no tocar fecha
-                }
-
-                // Mezclamos con lo que ya tiene el usuario en BD
-                val fechaFinal = when {
-                    req.fechaNacimiento == null -> u.fechaNacimiento // no cambiar
-                    else -> fechaNacimientoParsed                    // puede ser null (borrar) o fecha válida
-                }
-
-                val generoFinal = when {
-                    req.genero == null -> u.genero   // no cambiar
-                    else -> generoLimpio             // nuevo valor (puede ser null si decides soportar borrar)
-                }
-
-                var touched = 0
-
-                if (req.nombre != null)  touched += users.updateNombre(uid, req.nombre)
-                if (req.idioma  != null) touched += users.updateIdioma(uid, req.idioma)
-
-                if (req.telefono != null) {
-                    // telefonoLimpio = null → se borra en BD
-                    touched += users.updateTelefono(uid, telefonoLimpio)
-                }
-
-                if (req.fechaNacimiento != null || req.genero != null) {
-                    touched += users.updateDatosDemograficos(
-                        userId = uid,
-                        fechaNacimiento = fechaFinal,
-                        genero = generoFinal
-                    )
-                }
-
-                if (touched == 0) {
-                    return@put call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorRes("nothing_to_update")
-                    )
-                }
-
-                call.respond(OkRes())
-            }
+            // PUT /me → movido a controllers.AuthController (services.AuthService.updateProfile)
 
             // GET /me/perfil
             get("/perfil") {

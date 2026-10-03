@@ -12,7 +12,7 @@ import plugins.configureDatabase
 import plugins.configureCORS
 import plugins.DatabaseFactory
 
-import security.configureSecurity
+import middlewares.configureSecurity
 import routes.configureRouting
 
 import data.repository.admin.AdminUserRepository
@@ -26,6 +26,7 @@ import services.market.JobMarketClient
 import services.market.SkillTrendWorker
 
 import services.EmailService
+import services.AiQuestionGeneratorService
 import io.github.cdimascio.dotenv.dotenv
 
 fun main(args: Array<String>) = EngineMain.main(args)
@@ -94,6 +95,18 @@ fun Application.module() {
         redisCacheService.close()
     }
 
+    // Servicio generador de preguntas con IA: siempre montado; sin keys responde 503 seguro.
+    val openAiKey = dotenv["OPENAI_API_KEY"] ?: ""
+    val anthropicKey = dotenv["ANTHROPIC_API_KEY"] ?: ""
+    val aiService = AiQuestionGeneratorService(openAiKey = openAiKey, anthropicKey = anthropicKey)
+    if (openAiKey.isBlank() && anthropicKey.isBlank()) {
+        log.warn("OPENAI_API_KEY y ANTHROPIC_API_KEY no configurados. generate-ai responderá 503 provider_not_configured.")
+    }
+
+    monitor.subscribe(ApplicationStopped) {
+        aiService.close()
+    }
+
     // Configurar routing con todos los repositorios y servicios
     configureRouting(
         adminUserRepo = adminUserRepo,
@@ -105,7 +118,8 @@ fun Application.module() {
         cargoSkillRepo = cargoSkillRepo,
         redisCacheService = redisCacheService,
         cargoSkillGenerator = cargoSkillGenerator,
-        skillTrendWorker = skillTrendWorker
+        skillTrendWorker = skillTrendWorker,
+        aiService = aiService
     )
 
     configureMonitoring()
