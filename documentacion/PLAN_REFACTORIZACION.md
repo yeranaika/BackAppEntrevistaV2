@@ -166,6 +166,17 @@ Resultado:
 - Renombrar a español lo existente (`AiQuestion*` → `*_PREGUNTA_IA`).
 
 ## Fase 4 — Conexión con servicios y APIs externas
+
+**Estado:** en análisis (rama `refactor/fase-4-integraciones`, sin cambios de código todavía).
+
+Hallazgos verificados que debe corregir esta fase:
+- **Mercado/skills (bug desde el commit 4c83f60):** `SkillTrendWorker` y `CargoSkillGeneratorService` analizan `" "` en vez de `"${posting.title} ${posting.description}"`. Las tendencias nunca cuentan ofertas reales (toda skill técnica queda en 35) y los requisitos por cargo salen siempre del conjunto genérico. Varios mensajes perdieron sus interpolaciones (`"Cargo con ID  no encontrado"`).
+- **Esquema alterado por `createMissingTablesAndColumns`** (BD local): `consentimiento` tiene una columna extra `alcances` donde se guarda todo, mientras `alcances_aceptados` queda en `[]` y `acepta_entrenamiento_ia` siempre en false; `fecha_otorgado` y `usuario.fecha_creacion` perdieron la zona horaria; `perfil_usuario.nivel_experiencia` pasó a VARCHAR(40); índices duplicados; `objetivo_carrera` solo existe porque la crea Exposed. Plan: migración `015` (0 consentimientos guardados, sin pérdida de datos) y retirar la creación automática.
+- **Billing:** un mismo `purchase_token` de Google Play se puede canjear en varias cuentas (no se guarda el token); el canje de códigos no es atómico y se puede pasar de `max_usos`; `/billing/status` mira solo la última suscripción; si Google no responde se informa "compra no válida".
+- **Redis:** llamadas bloqueantes en hilos de Ktor; con Redis caído cada petición espera segundos (falta cortocircuito); cache-aside copiado 3 veces; crear un cargo no invalida `cargos:lista` (hasta 6 h desactualizado).
+- **Recordatorios:** sin validación de `hora`, `diasSemana` ni `tipoPractica` (valores largos → 500).
+- **Consentimientos:** publicar con una versión inexistente viola la FK → 500.
+- Límite de intentos: bloquear login por correo tras intentos fallidos (contador en Redis) y limitar `forgot-password`/`register` por IP sin romper las E2E.
 **Hoy:** clientes dispersos (`JobMarketClient`, proveedores LLM, `GooglePlayBillingService` dentro de `security/`, `EmailService`, `RedisCacheService`), cada uno con su propio manejo de errores y timeouts.
 
 Resultado (`INTEGRACIONES/`):
