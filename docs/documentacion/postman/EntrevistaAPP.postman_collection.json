@@ -180,13 +180,13 @@
                 "register"
               ]
             },
-            "description": "Crea la cuenta (contraseña Argon2id, mínimo 8 caracteres) y devuelve tokens.\nErrores con el formato antiguo que lee Android: `409 {\"error\":\"email_in_use\"}`, `422 {\"error\":\"invalid_country\"|\"invalid_birthdate\"}`.\nLímite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`.",
+            "description": "Crea la cuenta (contraseña Argon2id, mínimo 8 caracteres) y devuelve tokens.\nErrores con el formato antiguo que lee Android: `409 {\"error\":\"email_in_use\"}` y `422 {\"error\":\"<código>\"}` (ej. `area_invalida`, `nivel_experiencia_invalido`, `invalid_country`, `invalid_birthdate`).\nValores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.\nLímite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`.",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{correo}}\",\n  \"password\": \"{{contrasena}}\",\n  \"nombre\": \"Usuario Prueba\",\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"backend\"\n}",
+              "raw": "{\n  \"email\": \"{{correo}}\",\n  \"password\": \"{{contrasena}}\",\n  \"nombre\": \"Usuario Prueba\",\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"TI\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -512,7 +512,7 @@
                 "change-password"
               ]
             },
-            "description": "Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo.",
+            "description": "Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo.\nEl ejemplo usa **la misma** contraseña a propósito (responde `400`) para no cambiar la de la variable `contrasena`. Para cambiarla de verdad: poner otra en `nuevaContrasena` y luego actualizar la variable `contrasena`.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"contrasenaActual\": \"{{contrasena}}\",\n  \"nuevaContrasena\": \"{{contrasena}}\"\n}",
@@ -630,10 +630,10 @@
                 "perfil"
               ]
             },
-            "description": "",
+            "description": "Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"backend\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Conseguir mi primer trabajo\"\n}",
+              "raw": "{\n  \"nivelExperiencia\": \"junior\",\n  \"area\": \"TI\",\n  \"pais\": \"CL\",\n  \"notaObjetivos\": \"Conseguir mi primer trabajo\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -699,10 +699,10 @@
                 "objetivo"
               ]
             },
-            "description": "Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`).",
+            "description": "Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`). Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"area\": \"backend\",\n  \"metaCargo\": \"Backend Developer\",\n  \"nivel\": \"jr\"\n}",
+              "raw": "{\n  \"area\": \"TI\",\n  \"metaCargo\": \"Backend Developer\",\n  \"nivel\": \"jr\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -733,7 +733,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"area\": \"backend\",\n  \"nivelExperiencia\": \"junior\",\n  \"nombreCargo\": \"Backend Developer\",\n  \"descripcionObjetivo\": \"Primer empleo\"\n}",
+              "raw": "{\n  \"area\": \"TI\",\n  \"nivelExperiencia\": \"junior\",\n  \"nombreCargo\": \"Backend Developer\",\n  \"descripcionObjetivo\": \"Primer empleo\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

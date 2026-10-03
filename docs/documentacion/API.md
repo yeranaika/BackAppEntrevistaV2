@@ -103,7 +103,8 @@ Registro, login con correo o Google, rotación y cierre de sesión. Los requests
 `POST /auth/register` · Pública · responde `201`, `409`
 
 Crea la cuenta (contraseña Argon2id, mínimo 8 caracteres) y devuelve tokens.
-Errores con el formato antiguo que lee Android: `409 {"error":"email_in_use"}`, `422 {"error":"invalid_country"|"invalid_birthdate"}`.
+Errores con el formato antiguo que lee Android: `409 {"error":"email_in_use"}` y `422 {"error":"<código>"}` (ej. `area_invalida`, `nivel_experiencia_invalido`, `invalid_country`, `invalid_birthdate`).
+Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.
 Límite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`.
 
 ```json
@@ -112,7 +113,7 @@ Límite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`.
   "password": "{{contrasena}}",
   "nombre": "Usuario Prueba",
   "nivelExperiencia": "junior",
-  "area": "backend"
+  "area": "TI"
 }
 ```
 
@@ -214,6 +215,7 @@ Valida el código de 6 dígitos (15 min, intentos limitados) y cambia la contras
 `POST /auth/change-password` · Usuario · responde `200`, `400`
 
 Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo.
+El ejemplo usa **la misma** contraseña a propósito (responde `400`) para no cambiar la de la variable `contrasena`. Para cambiarla de verdad: poner otra en `nuevaContrasena` y luego actualizar la variable `contrasena`.
 
 ```json
 {
@@ -260,10 +262,12 @@ Cuenta + perfil + cargo meta. Guarda `usuarioId`.
 
 `PUT /me/perfil` · Usuario · responde `200`
 
+Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.
+
 ```json
 {
   "nivelExperiencia": "junior",
-  "area": "backend",
+  "area": "TI",
   "pais": "CL",
   "notaObjetivos": "Conseguir mi primer trabajo"
 }
@@ -297,11 +301,11 @@ Cuenta + perfil + cargo meta. Guarda `usuarioId`.
 
 `PUT /perfil/objetivo` · Usuario · responde `200`
 
-Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`).
+Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`). Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.
 
 ```json
 {
-  "area": "backend",
+  "area": "TI",
   "metaCargo": "Backend Developer",
   "nivel": "jr"
 }
@@ -313,7 +317,7 @@ Cuenta + perfil + cargo meta. Guarda `usuarioId`.
 
 ```json
 {
-  "area": "backend",
+  "area": "TI",
   "nivelExperiencia": "junior",
   "nombreCargo": "Backend Developer",
   "descripcionObjetivo": "Primer empleo"

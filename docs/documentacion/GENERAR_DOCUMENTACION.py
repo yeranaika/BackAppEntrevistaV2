@@ -68,12 +68,13 @@ Responde `OK` si la base de datos responde y `503 db_no_disponible` si no. Lo us
     ("01 · Autenticación", "Registro, login con correo o Google, rotación y cierre de sesión. "
      "Los requests de login guardan `accessToken` y `refreshToken` automáticamente.", [
         req("Registrar usuario", "POST", "/auth/register", PUBLICA,
-            body={"email": "{{correo}}", "password": "{{contrasena}}", "nombre": "Usuario Prueba", "nivelExperiencia": "junior", "area": "backend"},
+            body={"email": "{{correo}}", "password": "{{contrasena}}", "nombre": "Usuario Prueba", "nivelExperiencia": "junior", "area": "TI"},
             espera=[201, 409],
             guarda={"accessToken": ("j.accessToken", lambda j: j.get("accessToken")), "refreshToken": ("j.refreshToken", lambda j: j.get("refreshToken"))},
             desc="""
 Crea la cuenta (contraseña Argon2id, mínimo 8 caracteres) y devuelve tokens.
-Errores con el formato antiguo que lee Android: `409 {"error":"email_in_use"}`, `422 {"error":"invalid_country"|"invalid_birthdate"}`.
+Errores con el formato antiguo que lee Android: `409 {"error":"email_in_use"}` y `422 {"error":"<código>"}` (ej. `area_invalida`, `nivel_experiencia_invalido`, `invalid_country`, `invalid_birthdate`).
+Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.
 Límite: 30 registros cada 10 minutos por IP → `429 demasiadas_solicitudes`."""),
         req("Login", "POST", "/auth/login", PUBLICA, body={"email": "{{correo}}", "password": "{{contrasena}}"},
             guarda={"accessToken": ("j.accessToken", lambda j: j.get("accessToken")), "refreshToken": ("j.refreshToken", lambda j: j.get("refreshToken"))},
@@ -99,21 +100,21 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             desc="Valida el código de 6 dígitos (15 min, intentos limitados) y cambia la contraseña; cierra las demás sesiones."),
         req("Cambiar contraseña", "POST", "/auth/change-password", USUARIO,
             body={"contrasenaActual": "{{contrasena}}", "nuevaContrasena": "{{contrasena}}"}, espera=[200, 400],
-            desc="Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo."),
+            desc="Requiere la contraseña actual. `400` si la nueva es igual a la actual o no cumple el mínimo.\nEl ejemplo usa **la misma** contraseña a propósito (responde `400`) para no cambiar la de la variable `contrasena`. Para cambiarla de verdad: poner otra en `nuevaContrasena` y luego actualizar la variable `contrasena`."),
     ]),
     ("03 · Cuenta y perfil", "", [
         req("Mi cuenta", "GET", "/me", guarda={"usuarioId": ("j.id", lambda j: j.get("id"))},
             desc="Cuenta + perfil + cargo meta. Guarda `usuarioId`."),
         req("Actualizar cuenta", "PUT", "/me", body={"nombre": "Usuario Prueba", "idioma": "es", "telefono": "+56912345678", "fechaNacimiento": "1998-05-20", "genero": "otro"}),
         req("Mi perfil", "GET", "/me/perfil", espera=[200, 404]),
-        req("Actualizar perfil", "PUT", "/me/perfil", body={"nivelExperiencia": "junior", "area": "backend", "pais": "CL", "notaObjetivos": "Conseguir mi primer trabajo"}),
+        req("Actualizar perfil", "PUT", "/me/perfil", desc="Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.", body={"nivelExperiencia": "junior", "area": "TI", "pais": "CL", "notaObjetivos": "Conseguir mi primer trabajo"}),
         req("Eliminar mi cuenta", "DELETE", "/cuenta", body={"confirmar": "eliminar"}, omitir_en_prueba=True,
             desc="⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{\"confirmar\": \"eliminar\"}`."),
     ]),
     ("04 · Onboarding y objetivo", "", [
-        req("Onboarding (Android)", "PUT", "/perfil/objetivo", body={"area": "backend", "metaCargo": "Backend Developer", "nivel": "jr"},
-            desc="Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`)."),
-        req("Onboarding", "POST", "/onboarding", body={"area": "backend", "nivelExperiencia": "junior", "nombreCargo": "Backend Developer", "descripcionObjetivo": "Primer empleo"}),
+        req("Onboarding (Android)", "PUT", "/perfil/objetivo", body={"area": "TI", "metaCargo": "Backend Developer", "nivel": "jr"},
+            desc="Área, cargo meta y nivel (acepta `jr|mid|sr` o `junior|semisenior|senior`). Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`."),
+        req("Onboarding", "POST", "/onboarding", body={"area": "TI", "nivelExperiencia": "junior", "nombreCargo": "Backend Developer", "descripcionObjetivo": "Primer empleo"}),
         req("Ver onboarding", "GET", "/onboarding"),
         req("Estado del onboarding", "GET", "/onboarding/status"),
         req("Mi objetivo", "GET", "/me/objetivo", espera=[200, 404]),
@@ -296,7 +297,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Crear práctica (PR)", "POST", "/api/prueba-practica/front",
             body={"sector": "backend", "nivel": "jr", "metaCargo": "{{nombreCargo}}", "tipoPrueba": "PR"}, espera=[201, 409], guarda={
                 "pruebaId": ("j.pruebaId", lambda j: j.get("pruebaId")),
-                "preguntaAppId": ("j.preguntas[0].preguntaId", lambda j: primero_de_alternativas(j.get("preguntas"), "preguntaId", "configRespuesta", "id")[0]),
+                "preguntaAppId": ("j.preguntas[0].preguntaId", lambda j: (j.get("preguntas") or [{}])[0].get("preguntaId", "")),
                 "opcionAppId": ("(j.preguntas[0].configRespuesta.opciones || [{id: ''}])[0].id",
                                 lambda j: ((j.get("preguntas") or [{}])[0].get("configRespuesta", {}).get("opciones") or [{"id": ""}])[0]["id"])},
             desc="`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`."),
