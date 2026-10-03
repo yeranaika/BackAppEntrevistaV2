@@ -18,6 +18,7 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 
 private const val MENSAJE_JSON_INVALIDO = "El cuerpo de la solicitud no es JSON válido o le faltan campos"
+private const val MENSAJE_DEMASIADAS_SOLICITUDES = "Hiciste demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo"
 private const val MENSAJE_ERROR_INTERNO = "Ocurrió un error inesperado. Inténtalo nuevamente"
 
 /** Punto único donde los errores se convierten en respuesta HTTP. */
@@ -35,6 +36,10 @@ fun Application.configurarErrores() {
         }
         exception<ContentTransformationException> { call, _ ->
             call.respond(HttpStatusCode.BadRequest, RespuestaError.conMensaje("invalid_json", MENSAJE_JSON_INVALIDO))
+        }
+        // El plugin RateLimit responde 429 sin cuerpo: se completa con el formato único de error.
+        status(HttpStatusCode.TooManyRequests) { call, estado ->
+            call.respond(estado, RespuestaError.conMensaje("demasiadas_solicitudes", MENSAJE_DEMASIADAS_SOLICITUDES))
         }
         exception<Throwable> { call, causa ->
             call.application.log.error("Error no controlado en ${call.request.local.uri}", causa)

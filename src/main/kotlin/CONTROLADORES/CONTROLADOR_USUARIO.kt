@@ -1,5 +1,6 @@
 package CONTROLADORES
 
+import CONFIGURACION.LIMITE_REGISTRO
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorConflicto
 import ESQUEMAS.RespuestaErrorLegado
@@ -15,6 +16,7 @@ import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aRespuesta
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -28,16 +30,18 @@ import io.ktor.server.routing.*
  * DELETE /cuenta          borrado definitivo, body { "confirmar": "eliminar" }
  */
 fun Route.controladorUsuario(servicio: ServicioUsuario) {
-    post("/auth/register") {
-        val solicitud = call.receive<SolicitudRegistro>()
-        val tokens = try {
-            servicio.registrar(solicitud)
-        } catch (error: ErrorAplicacion) {
-            // Contrato legado de Android: cuerpo {"error"} y 409/422 para elegir el mensaje.
-            val estado = if (error is ErrorConflicto) HttpStatusCode.Conflict else HttpStatusCode.UnprocessableEntity
-            return@post call.respond(estado, RespuestaErrorLegado(error.codigo))
+    rateLimit(LIMITE_REGISTRO) {
+        post("/auth/register") {
+            val solicitud = call.receive<SolicitudRegistro>()
+            val tokens = try {
+                servicio.registrar(solicitud)
+            } catch (error: ErrorAplicacion) {
+                // Contrato legado de Android: cuerpo {"error"} y 409/422 para elegir el mensaje.
+                val estado = if (error is ErrorConflicto) HttpStatusCode.Conflict else HttpStatusCode.UnprocessableEntity
+                return@post call.respond(estado, RespuestaErrorLegado(error.codigo))
+            }
+            call.respond(HttpStatusCode.Created, tokens.aRespuesta())
         }
-        call.respond(HttpStatusCode.Created, tokens.aRespuesta())
     }
 
     authenticate("auth-jwt") {

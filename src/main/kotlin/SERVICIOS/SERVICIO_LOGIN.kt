@@ -1,6 +1,10 @@
 package SERVICIOS
 
+import CONFIGURACION.INTENTOS_MAXIMOS_LOGIN
+import CONFIGURACION.MINUTOS_BLOQUEO_LOGIN
+import ERRORES.ErrorDemasiadosIntentos
 import ERRORES.ErrorNoAutorizado
+import INTEGRACIONES.ContadorIntentos
 import ERRORES.ErrorProhibido
 import INTEGRACIONES.VerificadorIdentidadGoogle
 import MODELOS.LectorUsuarioSesion
@@ -15,18 +19,30 @@ class ServicioLogin(
     private val usuarios: LectorUsuarioSesion,
     private val cuentasOAuth: RepositorioCuentaOAuth,
     private val verificadorGoogle: VerificadorIdentidadGoogle,
-    private val tokens: ServicioToken
+    private val tokens: ServicioToken,
+    /** Fallos de login por correo; se comparte entre instancias (Redis). */
+    private val intentosFallidos: ContadorIntentos
 ) {
     // Se verifica contra este hash cuando el correo no existe, para que la respuesta tarde
     // lo mismo y no se pueda descubrir qué correos están registrados midiendo tiempos.
     private val hashSinUsuario by lazy { generarHashContrasena(UUID.randomUUID().toString()) }
 
     suspend fun iniciarSesion(correo: String, contrasena: String): ParTokens {
-        val usuario = usuarios.buscarPorCorreo(normalizarCorreo(correo))
+        val correoNormalizado = normalizarCorreo(correo)
+        // Se bloquea por correo exista o no la cuenta: así el bloqueo tampoco revela qué correos están registrados.
+        if (intentosFallidos.fallos(correoNormalizado) >= INTENTOS_MAXIMOS_LOGIN) {
+            throw ErrorDemasiadosIntentos(
+                "demasiados_intentos",
+                "Demasiados intentos fallidos. Espera $MINUTOS_BLOQUEO_LOGIN minutos o recupera tu contraseña"
+            )
+        }
+        val usuario = usuarios.buscarPorCorreo(correoNormalizado)
         val esContrasenaCorrecta = verificarContrasena(contrasena, usuario?.hashContrasena ?: hashSinUsuario)
         if (usuario == null || !esContrasenaCorrecta) {
+            intentosFallidos.registrarFallo(correoNormalizado)
             throw ErrorNoAutorizado("bad_credentials", "Correo o contraseña incorrectos")
         }
+        intentosFallidos.limpiar(correoNormalizado)
         // Se revisa después de la contraseña: sin ella no se revela el estado de la cuenta.
         return abrirSesion(usuario)
     }

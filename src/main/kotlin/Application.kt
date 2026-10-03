@@ -9,7 +9,8 @@ import io.ktor.server.application.*
 import io.ktor.server.netty.EngineMain
 import io.ktor.server.routing.IgnoreTrailingSlash
 import MIDDLEWARES.configurarSeguridad
-import routes.configurarRutas
+import CONFIGURACION.configurarLimiteSolicitudes
+import CONFIGURACION.configurarRutas
 
 fun main(args: Array<String>) = EngineMain.main(args)
 
@@ -20,10 +21,11 @@ fun Application.module() {
     configurarCors()
     configurarSerializacion()
     configurarErrores()
-    val db = configurarBaseDatos(configuracion.baseDatos)
+    configurarLimiteSolicitudes(configuracion.limites)
+    configurarBaseDatos(configuracion.baseDatos)
     configurarSeguridad()
 
-    val dependencias = ContenedorDependencias(configuracion, db)
+    val dependencias = ContenedorDependencias(configuracion)
     dependencias.iniciarTareasSegundoPlano()
     monitor.subscribe(ApplicationStopped) { dependencias.close() }
 

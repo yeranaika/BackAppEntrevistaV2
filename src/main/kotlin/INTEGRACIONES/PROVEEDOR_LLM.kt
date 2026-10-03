@@ -3,6 +3,8 @@ package INTEGRACIONES
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorRespuestaExterna
 import ERRORES.ErrorServicioExterno
+import UTILIDADES.PoliticaResiliencia
+import kotlin.time.Duration.Companion.milliseconds
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -57,6 +59,22 @@ data class RespuestaProveedorIa(
  */
 interface ProveedorPreguntasIa {
     suspend fun generar(solicitud: SolicitudProveedorIa): RespuestaProveedorIa
+}
+
+/**
+ * Agrega reintentos y cortocircuito a un proveedor. Solo se reintenta cuando el proveedor no respondió o
+ * respondió con error HTTP; una respuesta con formato inválido no mejora reintentando y cuesta tokens.
+ */
+class ProveedorConResiliencia(
+    private val interno: ProveedorPreguntasIa,
+    nombre: String
+) : ProveedorPreguntasIa {
+    private val politica = PoliticaResiliencia(nombre = nombre, tiempoMaximo = (TIMEOUT_LLM_MS + 10_000).milliseconds, intentos = 2)
+
+    override suspend fun generar(solicitud: SolicitudProveedorIa): RespuestaProveedorIa =
+        politica.ejecutar(esReintentable = { it is ErrorRespuestaExterna && it.codigo == "provider_http_error" }) {
+            interno.generar(solicitud)
+        }
 }
 
 /** Cliente HTTP compartido por los proveedores; se cierra al apagar la aplicación. */

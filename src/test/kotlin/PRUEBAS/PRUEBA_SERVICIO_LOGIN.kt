@@ -1,7 +1,9 @@
 package PRUEBAS
 
+import ERRORES.ErrorDemasiadosIntentos
 import ERRORES.ErrorNoAutorizado
 import ERRORES.ErrorProhibido
+import INTEGRACIONES.ContadorIntentosEnMemoria
 import INTEGRACIONES.IdentidadGoogle
 import MODELOS.ROL_ADMIN
 import PRUEBAS.DOBLES.fallaCon
@@ -22,11 +24,13 @@ class PruebaServicioLogin {
     private val usuarios = UsuariosEnMemoria()
     private val cuentasOAuth = CuentasOAuthEnMemoria(usuarios)
     private val identidades = mutableMapOf<String, IdentidadGoogle>()
+    private val intentos = ContadorIntentosEnMemoria()
     private val servicio = ServicioLogin(
         usuarios = usuarios,
         cuentasOAuth = cuentasOAuth,
         verificadorGoogle = GoogleEnMemoria(identidades),
-        tokens = ServicioToken(RefreshTokensEnMemoria(), usuarios, JWT_PRUEBA)
+        tokens = ServicioToken(RefreshTokensEnMemoria(), usuarios, JWT_PRUEBA),
+        intentosFallidos = intentos
     )
 
     private fun rolDe(tokenAcceso: String) = JWT.decode(tokenAcceso).getClaim("role").asString()
@@ -95,5 +99,28 @@ class PruebaServicioLogin {
         usuarios.agregar("bloqueada@gmail.com", "Clave-segura-1", estaActivo = false)
         identidades["token-bloqueada"] = IdentidadGoogle("sub-b", "bloqueada@gmail.com", correoVerificado = true)
         fallaCon<ErrorProhibido>("inactive_user") { servicio.iniciarSesionConGoogle("token-bloqueada") }
+    }
+
+    // ---------- Bloqueo por intentos fallidos ----------
+
+    @Test
+    fun `tras 5 fallos el correo queda bloqueado incluso con la contrasena correcta`() {
+        usuarios.agregar("ana@ejemplo.com", "Clave-segura-1")
+        repeat(5) { fallaCon<ErrorNoAutorizado>("bad_credentials") { servicio.iniciarSesion("ana@ejemplo.com", "mala") } }
+        fallaCon<ErrorDemasiadosIntentos>("demasiados_intentos") { servicio.iniciarSesion("ana@ejemplo.com", "Clave-segura-1") }
+    }
+
+    @Test
+    fun `un login correcto reinicia el contador`() = runBlocking<Unit> {
+        usuarios.agregar("ana@ejemplo.com", "Clave-segura-1")
+        repeat(4) { fallaCon<ErrorNoAutorizado>("bad_credentials") { servicio.iniciarSesion("ana@ejemplo.com", "mala") } }
+        servicio.iniciarSesion(" ANA@ejemplo.com ", "Clave-segura-1")
+        assertEquals(0, intentos.fallos("ana@ejemplo.com"))
+    }
+
+    @Test
+    fun `un correo inexistente tambien se bloquea para no revelar que no existe`() {
+        repeat(5) { fallaCon<ErrorNoAutorizado>("bad_credentials") { servicio.iniciarSesion("nadie@ejemplo.com", "x") } }
+        fallaCon<ErrorDemasiadosIntentos>("demasiados_intentos") { servicio.iniciarSesion("nadie@ejemplo.com", "x") }
     }
 }

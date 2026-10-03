@@ -1,6 +1,7 @@
 package MODELOS
 
 import ERRORES.ErrorConflicto
+import UTILIDADES.SQLSTATE_VALOR_DUPLICADO
 import UTILIDADES.transaccion
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.ResultRow
@@ -14,7 +15,6 @@ import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 import java.util.UUID
 
-private const val SQLSTATE_VALOR_DUPLICADO = "23505"
 
 interface RepositorioUsuario {
     suspend fun existeCorreo(correo: String): Boolean

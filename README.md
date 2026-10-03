@@ -62,7 +62,11 @@ pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1                      # contra http:
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplicada
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una generación real (cuesta)
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1  # requiere migrations/015 y Redis; -ConLimites prueba el límite por IP
 ```
+La Fase 4 usa también el contenedor `Entrevista_Redis`, no llama a las APIs de empleo ni publica versiones del EULA,
+y la sección de compras de Google Play necesita `GOOGLE_PLAY_BILLING_MOCK=true`. `-ConLimites` deja la IP sin poder
+registrar cuentas durante unos minutos.
 Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend no responde.
 
 ---
@@ -83,7 +87,9 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 ### 0. Sistema
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/health` | Pública | Healthcheck del servicio (retorna `OK`). |
+| `GET` | `/health` | Pública | Verifica la base de datos: `OK` o `503 db_no_disponible`. Redis no se incluye (la app funciona sin caché). |
+
+**Límites:** `/auth/register` (30 cada 10 min) y `/auth/forgot-password` (5 cada 15 min) por IP → `429 demasiadas_solicitudes`. El login se bloquea 15 min por correo tras 5 contraseñas incorrectas → `429 demasiados_intentos` (contador compartido en Redis).
 
 ---
 
@@ -143,7 +149,7 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 | Método | Ruta | Auth | Descripción | Body (JSON) |
 |---|---|---|---|---|
 | `GET` | `/recordatorios/preferencias` | `Bearer JWT` | Obtiene los días, hora y tipo de práctica configurados. | - |
-| `PUT` | `/recordatorios/preferencias` | `Bearer JWT` | Guarda las preferencias de recordatorios y notificaciones. | `{"diasSemana": ["lunes",...], "hora": "19:00", "tipoPractica": "simulacion_ia", "habilitado": true}` |
+| `PUT` | `/recordatorios/preferencias` | `Bearer JWT` | Guarda las preferencias de recordatorios y notificaciones. | `{"diasSemana": ["LUN","MIE",...], "hora": "19:00", "tipoPractica": "simulacion_ia", "habilitado": true}` — días `LUN..DOM` (también acepta nombres completos), hora `HH:mm`, `tipoPractica` hasta 32 caracteres. |
 
 ---
 
@@ -153,7 +159,12 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 | `GET` | `/consent/current` | Pública | Obtiene el texto y versión del consentimiento legal vigente. | - |
 | `POST` | `/me/consent` | `Bearer JWT` | Registra la aceptación del consentimiento con sus alcances. | `{"version": "v1.0", "alcances": {"uso_datos_sesion": true, ...}}` |
 | `GET` | `/me/consent/latest` | `Bearer JWT` | Retorna el último consentimiento activo del usuario. | - |
-| `POST` | `/me/consent/revoke` | `Bearer JWT` | Revoca el consentimiento activo del usuario. | - |
+| `POST` | `/me/consent/revoke` | `Bearer JWT` | Revoca el consentimiento activo del usuario (`404` si no hay). | - |
+| `POST` | `/admin/consent/text` | `Bearer JWT (Admin)` | Publica una nueva versión del texto (queda como única vigente). | `{"version", "title", "body"}` |
+
+Una versión inexistente responde `404 version_no_encontrada`. Si la BD no tiene texto, se publica `docs/legal/EULA.md` como `1.0.0`.
+
+**Documentos legales (`/api/v1/legal`, públicos):** `GET /eula`, `GET /versions`, `GET /terms`, `GET /privacy` (desde `docs/legal/`); `POST /admin/eula` (admin) publica una versión.
 
 ---
 
@@ -164,6 +175,8 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 | `POST` | `/billing/google/verify` | `Bearer JWT` | Valida y activa compras realizadas vía Google Play Billing. | `{"product_id", "purchase_token", "purchase_time"}` |
 | `POST` | `/billing/code/redeem` | `Bearer JWT` | Canjea un código promocional o institucional. | `{"code"}` |
 | `POST` | `/billing/admin/codes` | `Bearer JWT (Admin)` | Crea códigos de suscripción (PROM, INST, GOOG). | `{"days", "label"?, "max_uses", "license_type", "expires_at"?}` |
+
+Un `purchase_token` pertenece a una sola cuenta (`409 compra_ya_registrada`; se guarda solo su hash). Google caído → `503`, compra inválida → `400 compra_invalida`. El canje es atómico (nunca supera `max_uses`) y suma sus días al premium vigente.
 
 ---
 
@@ -209,3 +222,35 @@ Se incluye una colección completa lista para importar en Postman ubicada en:
 |---|---|---|---|
 | `GET` | `/api/v1/preguntas` | `Bearer JWT` | Preguntas **aprobadas** al azar, sin respuesta ideal ni opción correcta. Filtros: `skillId`, `cargoId`, `nivel`, `tipo`, `categoria`, `cantidad` (1–20). |
 
+---
+
+### 12. Mercado laboral y skills
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/cargos` (alias `/market/cargos`) | Pública | Cargos activos (caché Redis 6 h, se invalida al crear cargos). |
+| `GET` | `/api/v1/cargos/{id}/skills` | Pública | Matriz de skills del cargo (caché 12 h). |
+| `GET` | `/market/cargos/{id}/skills` | Pública | Solo la lista de requisitos (formato antiguo del panel). |
+| `GET` | `/api/v1/skills/trending?categoria=tecnica\|blanda&limit=1..100` | Pública | Skills más demandadas. |
+| `GET` | `/market/skills` · `/market/skills/{id}/tendencias` | Pública | Skills por demanda e historial semanal. |
+| `POST` | `/admin/market/sync-trends` | Admin | Sincroniza tendencias con las APIs de empleo (**consume cuota**). |
+| `POST` | `/admin/market/cargos` | Admin | Crea un cargo. `{"nombre", "area", "descripcion"?, "nivelBase"?, "autoGenerateSkills"?}` |
+| `POST` | `/admin/market/cargos/{id}/generate-requirements` · `/admin/market/cargos/generate-all` | Admin | Regenera requisitos desde ofertas reales. |
+
+La sincronización corre sola cada 7 días; al reiniciar el servidor espera lo que falte desde la última (no gasta cuota en cada arranque).
+Fuentes en orden: JSearch → Remotive → Arbeitnow → dataset de contingencia, cada una con timeout, reintentos y cortocircuito.
+
+---
+
+## ⚙️ Variables de entorno de integraciones
+| Variable | Uso |
+|---|---|
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Caché y bloqueo de login. Si Redis cae la app sigue funcionando (sin caché). |
+| `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | API de empleo principal; sin ella se usan las fuentes gratuitas. |
+| `GOOGLE_PLAY_PACKAGE`, `GOOGLE_PLAY_SERVICE_JSON_B64` | Verificación real de compras (se validan al arrancar). |
+| `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
+| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
+
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` y `migrations/015` sobre una BD existente:
+```powershell
+Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
+```

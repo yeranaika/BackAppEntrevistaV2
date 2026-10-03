@@ -165,11 +165,31 @@ Resultado:
 - Las preguntas generadas por IA quedan en `estado = 'pendiente'`; solo `aprobada` se sirve a usuarios.
 - Renombrar a español lo existente (`AiQuestion*` → `*_PREGUNTA_IA`).
 
-## Fase 4 — Conexión con servicios y APIs externas
+## Fase 4 — Conexión con servicios y APIs externas ✅ (rama `refactor/fase-4-integraciones`)
 
-**Estado:** en análisis (rama `refactor/fase-4-integraciones`, sin cambios de código todavía).
+**Estado:** completada. 181 pruebas en verde + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1` (71/71, 73/73 con `-ConLimites`)
+contra Postgres y Redis reales; regresión E2E de las fases 1–3 en verde (34, 48 y 38). Migración `015` aplicada a la BD local.
 
-Hallazgos verificados que debe corregir esta fase:
+Hecho:
+- `UTILIDAD_RESILIENCIA`: `PoliticaResiliencia` común (timeout por intento, reintento exponencial con aleatoriedad solo en fallas
+  transitorias, cortocircuito, sin reintentar cancelaciones). La usan LLM (`ProveedorConResiliencia`), correo, Google Play,
+  APIs de empleo (una política por fuente) y Redis.
+- `INTEGRACIONES/`: `Cache` + `CacheRedis` (no bloquea hilos de Ktor, cortocircuito, falla abierta, `obtenerOCalcular`),
+  `ContadorIntentos`, `ClienteMercadoLaboral` (JSearch → Remotive → Arbeitnow → dataset de contingencia),
+  `VerificadorCompraGoogle` (real o simulado), `FuenteDocumentosLegales`.
+- Mercado en capas: `REPOSITORIO_MERCADO` (lector/escritor), `NormalizadorSkill`, `ServicioRequisitosCargo`,
+  `ServicioTendenciasSkill` + `TareaSincronizacionMercado` (no resincroniza en cada reinicio), `ServicioMercado` con caché e invalidación.
+  `/market/cargos` y `/api/v1/cargos` comparten servicio y caché.
+- Consentimientos/EULA/legal, recordatorios y billing migrados a CONTROLADORES → SERVICIOS → MODELOS con el mismo JSON de Android.
+- Bloqueo de login por correo (5 fallos → 15 min, en Redis) y límite por IP de `register`/`forgot-password` (plugin RateLimit).
+- `GET /health` verifica la BD (503 si no responde). Se retiró `createMissingTablesAndColumns`; Hikari con timeout de conexión de 5 s.
+- Código antiguo eliminado: `routes/{market,skills,consent,legal,billing,usuario}`, `services/{cache,market}`, `security/billing`
+  y sus modelos/tablas. Queda `routes/sync` y `FreemiumTextEvaluator` para la Fase 6.
+- Dependencias de Ktor fijadas en 3.3.1 (las versiones `3.+` mezclaban 3.6 con 3.3 y rompían las pruebas).
+
+Pendiente conocido: el límite por IP vive en memoria de cada instancia (con varias instancias, moverlo a Redis).
+
+Hallazgos verificados que corrigió esta fase:
 - **Mercado/skills (bug desde el commit 4c83f60):** `SkillTrendWorker` y `CargoSkillGeneratorService` analizan `" "` en vez de `"${posting.title} ${posting.description}"`. Las tendencias nunca cuentan ofertas reales (toda skill técnica queda en 35) y los requisitos por cargo salen siempre del conjunto genérico. Varios mensajes perdieron sus interpolaciones (`"Cargo con ID  no encontrado"`).
 - **Esquema alterado por `createMissingTablesAndColumns`** (BD local): `consentimiento` tiene una columna extra `alcances` donde se guarda todo, mientras `alcances_aceptados` queda en `[]` y `acepta_entrenamiento_ia` siempre en false; `fecha_otorgado` y `usuario.fecha_creacion` perdieron la zona horaria; `perfil_usuario.nivel_experiencia` pasó a VARCHAR(40); índices duplicados; `objetivo_carrera` solo existe porque la crea Exposed. Plan: migración `015` (0 consentimientos guardados, sin pérdida de datos) y retirar la creación automática.
 - **Billing:** un mismo `purchase_token` de Google Play se puede canjear en varias cuentas (no se guarda el token); el canje de códigos no es atómico y se puede pasar de `max_usos`; `/billing/status` mira solo la última suscripción; si Google no responde se informa "compra no válida".
@@ -221,7 +241,7 @@ Resultado:
 ---
 
 ## Fuera de estas fases (se ordenan junto con la fase que los toque)
-Billing/suscripciones, consentimientos/EULA, recordatorios: se migran a capas durante la Fase 2 (los que dependen del usuario) y Fase 4 (Google Play).
+Billing/suscripciones, consentimientos/EULA y recordatorios: migrados a capas en la Fase 4. Sincronización offline y freemium: Fase 6.
 
 ## Orden y dependencias
 ```

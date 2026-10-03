@@ -8,6 +8,8 @@ import io.ktor.util.AttributeKey
 private const val PUERTO_REDIS_POR_DEFECTO = 6379
 private const val PUERTO_SMTP_POR_DEFECTO = 465
 private const val TAMANO_POOL_BD_POR_DEFECTO = 10
+private const val REGISTROS_POR_IP_POR_DEFECTO = 30
+private const val RECUPERACIONES_POR_IP_POR_DEFECTO = 5
 private const val HOST_JSEARCH_POR_DEFECTO = "jsearch.p.rapidapi.com"
 
 data class ConfiguracionBaseDatos(
@@ -63,6 +65,12 @@ data class ConfiguracionLlm(
     val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank()
 }
 
+/** Solicitudes permitidas por IP en cada ventana (ver CONFIGURACION_LIMITE_SOLICITUDES). */
+data class ConfiguracionLimites(
+    val registrosPorIp: Int,
+    val recuperacionesPorIp: Int
+)
+
 /** Toda la configuración externa de la aplicación, leída una sola vez al arrancar. */
 data class ConfiguracionGeneral(
     val baseDatos: ConfiguracionBaseDatos,
@@ -72,7 +80,8 @@ data class ConfiguracionGeneral(
     val redis: ConfiguracionRedis,
     val correo: ConfiguracionCorreo,
     val mercadoLaboral: ConfiguracionMercadoLaboral,
-    val llm: ConfiguracionLlm
+    val llm: ConfiguracionLlm,
+    val limites: ConfiguracionLimites
 )
 
 private val ClaveConfiguracion = AttributeKey<ConfiguracionGeneral>("configuracion-general")
@@ -142,6 +151,10 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         llm = ConfiguracionLlm(
             openAiApiKey = lector.opcional("OPENAI_API_KEY").orEmpty(),
             anthropicApiKey = lector.opcional("ANTHROPIC_API_KEY").orEmpty()
+        ),
+        limites = ConfiguracionLimites(
+            registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),
+            recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO)
         )
     )
 }

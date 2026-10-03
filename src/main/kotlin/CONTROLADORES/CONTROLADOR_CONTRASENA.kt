@@ -1,5 +1,6 @@
 package CONTROLADORES
 
+import CONFIGURACION.LIMITE_RECUPERACION
 import ESQUEMAS.RespuestaMensaje
 import ESQUEMAS.SolicitudCambioContrasena
 import ESQUEMAS.SolicitudRecuperacion
@@ -7,6 +8,7 @@ import ESQUEMAS.SolicitudRestablecer
 import SERVICIOS.ServicioContrasena
 import UTILIDADES.usuarioIdDesdeJwt
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -18,9 +20,11 @@ import io.ktor.server.routing.*
  */
 fun Route.controladorContrasena(servicio: ServicioContrasena) {
     route("/auth") {
-        post("/forgot-password") {
-            servicio.solicitarRecuperacion(call.receive<SolicitudRecuperacion>().correo)
-            call.respond(RespuestaMensaje("Si el correo está registrado, te enviamos un código para restablecer tu contraseña"))
+        rateLimit(LIMITE_RECUPERACION) {
+            post("/forgot-password") {
+                servicio.solicitarRecuperacion(call.receive<SolicitudRecuperacion>().correo)
+                call.respond(RespuestaMensaje("Si el correo está registrado, te enviamos un código para restablecer tu contraseña"))
+            }
         }
 
         post("/reset-password") {

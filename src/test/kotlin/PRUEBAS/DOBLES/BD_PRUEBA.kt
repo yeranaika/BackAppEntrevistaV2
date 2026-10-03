@@ -1,14 +1,37 @@
 package PRUEBAS.DOBLES
 
+import CONFIGURACION.ConfiguracionLimites
 import CONFIGURACION.configurarErrores
+import CONFIGURACION.configurarLimiteSolicitudes
 import CONFIGURACION.configurarSerializacion
 import CONTROLADORES.controladorAdminUsuario
+import CONTROLADORES.controladorConsentimiento
+import CONTROLADORES.controladorMercado
+import CONTROLADORES.controladorRecordatorio
+import CONTROLADORES.controladorSalud
+import CONTROLADORES.controladorSuscripcion
 import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPregunta
 import CONTROLADORES.controladorUsuario
+import INTEGRACIONES.ContadorIntentosEnMemoria
+import INTEGRACIONES.FuenteDocumentosLegalesArchivo
 import INTEGRACIONES.TipoProveedorIa
+import MODELOS.RepositorioConsentimientoExposed
+import MODELOS.RepositorioMercadoExposed
+import MODELOS.RepositorioRecordatorioExposed
+import MODELOS.RepositorioSuscripcionExposed
+import MODELOS.RepositorioTextoConsentimientoExposed
+import MODELOS.TablaCargo
+import MODELOS.TablaCargoSkill
+import MODELOS.TablaCodigoSuscripcion
+import MODELOS.TablaConsentimiento
+import MODELOS.TablaRecordatorio
+import MODELOS.TablaSkill
+import MODELOS.TablaSkillTendencia
+import MODELOS.TablaSuscripcion
+import MODELOS.TablaTextoConsentimiento
 import INTEGRACIONES.VerificadorIdentidadGoogle
 import MODELOS.LectorCatalogoExposed
 import MODELOS.RepositorioGeneracionPreguntaIaExposed
@@ -29,7 +52,13 @@ import MODELOS.TablaRecuperacionContrasena
 import MODELOS.TablaRefreshToken
 import MODELOS.TablaUsuario
 import SERVICIOS.ServicioAdminUsuario
+import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioMercado
+import SERVICIOS.ServicioRecordatorio
+import SERVICIOS.ServicioRequisitosCargo
+import SERVICIOS.ServicioSuscripcion
+import SERVICIOS.ServicioTendenciasSkill
 import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioOnboarding
@@ -37,8 +66,6 @@ import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import com.auth0.jwt.JWT
-import data.tables.market.CargoTable
-import data.tables.market.SkillTable
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondError
@@ -76,7 +103,8 @@ object BdPrueba {
             // repite el ALTER ... ADD CONSTRAINT usuario_correo_unique
             listOf(
                 TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena,
-                CargoTable, SkillTable, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa
+                TablaCargo, TablaSkill, TablaSkillTendencia, TablaCargoSkill, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa,
+                TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion
             )
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
@@ -91,7 +119,11 @@ object BdPrueba {
 class SistemaPrueba(
     google: VerificadorIdentidadGoogle = GoogleEnMemoria(),
     /** LLM falso: por defecto responde un lote válido de 1 pregunta abierta. */
-    val proveedorIa: ProveedorIaGrabador = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+    val proveedorIa: ProveedorIaGrabador = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto")),
+    /** Por defecto holgados para que las pruebas no choquen con el límite; se bajan para probarlo. */
+    private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000),
+    val clienteMercado: ClienteMercadoLaboralFalso = ClienteMercadoLaboralFalso(emptyMap()),
+    val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso()
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -103,7 +135,8 @@ class SistemaPrueba(
     val correo = CorreoEnMemoria()
 
     val tokens = ServicioToken(refreshTokens, usuarios, JWT_PRUEBA)
-    val login = ServicioLogin(usuarios, cuentasOAuth, google, tokens)
+    val intentosLogin = ContadorIntentosEnMemoria()
+    val login = ServicioLogin(usuarios, cuentasOAuth, google, tokens, intentosLogin)
     val usuario = ServicioUsuario(usuarios, perfiles, objetivos, tokens)
     val onboarding = ServicioOnboarding(perfiles, objetivos)
     val contrasena = ServicioContrasena(
@@ -119,13 +152,24 @@ class SistemaPrueba(
         mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
     )
 
+    val cache = CacheEnMemoria()
+    val mercadoRepo = RepositorioMercadoExposed()
+    val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, clienteMercado)
+    val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
+    val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, clienteMercado, requisitos) { mercado.invalidarCache() }
+    val documentos = FuenteDocumentosLegalesArchivo()
+    val consentimiento = ServicioConsentimiento(RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos)
+    val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
+    val suscripciones = RepositorioSuscripcionExposed()
+    val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras)
+
     /** Inserta un cargo y una skill en el catálogo y devuelve sus ids. */
     fun crearCatalogo(nombreCargo: String = "Backend Developer", nombreSkill: String = "Kotlin"): Pair<UUID, UUID> {
         val cargoId = UUID.randomUUID()
         val skillId = UUID.randomUUID()
         transaction(db) {
-            CargoTable.insert { it[CargoTable.cargoId] = cargoId; it[nombre] = nombreCargo; it[area] = "backend" }
-            SkillTable.insert { it[SkillTable.skillId] = skillId; it[nombre] = nombreSkill; it[categoria] = "tecnica"; it[tipoArea] = "backend" }
+            TablaCargo.insert { it[TablaCargo.cargoId] = cargoId; it[nombre] = nombreCargo; it[area] = "backend" }
+            TablaSkill.insert { it[TablaSkill.skillId] = skillId; it[nombre] = nombreSkill; it[categoria] = "tecnica"; it[tipoArea] = "backend" }
         }
         return cargoId to skillId
     }
@@ -135,6 +179,7 @@ class SistemaPrueba(
         // La misma serialización que producción: el contrato JSON depende de ella.
         configurarSerializacion()
         configurarErrores()
+        configurarLimiteSolicitudes(limites)
         install(Authentication) {
             jwt("auth-jwt") {
                 verifier(JWT.require(JWT_PRUEBA.algoritmo).withIssuer(JWT_PRUEBA.emisor).withAudience(JWT_PRUEBA.audiencia).build())
@@ -163,6 +208,11 @@ class SistemaPrueba(
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
             controladorPregunta(pregunta, generacion)
+            controladorMercado(mercado, tendencias)
+            controladorConsentimiento(consentimiento, documentos)
+            controladorRecordatorio(recordatorio)
+            controladorSuscripcion(suscripcion)
+            controladorSalud()
         }
     }
 }

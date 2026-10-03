@@ -152,6 +152,17 @@ CREATE TABLE IF NOT EXISTS perfil_usuario (
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Cargo al que aspira el usuario (/me/objetivo y onboarding). Se guarda el historial; uno activo.
+CREATE TABLE IF NOT EXISTS objetivo_carrera (
+    objetivo_id  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id   UUID         NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+    nombre_cargo VARCHAR(120) NOT NULL,
+    sector       VARCHAR(50),
+    activo       BOOLEAN      NOT NULL DEFAULT TRUE
+);
+CREATE INDEX IF NOT EXISTS idx_objetivo_carrera_usuario_activo
+    ON objetivo_carrera(usuario_id) WHERE activo = TRUE;
+
 CREATE TABLE IF NOT EXISTS recordatorio_preferencia (
     usuario_id    UUID        PRIMARY KEY REFERENCES usuario(usuario_id) ON DELETE CASCADE,
     dias_semana   VARCHAR(50) NOT NULL,
@@ -744,8 +755,12 @@ CREATE TABLE IF NOT EXISTS suscripcion (
     fecha_inicio     TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_renovacion TIMESTAMPTZ,
     fecha_expiracion TIMESTAMPTZ,
-    codigo_id        UUID        REFERENCES codigo_suscripcion(codigo_id)
+    codigo_id        UUID        REFERENCES codigo_suscripcion(codigo_id),
+    -- SHA-256 del purchase token de Google Play: un pago no puede activar dos cuentas
+    token_compra_hash TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_suscripcion_token_compra
+    ON suscripcion(token_compra_hash) WHERE token_compra_hash IS NOT NULL;
 -- Índice de cobertura: /billing/status resuelto sin tocar la tabla
 CREATE INDEX IF NOT EXISTS idx_suscripcion_usuario
     ON suscripcion(usuario_id, estado)

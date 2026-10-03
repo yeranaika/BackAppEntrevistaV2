@@ -15,3 +15,7 @@ const val MINUTOS_VIGENCIA_CODIGO_RECUPERACION = 15L
 
 /** Tras estos intentos fallidos el código se invalida: 6 dígitos no resisten fuerza bruta sin límite. */
 const val INTENTOS_MAXIMOS_CODIGO_RECUPERACION = 5
+
+/** Logins fallidos permitidos por correo antes de bloquear temporalmente (incluso con la contraseña correcta). */
+const val INTENTOS_MAXIMOS_LOGIN = 5
+const val MINUTOS_BLOQUEO_LOGIN = 15L

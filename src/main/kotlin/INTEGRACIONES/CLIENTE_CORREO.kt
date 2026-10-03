@@ -2,7 +2,8 @@ package INTEGRACIONES
 
 import CONFIGURACION.ConfiguracionCorreo
 import CONFIGURACION.MINUTOS_VIGENCIA_CODIGO_RECUPERACION
-import ERRORES.ErrorServicioExterno
+import UTILIDADES.PoliticaResiliencia
+import UTILIDADES.esFallaTransitoria
 import jakarta.mail.Authenticator
 import jakarta.mail.Message
 import jakarta.mail.MessagingException
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.time.Year
 import java.util.Properties
+import kotlin.time.Duration.Companion.seconds
 
 private const val NOMBRE_REMITENTE = "EntrevistaAPP"
 private const val PUERTO_SMTP_SSL = 465
@@ -31,6 +33,7 @@ interface EnviadorCorreo {
 class ClienteCorreoSmtp(private val config: ConfiguracionCorreo) : EnviadorCorreo {
 
     private val log = LoggerFactory.getLogger(ClienteCorreoSmtp::class.java)
+    private val politica = PoliticaResiliencia(nombre = "correo", tiempoMaximo = 30.seconds, intentos = 3)
 
     private val sesion: Session by lazy {
         val propiedades = Properties().apply {
@@ -79,10 +82,11 @@ class ClienteCorreoSmtp(private val config: ConfiguracionCorreo) : EnviadorCorre
         enviar(correo, "Tu cuenta usa Google - EntrevistaAPP", cuerpo)
     }
 
+    /** Reintenta fallas de SMTP; si persisten lanza 503 correo_no_disponible. */
     private suspend fun enviar(destinatario: String, asunto: String, contenido: String) {
-        // Jakarta Mail es bloqueante: no debe ocupar los hilos de Ktor.
-        withContext(Dispatchers.IO) {
-            try {
+        politica.ejecutar(esReintentable = { it is MessagingException || esFallaTransitoria(it) }) {
+            // Jakarta Mail es bloqueante: no debe ocupar los hilos de Ktor.
+            withContext(Dispatchers.IO) {
                 val mensaje = MimeMessage(sesion).apply {
                     setFrom(InternetAddress(config.usuario, NOMBRE_REMITENTE))
                     setRecipients(Message.RecipientType.TO, InternetAddress.parse(destinatario))
@@ -90,11 +94,9 @@ class ClienteCorreoSmtp(private val config: ConfiguracionCorreo) : EnviadorCorre
                     setContent(plantilla(contenido), "text/html; charset=UTF-8")
                 }
                 Transport.send(mensaje)
-                log.info("Correo '{}' enviado", asunto)
-            } catch (e: MessagingException) {
-                throw ErrorServicioExterno("correo_no_disponible", "No se pudo enviar el correo", e)
             }
         }
+        log.info("Correo '{}' enviado", asunto)
     }
 
     // El nombre lo escribe el usuario: sin escapar permitiría inyectar HTML en el correo.
