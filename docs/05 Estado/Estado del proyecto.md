@@ -27,7 +27,7 @@ Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLA
 - Las ramas están **apiladas**: `main` → fase-0 → … → fase-7 → documentacion-api. La más reciente contiene todo.
 - Fases 0–7 están en GitHub (`yeranaika/BackAppEntrevistaV2`). PR: fases 0–4 contra `main`, luego 5→4, 6→5, 7→6
   (descripciones en `pull-requests/`). Se fusionan **en orden**; al fusionar una, cambiar la base de la siguiente a `main`.
-- `refactor/documentacion-api` aún no se sube.
+- `refactor/documentacion-api` está en GitHub; su PR va contra `refactor/fase-7-feedback`.
 - `gh` no tiene sesión en la máquina de desarrollo: los PR se crean desde el enlace *compare* de GitHub.
 
 ## Base de datos local
