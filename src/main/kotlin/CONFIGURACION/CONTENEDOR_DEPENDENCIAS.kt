@@ -51,10 +51,21 @@ import SERVICIOS.ServicioUsuario
 import MODELOS.RepositorioMetricaVideoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
 import SERVICIOS.ProcesadorEntrevistaSinReporte
-import SERVICIOS.SelectorPreguntasEntrevista
+import MODELOS.RepositorioNivelSkillExposed
+import MODELOS.RepositorioNivelacionExposed
+import MODELOS.RepositorioPracticaExposed
+import MODELOS.RepositorioTestNivelacionExposed
+import SERVICIOS.CorrectorRespuestas
+import SERVICIOS.EvaluadorRespuesta
+import SERVICIOS.EvaluadorRespuestaFreemium
+import SERVICIOS.ResolutorContextoPrueba
+import SERVICIOS.ServicioNivelacion
+import SERVICIOS.ServicioPractica
+import SERVICIOS.ServicioPruebasApp
+import SERVICIOS.ServicioTestNivelacion
+import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
 import SERVICIOS.TareaSincronizacionMercado
-import data.repository.sync.SyncRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -84,7 +95,6 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val lectorCatalogo = LectorCatalogoExposed()
     // Una sola instancia sirve a LectorMercado y a EscritorMercado.
     val repositorioMercado = RepositorioMercadoExposed()
-    val repositorioSincronizacion = SyncRepository()
 
     // ---------- Integraciones externas (todas con tiempo máximo, reintentos y cortocircuito) ----------
     val cache = CacheRedis(configuracion.redis)
@@ -158,15 +168,57 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras)
 
+    private val selectorPreguntas = SelectorPreguntas(repositorioPregunta, repositorioMercado)
+    private val repositorioSesionEntrevista = RepositorioSesionEntrevistaExposed()
+    private val repositorioTestNivelacion = RepositorioTestNivelacionExposed()
+    private val resolutorContexto = ResolutorContextoPrueba(repositorioMercado, repositorioPerfil, repositorioObjetivo)
+
     val servicioEntrevista = ServicioEntrevista(
-        sesiones = RepositorioSesionEntrevistaExposed(),
+        sesiones = repositorioSesionEntrevista,
         metricas = RepositorioMetricaVideoExposed(),
-        selector = SelectorPreguntasEntrevista(repositorioPregunta, repositorioMercado),
-        mercado = repositorioMercado,
-        perfiles = repositorioPerfil,
-        objetivos = repositorioObjetivo,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
         procesador = ProcesadorEntrevistaSinReporte(),
         tareasSegundoPlano = tareasSegundoPlano
+    )
+
+    // Corrección de respuestas abiertas: hoy el motor freemium; en premium se puede cambiar por un LLM.
+    val evaluadorRespuesta: EvaluadorRespuesta = EvaluadorRespuestaFreemium()
+    private val corrector = CorrectorRespuestas(evaluadorRespuesta)
+    private val repositorioPractica = RepositorioPracticaExposed()
+    private val repositorioNivelacion = RepositorioNivelacionExposed()
+    private val repositorioNivelSkill = RepositorioNivelSkillExposed()
+
+    val servicioPractica = ServicioPractica(
+        practicas = repositorioPractica,
+        preguntas = repositorioPregunta,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        corrector = corrector
+    )
+
+    val servicioNivelacion = ServicioNivelacion(
+        nivelaciones = repositorioNivelacion,
+        tests = repositorioTestNivelacion,
+        preguntas = repositorioPregunta,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        corrector = corrector
+    )
+
+    val servicioTestNivelacion = ServicioTestNivelacion(repositorioTestNivelacion, repositorioPregunta, repositorioMercado)
+
+    val servicioPruebasApp = ServicioPruebasApp(
+        entrevistas = servicioEntrevista,
+        practicas = servicioPractica,
+        nivelaciones = servicioNivelacion,
+        sesionesEntrevista = repositorioSesionEntrevista,
+        repositorioPracticas = repositorioPractica,
+        repositorioNivelaciones = repositorioNivelacion
     )
 
     private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)

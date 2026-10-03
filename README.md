@@ -64,6 +64,7 @@ pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplic
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una generación real (cuesta)
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1  # requiere migrations/015 y Redis; -ConLimites prueba el límite por IP
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_5_ENTREVISTA.ps1    # requiere migrations/016; arma su propio banco de preguntas
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_6_PRUEBA.ps1        # requiere migrations/017; práctica, nivelación y sincronización offline
 ```
 La Fase 4 usa también el contenedor `Entrevista_Redis`, no llama a las APIs de empleo ni publica versiones del EULA,
 y la sección de compras de Google Play necesita `GOOGLE_PLAY_BILLING_MOCK=true`. `-ConLimites` deja la IP sin poder
@@ -181,11 +182,29 @@ Un `purchase_token` pertenece a una sola cuenta (`409 compra_ya_registrada`; se 
 
 ---
 
-### 9. Sincronización Offline y Freemium (`/api/v1`)
+### 9. Práctica, nivelación, sincronización offline y freemium (`/api/v1`)
 | Método | Ruta | Auth | Descripción | Body (JSON) |
 |---|---|---|---|---|
-| `POST` | `/api/v1/practice/evaluate-freemium` | Pública | Evaluación algorítmica de texto sin consumo de tokens de IA. | `{"preguntaId"?, "userText", "idealText", "expectedKeywords": [...]}` |
-| `POST` | `/api/v1/sync/attempts` | `Bearer JWT` | Sincronización por lotes de intentos de práctica realizados offline. | `{"attempts": [{"localAttemptId", "skillId", "modo", "puntajeTotal", "respuestas": [...]}]}` |
+| `POST` | `/api/v1/practicas` | `Bearer JWT` | Inicia una práctica (1–20 preguntas escritas). Con `skillId` practica esa skill; si no, el cargo (u objetivo del onboarding). Empezar otra abandona la anterior. | `{"skillId"? \| "cargoId"? \| "cargo"?, "categoria"?, "modo"? (opcion_multiple\|abierta_texto\|mixto), "nivel"?, "cantidadPreguntas"?}` |
+| `GET` | `/api/v1/practicas` | `Bearer JWT` | Últimas prácticas. | - |
+| `GET` | `/api/v1/practicas/{id}` | `Bearer JWT` | Detalle con la corrección de lo respondido. | - |
+| `POST` | `/api/v1/practicas/{id}/respuestas` | `Bearer JWT` | Responde y recibe feedback inmediato (opción correcta y su explicación, o el motor freemium en las abiertas). | `{"preguntaId", "opcionId"? \| "texto"?, "tiempoRespuestaMs"?}` |
+| `POST` | `/api/v1/practicas/{id}/finalizar` | `Bearer JWT` | Cierra con el promedio (0–100) y lo acumula en el puntaje de cada skill. | - |
+| `POST` | `/api/v1/nivelacion` | `Bearer JWT` | Test de nivelación: el que armó un admin para el cargo o 3 técnicas por nivel desde el banco. | `{"cargoId"? \| "cargo"?}` |
+| `GET` | `/api/v1/nivelacion/{id}` | `Bearer JWT` | Detalle; la corrección se ve al terminar. | - |
+| `POST` | `/api/v1/nivelacion/{id}/respuestas` | `Bearer JWT` | Rinde el test (una sola vez): nivel global, nivel por skill y brechas contra el cargo. | `{"respuestas": [{"preguntaId", "opcionId"? \| "texto"?}]}` |
+| `GET` | `/api/v1/nivelacion/resultado` | `Bearer JWT` | Último resultado (`204` si nunca se niveló). | - |
+| `GET` | `/api/v1/me/niveles-skill` | `Bearer JWT` | Nivel y puntaje acumulado por skill. | - |
+| `GET` | `/api/v1/pruebas/historial` | `Bearer JWT` | Entrevistas, prácticas y nivelaciones juntas. | - |
+| `POST` | `/api/v1/sync/attempts` | `Bearer JWT` | Intentos hechos sin conexión. Idempotente por `localAttemptId`; si la pregunta está en el banco se vuelve a corregir en el servidor. | `{"attempts": [{"localAttemptId", "skillId", "modo", "nivelPreguntas", "fechaCreacionIso"?, "respuestas": [...]}]}` |
+| `POST` | `/api/v1/practice/evaluate-freemium` | `Bearer JWT` | Corrige un texto con el motor freemium (sin IA). | `{"userText", "idealText", "expectedKeywords": [...]}` |
+
+**Tests de nivelación (admin):** `POST|GET /api/v1/admin/tests-nivelacion`, `GET|PUT|DELETE /api/v1/admin/tests-nivelacion/{id}`
+(`{"titulo", "cargoId"?, "area", "nivelObjetivo"?, "descripcion"?, "preguntasIds": [3..30 aprobadas, sin video]}`; DELETE es baja lógica).
+
+- **Nivel:** se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida. Las no respondidas cuentan 0.
+- **Brecha:** por cada skill evaluada contra `cargo_skill.nivel_requerido`; prioridad alta si faltan 2 niveles o la skill es obligatoria.
+- **Práctica:** suma puntaje a la skill pero no cambia su nivel (eso lo decide la nivelación). Una abierta cuenta como correcta desde 60 puntos.
 
 ---
 
@@ -260,9 +279,11 @@ Fuentes en orden: JSearch → Remotive → Arbeitnow → dataset de contingencia
 - Cada pregunta guarda un snapshot (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.
 - Las entrevistas de otro usuario responden `404`.
 
-**App Android (`/api/prueba-practica`, mismo servicio por debajo):** `POST /front` con `tipoPrueba` `ENT` crea la entrevista con el JSON
-de siempre; `POST /{pruebaId}/respuestas` guarda todas las respuestas y la finaliza. La opción múltiple se corrige al instante;
-las respuestas abiertas quedan para el reporte de feedback (Fase 7). Los tipos `PR`, `NV` y `BL` llegan en la Fase 6.
+**App Android (`/api/prueba-practica`, mismos servicios por debajo):** `POST /front` crea la prueba según `tipoPrueba`:
+`ENT` entrevista, `PR` práctica técnica, `BL` práctica blanda, `NV` nivelación (con el JSON de siempre).
+`POST /{pruebaId}/respuestas` guarda las respuestas (acepta `respuestaAbierta` y `respuestaTexto`) y la cierra;
+la nivelación devuelve `nivelDetectado` ("Junior" | "Semi Senior" | "Senior"). `GET /intentos` es el historial de todas.
+En la entrevista las abiertas quedan para el reporte de feedback (Fase 7); en práctica y nivelación se corrigen con el motor freemium.
 
 ---
 
@@ -275,7 +296,7 @@ las respuestas abiertas quedan para el reporte de feedback (Fase 7). Los tipos `
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014`, `015` y `016` (idempotentes) sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `017` (idempotentes) sobre una BD existente:
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
 ```

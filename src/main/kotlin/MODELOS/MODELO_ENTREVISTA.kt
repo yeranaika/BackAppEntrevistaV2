@@ -25,7 +25,9 @@ val EXPRESIONES_VALIDAS = setOf("seguro", "nervioso", "distraido", "neutral", "c
 data class OpcionSnapshot(
     val id: String,
     val texto: String,
-    @SerialName("es_correcta") val esCorrecta: Boolean
+    @SerialName("es_correcta") val esCorrecta: Boolean,
+    /** Por qué la opción es (o no) correcta: es el feedback inmediato de la práctica. */
+    val explicacion: String? = null
 )
 
 /** Pregunta de una sesión (un "slot"): snapshot de la pregunta + la respuesta del usuario. */
@@ -121,5 +123,7 @@ data class CriterioSeleccionPreguntas(
     val soloSinCargo: Boolean = false,
     /** Solo preguntas que no son de ninguna skill (generales). */
     val soloSinSkill: Boolean = false,
+    /** Solo estos tipos (vacío = cualquiera). */
+    val tipos: Set<TipoPregunta> = emptySet(),
     val excluir: Set<UUID> = emptySet()
 )

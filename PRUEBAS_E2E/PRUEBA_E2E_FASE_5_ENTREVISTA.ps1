@@ -201,8 +201,8 @@ try {
     Probar 'feedback explica que las abiertas van al reporte' { $resultado.Json.feedbackGeneral -match '3 respuestas abiertas' }
     Probar 'en BD la sesión quedó finalizada' { (Ejecutar-Sql "select estado from app.sesion_entrevista where sesion_id = '$($prueba.Json.pruebaId)'") -eq 'finalizada' }
     $pedidoPractica = $pedidoApp.Clone()
-    $pedidoPractica.tipoPrueba = 'PR'
-    Probar 'tipo PR (práctica, Fase 6) → 400 tipo_prueba_no_soportado' {
+    $pedidoPractica.tipoPrueba = 'XX'
+    Probar 'tipo desconocido → 400 tipo_prueba_no_soportado' {
         (Llamar-Api POST '/api/prueba-practica/front' $pedidoPractica -Token $ana).Json.error -eq 'tipo_prueba_no_soportado'
     }
 }

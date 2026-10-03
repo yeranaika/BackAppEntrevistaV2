@@ -72,6 +72,7 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
             criterio.skillIds.takeIf { it.isNotEmpty() }?.let { TablaPregunta.skillId inList it },
             if (criterio.soloSinCargo) TablaPregunta.cargoId.isNull() else null,
             if (criterio.soloSinSkill) TablaPregunta.skillId.isNull() else null,
+            criterio.tipos.takeIf { it.isNotEmpty() }?.let { tipos -> TablaPregunta.tipoPregunta inList tipos.map { it.valorBd } },
             criterio.excluir.takeIf { it.isNotEmpty() }?.let { TablaPregunta.preguntaId notInList it }
         )
         val filas = TablaPregunta.selectAll()

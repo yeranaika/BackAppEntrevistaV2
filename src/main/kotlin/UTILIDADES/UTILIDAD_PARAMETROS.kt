@@ -24,3 +24,10 @@ fun ApplicationCall.booleanoDeConsulta(nombre: String): Boolean? {
     return valor.lowercase().toBooleanStrictOrNull()
         ?: throw ErrorValidacion("parametro_invalido", "El parámetro $nombre debe ser true o false")
 }
+
+/** Query param UUID opcional (ej: ?cargoId=...); responde 400 si no tiene formato de UUID. */
+fun ApplicationCall.uuidDeConsulta(nombre: String): UUID? {
+    val valor = request.queryParameters[nombre]?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching { UUID.fromString(valor) }
+        .getOrElse { throw ErrorValidacion("id_invalido", "El parámetro $nombre no tiene formato de UUID") }
+}

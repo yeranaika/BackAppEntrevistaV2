@@ -235,7 +235,34 @@ Resultado:
 - `REPOSITORIO_SESION_ENTREVISTA`, `REPOSITORIO_METRICA_VIDEO` (inserción en lote).
 - Al finalizar dispara la generación del reporte (Fase 7) en segundo plano.
 
-## Fase 6 — Creación de prueba (Flujo 1: nivelación y Flujo 2: práctica)
+## Fase 6 — Creación de prueba (Flujo 1: nivelación y Flujo 2: práctica) ✅ (rama `refactor/fase-6-prueba`)
+**Estado:** completada. 243 pruebas en verde + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_6_PRUEBA.ps1` (39/39) contra Postgres real;
+regresión E2E de las fases 1–5 en verde. Migración `017` aplicada a la BD local.
+
+Hecho:
+- Práctica (`/api/v1/practicas`): por skill o por cargo, modos opción múltiple / abierta / mixto, feedback inmediato por respuesta,
+  una práctica en curso a la vez, snapshot de las preguntas servidas, puntaje acumulado por skill.
+- Nivelación (`/api/v1/nivelacion`): test del admin para el cargo o 3 técnicas por nivel; `CalculadoraNivel`; brechas contra `cargo_skill`
+  (`skills_gap` / `skills_ok`); `nivel_skill_usuario`; se rinde una sola vez (también con envíos simultáneos).
+- Tests de nivelación del admin (`/api/v1/admin/tests-nivelacion`).
+- `EvaluadorRespuesta` (interfaz) + `EvaluadorRespuestaFreemium` (el motor anterior, sin regalar 40 puntos cuando no hay palabras clave)
+  + `CorrectorRespuestas` compartido; palabras clave desde la rúbrica.
+- La app Android funciona con PR, BL y NV por `/api/prueba-practica` (`ServicioPruebasApp`) y tiene historial en `/intentos`.
+- `SelectorPreguntas` y `ResolutorContextoPrueba` compartidos por entrevista, práctica y nivelación.
+- Se eliminó todo el código antiguo (`routes/`, `data/`, `services/`): `src/main/kotlin` solo tiene las capas MVC.
+
+Bugs corregidos:
+- `/api/v1/sync/attempts` respondía "sincronizado" sin guardar nada (los intentos offline se perdían). Ahora guarda de verdad,
+  idempotente por `localAttemptId`, y vuelve a corregir en el servidor las preguntas que están en el banco.
+- `/api/v1/practice/evaluate-freemium` era público; ahora exige sesión como el resto de la práctica.
+- `skill_tendencia.nivel_requerido` tenía como valor por defecto `'intermedio'`, que su propio CHECK rechaza.
+
+Decisiones:
+- `resultado_nivelacion.onboarding_id` pasa a ser opcional: V2 guarda el objetivo en `objetivo_carrera`, no en `onboarding_usuario`.
+  Por eso no se marca `nivel_verificado`; el resultado queda en `resultado_nivelacion` y `nivel_skill_usuario`.
+- La nivelación no cambia el nivel del perfil (lo eligió el usuario); se informa como "nivel sugerido".
+
+Plan original:
 **Hoy:** tablas `test_nivelacion`, `intento_test`, `resultado_nivelacion`, `sesion_practica`, `respuesta_practica` sin código; existe `SyncRoutes` (práctica offline) y `FreemiumTextEvaluator` acoplados en un repositorio.
 
 Resultado:

@@ -14,18 +14,13 @@ import CONFIGURACION.TAMANO_PAGINA_ENTREVISTAS_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
-import MODELOS.Cargo
 import MODELOS.EXPRESIONES_VALIDAS
 import MODELOS.EstadoSesionEntrevista
-import MODELOS.LectorMercado
 import MODELOS.MetricaVideo
-import MODELOS.NivelExperiencia
 import MODELOS.NuevaSesionEntrevista
 import MODELOS.PaginaSesionesEntrevista
 import MODELOS.PreguntaSesion
 import MODELOS.RepositorioMetricaVideo
-import MODELOS.RepositorioObjetivoCarrera
-import MODELOS.RepositorioPerfil
 import MODELOS.RepositorioSesionEntrevista
 import MODELOS.RespuestaRegistrada
 import MODELOS.ResultadoRegistroRespuestas
@@ -39,8 +34,6 @@ import java.net.URI
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
-
-private const val LARGO_MAXIMO_NOMBRE_CARGO = 120
 
 /** Qué entrevista quiere el usuario. Lo que venga en null se completa con su perfil y objetivo. */
 data class PedidoEntrevista(
@@ -66,10 +59,8 @@ data class RespuestaUsuario(
 class ServicioEntrevista(
     private val sesiones: RepositorioSesionEntrevista,
     private val metricas: RepositorioMetricaVideo,
-    private val selector: SelectorPreguntasEntrevista,
-    private val mercado: LectorMercado,
-    private val perfiles: RepositorioPerfil,
-    private val objetivos: RepositorioObjetivoCarrera,
+    private val selector: SelectorPreguntas,
+    private val contexto: ResolutorContextoPrueba,
     private val procesador: ProcesadorEntrevistaFinalizada,
     private val tareasSegundoPlano: CoroutineScope,
     private val reloj: Clock = Clock.systemUTC()
@@ -88,13 +79,13 @@ class ServicioEntrevista(
                 "La entrevista debe tener entre $PREGUNTAS_ENTREVISTA_MINIMO y $PREGUNTAS_ENTREVISTA_MAXIMO preguntas"
             )
         }
-        val (cargo, nombreCargo) = resolverCargo(usuarioId, pedido)
-        val nivel = resolverNivel(usuarioId, pedido.nivel, cargo)
+        val (cargo, nombreCargo) = contexto.cargo(usuarioId, pedido.cargoId, pedido.nombreCargo)
+        val nivel = contexto.nivel(usuarioId, pedido.nivel, cargo)
 
         liberarSesionAnterior(usuarioId, reemplazarEnProgreso)
 
         val recientes = sesiones.preguntasRecientes(usuarioId, SESIONES_SIN_REPETIR_PREGUNTAS)
-        val preguntas = selector.seleccionar(cargo, nivel, cantidad, recientes)
+        val preguntas = selector.seleccionarMixta(ContextoSeleccion(cargo, nivel, recientes), cantidad)
         if (preguntas.size < PREGUNTAS_ENTREVISTA_MINIMO) {
             throw ErrorConflicto(
                 "preguntas_insuficientes",
@@ -112,13 +103,12 @@ class ServicioEntrevista(
         return null
     }
 
-    suspend fun obtener(usuarioId: UUID, sesionId: UUID): SesionEntrevista {
-        val sesion = sesiones.buscar(sesionId)
-        if (sesion == null || sesion.usuarioId != usuarioId) {
-            throw ErrorNoEncontrado("entrevista_no_encontrada", "La entrevista no existe")
-        }
-        return sesion
-    }
+    suspend fun obtener(usuarioId: UUID, sesionId: UUID): SesionEntrevista =
+        buscarPropia(usuarioId, sesionId) ?: throw ErrorNoEncontrado("entrevista_no_encontrada", "La entrevista no existe")
+
+    /** La entrevista si es del usuario; null si no existe o es de otro. */
+    suspend fun buscarPropia(usuarioId: UUID, sesionId: UUID): SesionEntrevista? =
+        sesiones.buscar(sesionId)?.takeIf { it.usuarioId == usuarioId }
 
     /** La primera pregunta sin responder, o null si ya respondió todas. */
     suspend fun siguientePregunta(usuarioId: UUID, sesionId: UUID): PreguntaSesion? =
@@ -196,34 +186,6 @@ class ServicioEntrevista(
     }
 
     // ---------- Reglas ----------
-
-    /** Cargo pedido por id, por nombre o, si no viene ninguno, el objetivo activo del usuario. */
-    private suspend fun resolverCargo(usuarioId: UUID, pedido: PedidoEntrevista): Pair<Cargo?, String> {
-        pedido.cargoId?.let { texto ->
-            val id = runCatching { UUID.fromString(texto) }.getOrNull()
-                ?: throw ErrorValidacion("cargo_id_invalido", "El id del cargo no es válido")
-            val cargo = mercado.buscarCargo(id)?.takeIf { it.estaActivo }
-                ?: throw ErrorNoEncontrado("cargo_no_encontrado", "El cargo no existe")
-            return cargo to cargo.nombre
-        }
-        val nombre = pedido.nombreCargo?.trim()?.takeIf { it.isNotEmpty() }
-            ?: objetivos.buscarActivo(usuarioId)?.nombreCargo
-            ?: throw ErrorValidacion("cargo_requerido", "Indica el cargo o define tu objetivo en el onboarding")
-        if (nombre.length > LARGO_MAXIMO_NOMBRE_CARGO) {
-            throw ErrorValidacion("cargo_invalido", "El cargo admite hasta $LARGO_MAXIMO_NOMBRE_CARGO caracteres")
-        }
-        // Un cargo que no está en el catálogo igual se puede practicar, con preguntas generales.
-        val cargo = mercado.buscarCargoPorNombre(nombre)?.takeIf { it.estaActivo }
-        return cargo to (cargo?.nombre ?: nombre)
-    }
-
-    private suspend fun resolverNivel(usuarioId: UUID, nivel: String?, cargo: Cargo?): NivelExperiencia {
-        if (!nivel.isNullOrBlank()) {
-            return NivelExperiencia.desdeTexto(nivel)
-                ?: throw ErrorValidacion("nivel_invalido", "El nivel debe ser junior, semisenior o senior")
-        }
-        return perfiles.buscarPorUsuario(usuarioId)?.nivelExperiencia ?: cargo?.nivelBase ?: NivelExperiencia.JUNIOR
-    }
 
     private suspend fun liberarSesionAnterior(usuarioId: UUID, reemplazar: Boolean) {
         val anterior = sesiones.buscarEnProgreso(usuarioId) ?: return

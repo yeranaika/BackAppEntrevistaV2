@@ -6,7 +6,9 @@ import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorEntrevista
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorMercado
+import CONTROLADORES.controladorNivelacion
 import CONTROLADORES.controladorOnboarding
+import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPregunta
 import CONTROLADORES.controladorPruebaPractica
 import CONTROLADORES.controladorRecordatorio
@@ -15,7 +17,6 @@ import CONTROLADORES.controladorSuscripcion
 import CONTROLADORES.controladorUsuario
 import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
-import routes.sync.syncRoutes
 
 /** Monta todas las rutas con las dependencias ya construidas en el contenedor. */
 fun Application.configurarRutas(d: ContenedorDependencias) {
@@ -38,11 +39,10 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
         // Mercado laboral: cargos, skills y tendencias
         controladorMercado(d.servicioMercado, d.servicioTendencias)
 
-        // Simulación de entrevista (API por sesión y contrato de la app Android)
+        // Pruebas: entrevista, práctica y nivelación (API /api/v1 y contrato de la app Android)
         controladorEntrevista(d.servicioEntrevista)
-        controladorPruebaPractica(d.servicioEntrevista)
-
-        // Pendiente de migrar con la práctica (Fase 6)
-        syncRoutes(d.repositorioSincronizacion)
+        controladorPractica(d.servicioPractica, d.servicioPruebasApp, d.evaluadorRespuesta)
+        controladorNivelacion(d.servicioNivelacion, d.servicioTestNivelacion)
+        controladorPruebaPractica(d.servicioPruebasApp)
     }
 }

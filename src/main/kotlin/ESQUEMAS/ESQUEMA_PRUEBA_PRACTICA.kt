@@ -3,8 +3,8 @@ package ESQUEMAS
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Contrato que ya usa la app Android (EntrevistaTestDtos) en /api/prueba-practica para la entrevista (ENT).
-// No renombrar campos: la app los lee tal cual.
+// Contrato que ya usa la app Android en /api/prueba-practica para entrevista (ENT), práctica (PR, BL)
+// y nivelación (NV). No renombrar campos: la app los lee tal cual.
 
 @Serializable
 data class SolicitudCrearPruebaPractica(
@@ -12,7 +12,7 @@ data class SolicitudCrearPruebaPractica(
     /** jr | mid | sr (también junior | semisenior | senior). */
     val nivel: String? = null,
     val metaCargo: String? = null,
-    /** ENT | MIX | SIM: simulación de entrevista. PR, NV y BL llegan en la Fase 6. */
+    /** ENT | MIX | SIM: entrevista · PR: práctica técnica · BL: práctica blanda · NV: nivelación */
     val tipoPrueba: String? = null,
     val cantidadPR: Int? = null,
     val cantidadNV: Int? = null,
@@ -40,7 +40,7 @@ data class PreguntaPruebaPractica(
     /** Id de la pregunta dentro de la sesión (se devuelve tal cual al responder). */
     val preguntaId: String,
     val texto: String,
-    /** PR técnica, BL blanda */
+    /** PR técnica, BL blanda, NV nivelación */
     val tipoBanco: String,
     val sector: String,
     /** jr | mid | sr */
@@ -66,7 +66,10 @@ data class RespuestaCrearPruebaPractica(
 data class RespuestaPreguntaPractica(
     val preguntaId: String,
     val opcionesSeleccionadas: List<String>? = null,
-    val respuestaAbierta: String? = null
+    /** Lo envía la pantalla de entrevista. */
+    val respuestaAbierta: String? = null,
+    /** Lo envían las pantallas de práctica y nivelación. */
+    val respuestaTexto: String? = null
 )
 
 @Serializable
@@ -86,13 +89,33 @@ data class ResultadoPreguntaPractica(
 @Serializable
 data class RespuestaEnviarRespuestasPractica(
     val ok: Boolean,
-    /** Correctas entre las preguntas que se corrigen al instante (opción múltiple). */
+    /** Respuestas correctas (en la entrevista: solo entre las de alternativas). */
     val puntaje: Int,
-    /** Preguntas corregidas al instante; la app muestra "puntaje / totalPreguntas". */
+    /** La app muestra "puntaje / totalPreguntas". En la entrevista cuenta solo las de alternativas. */
     val totalPreguntas: Int,
     val respondidas: Int,
     val correctas: Int,
+    /** Solo nivelación: "Junior" | "Semi Senior" | "Senior" (la app lo muestra tal cual). */
     val nivelDetectado: String? = null,
     val detalle: List<ResultadoPreguntaPractica>,
-    val feedbackGeneral: String? = null
+    val feedbackGeneral: String? = null,
+    /** "nlp" si se corrigieron respuestas abiertas con el motor freemium (la app muestra "Revisión: NLP básica"). */
+    val feedbackMode: String? = null
+)
+
+/** Elemento de GET /api/prueba-practica/intentos (historial de la app). */
+@Serializable
+data class IntentoPruebaApp(
+    val intentoId: String,
+    val pruebaId: String,
+    val fechaInicio: String,
+    val fechaFin: String? = null,
+    val puntaje: Int? = null,
+    val puntajeTotal: Int,
+    /** jr | mid | sr */
+    val nivel: String? = null,
+    val metaCargo: String? = null,
+    /** practica | nivelacion | entrevista (la app filtra por este valor) */
+    val tipoPrueba: String,
+    val estado: String
 )

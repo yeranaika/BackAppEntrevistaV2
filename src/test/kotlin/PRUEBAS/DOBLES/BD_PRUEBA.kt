@@ -9,6 +9,8 @@ import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorMercado
 import CONTROLADORES.controladorRecordatorio
 import CONTROLADORES.controladorEntrevista
+import CONTROLADORES.controladorNivelacion
+import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPruebaPractica
 import CONTROLADORES.controladorSalud
 import CONTROLADORES.controladorSuscripcion
@@ -70,10 +72,27 @@ import SERVICIOS.ServicioUsuario
 import com.auth0.jwt.JWT
 import MODELOS.RepositorioMetricaVideoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
+import MODELOS.RepositorioNivelSkillExposed
+import MODELOS.RepositorioNivelacionExposed
+import MODELOS.RepositorioPracticaExposed
+import MODELOS.RepositorioTestNivelacionExposed
+import MODELOS.TablaIntentoTest
 import MODELOS.TablaMetricaVideo
+import MODELOS.TablaNivelSkillUsuario
+import MODELOS.TablaRespuestaPractica
+import MODELOS.TablaResultadoNivelacion
+import MODELOS.TablaSesionPractica
+import MODELOS.TablaTestNivelacion
+import SERVICIOS.CorrectorRespuestas
+import SERVICIOS.EvaluadorRespuestaFreemium
+import SERVICIOS.ServicioNivelacion
+import SERVICIOS.ServicioPractica
+import SERVICIOS.ServicioPruebasApp
+import SERVICIOS.ServicioTestNivelacion
 import MODELOS.TablaSesionEntrevista
 import MODELOS.TablaSesionPreguntaRespuesta
-import SERVICIOS.SelectorPreguntasEntrevista
+import SERVICIOS.ResolutorContextoPrueba
+import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -114,7 +133,9 @@ object BdPrueba {
                 TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena,
                 TablaCargo, TablaSkill, TablaSkillTendencia, TablaCargoSkill, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa,
                 TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion,
-                TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo
+                TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo,
+                TablaTestNivelacion, TablaIntentoTest, TablaResultadoNivelacion, TablaSesionPractica, TablaRespuestaPractica,
+                TablaNivelSkillUsuario
             )
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
@@ -177,17 +198,30 @@ class SistemaPrueba(
 
     val sesionesEntrevista = RepositorioSesionEntrevistaExposed()
     val metricasVideo = RepositorioMetricaVideoExposed()
+    val selectorPreguntas = SelectorPreguntas(preguntas, mercadoRepo)
+    val resolutorContexto = ResolutorContextoPrueba(mercadoRepo, perfiles, objetivos)
     val entrevista = ServicioEntrevista(
         sesiones = sesionesEntrevista,
         metricas = metricasVideo,
-        selector = SelectorPreguntasEntrevista(preguntas, mercadoRepo),
-        mercado = mercadoRepo,
-        perfiles = perfiles,
-        objetivos = objetivos,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
         procesador = procesadorEntrevista,
         tareasSegundoPlano = CoroutineScope(Dispatchers.Unconfined),
         reloj = reloj
     )
+
+    val evaluador = EvaluadorRespuestaFreemium()
+    val corrector = CorrectorRespuestas(evaluador)
+    val practicasRepo = RepositorioPracticaExposed()
+    val nivelacionesRepo = RepositorioNivelacionExposed()
+    val testsNivelacionRepo = RepositorioTestNivelacionExposed()
+    val nivelesSkill = RepositorioNivelSkillExposed()
+    val practica = ServicioPractica(practicasRepo, preguntas, selectorPreguntas, resolutorContexto, mercadoRepo, nivelesSkill, corrector, reloj)
+    val nivelacion = ServicioNivelacion(
+        nivelacionesRepo, testsNivelacionRepo, preguntas, selectorPreguntas, resolutorContexto, mercadoRepo, nivelesSkill, corrector, reloj
+    )
+    val testsNivelacion = ServicioTestNivelacion(testsNivelacionRepo, preguntas, mercadoRepo)
+    val pruebasApp = ServicioPruebasApp(entrevista, practica, nivelacion, sesionesEntrevista, practicasRepo, nivelacionesRepo)
 
     /** Inserta un cargo y una skill en el catálogo y devuelve sus ids. */
     fun crearCatalogo(nombreCargo: String = "Backend Developer", nombreSkill: String = "Kotlin"): Pair<UUID, UUID> {
@@ -240,7 +274,9 @@ class SistemaPrueba(
             controladorSuscripcion(suscripcion)
             controladorSalud()
             controladorEntrevista(entrevista)
-            controladorPruebaPractica(entrevista)
+            controladorPractica(practica, pruebasApp, evaluador)
+            controladorNivelacion(nivelacion, testsNivelacion)
+            controladorPruebaPractica(pruebasApp)
         }
     }
 }

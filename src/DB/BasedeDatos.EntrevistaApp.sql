@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS skill_tendencia (
     tendencia_id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id            UUID        NOT NULL REFERENCES skill(skill_id) ON DELETE CASCADE,
     frecuencia_ofertas  INTEGER     NOT NULL DEFAULT 0,
-    nivel_requerido     VARCHAR(20) NOT NULL DEFAULT 'intermedio'
+    nivel_requerido     VARCHAR(20) NOT NULL DEFAULT 'semisenior'
                         CHECK (nivel_requerido IN ('junior', 'semisenior', 'senior')),
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -495,7 +495,10 @@ CREATE TABLE IF NOT EXISTS intento_test (
     -- [{ "pregunta_id":"...", "opcion_id":"...", "respuesta_texto":"...", "correcta":true, "puntaje":8.5 }]
     respuestas_detalle JSONB       NOT NULL DEFAULT '[]',
     fecha_inicio       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    fecha_fin          TIMESTAMPTZ
+    fecha_fin          TIMESTAMPTZ,
+    -- Cargo evaluado (el objetivo vive en objetivo_carrera, no en onboarding_usuario)
+    cargo_id           UUID        REFERENCES cargo(cargo_id) ON DELETE SET NULL,
+    cargo_objetivo     VARCHAR(120)
 );
 CREATE INDEX IF NOT EXISTS idx_intento_usuario
     ON intento_test(usuario_id, tipo_test, fecha_inicio DESC)
@@ -510,7 +513,8 @@ CREATE TABLE IF NOT EXISTS resultado_nivelacion (
     resultado_id     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     intento_id       UUID        NOT NULL UNIQUE REFERENCES intento_test(intento_id) ON DELETE CASCADE,
     usuario_id       UUID        NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
-    onboarding_id    UUID        NOT NULL REFERENCES onboarding_usuario(onboarding_id) ON DELETE CASCADE,
+    onboarding_id    UUID        REFERENCES onboarding_usuario(onboarding_id) ON DELETE CASCADE,
+    cargo_id         UUID        REFERENCES cargo(cargo_id) ON DELETE SET NULL,
     -- Nivel global asignado tras el test (consolida todas las skills)
     nivel_global_asignado VARCHAR(20) NOT NULL
                      CHECK (nivel_global_asignado IN ('junior', 'semisenior', 'senior')),
@@ -541,11 +545,13 @@ CREATE TABLE IF NOT EXISTS sesion_practica (
     sesion_practica_id UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id         UUID        NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
     onboarding_id      UUID        REFERENCES onboarding_usuario(onboarding_id) ON DELETE SET NULL,
-    skill_id           UUID        NOT NULL REFERENCES skill(skill_id) ON DELETE CASCADE,
+    -- NULL cuando se practica un cargo completo (la app practica por cargo, no por skill)
+    skill_id           UUID        REFERENCES skill(skill_id) ON DELETE CASCADE,
     cargo_id           UUID        REFERENCES cargo(cargo_id) ON DELETE SET NULL,
-    -- 'opcion_multiple' | 'abierta_texto' (el usuario elige el modo de práctica)
+    cargo_objetivo     VARCHAR(120),
+    -- 'opcion_multiple' | 'abierta_texto' | 'mixto'
     modo               VARCHAR(20) NOT NULL
-                       CHECK (modo IN ('opcion_multiple', 'abierta_texto')),
+                       CHECK (modo IN ('opcion_multiple', 'abierta_texto', 'mixto')),
     -- 'tecnica' | 'blanda'
     categoria          VARCHAR(10) NOT NULL
                        CHECK (categoria IN ('tecnica', 'blanda')),
@@ -561,6 +567,10 @@ CREATE TABLE IF NOT EXISTS sesion_practica (
     total_preguntas    SMALLINT    NOT NULL DEFAULT 0,
     -- Preguntas respondidas correctamente
     correctas          SMALLINT    NOT NULL DEFAULT 0,
+    -- Preguntas servidas (snapshot): permiten validar y corregir las respuestas
+    preguntas_snap     JSONB       NOT NULL DEFAULT '[]',
+    -- Id que asigna la app a un intento hecho sin conexión (sincronización idempotente)
+    id_local           VARCHAR(64),
     fecha_inicio       TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_fin          TIMESTAMPTZ
 );
@@ -570,6 +580,8 @@ CREATE INDEX IF NOT EXISTS idx_sesion_practica_usuario
 -- Índice parcial: sesiones activas (para evitar duplicar sesiones abiertas)
 CREATE INDEX IF NOT EXISTS idx_sesion_practica_activa
     ON sesion_practica(usuario_id, skill_id) WHERE estado = 'en_progreso';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sesion_practica_id_local
+    ON sesion_practica(usuario_id, id_local) WHERE id_local IS NOT NULL;
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- Respuestas individuales dentro de una sesión de práctica
@@ -599,7 +611,7 @@ CREATE TABLE IF NOT EXISTS respuesta_practica (
     orden             SMALLINT    NOT NULL,
     fecha_respuesta   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_respuesta_practica_sesion
+CREATE UNIQUE INDEX IF NOT EXISTS idx_respuesta_practica_sesion_orden
     ON respuesta_practica(sesion_practica_id, orden);
 
 -- =============================================================================

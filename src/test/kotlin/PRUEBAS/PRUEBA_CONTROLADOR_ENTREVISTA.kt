@@ -206,7 +206,7 @@ class PruebaControladorEntrevista {
         application { sistema.montar(this) }
         val ana = tokenDe(sistema, "ana@ejemplo.com")
 
-        val practica = enviar("POST", "/api/prueba-practica/front", """{"sector":"x","nivel":"jr","metaCargo":"QA","tipoPrueba":"PR"}""", ana)
+        val practica = enviar("POST", "/api/prueba-practica/front", """{"sector":"x","nivel":"jr","metaCargo":"QA","tipoPrueba":"XX"}""", ana)
         assertEquals(HttpStatusCode.BadRequest, practica.status)
         assertEquals("tipo_prueba_no_soportado", practica.objeto().texto("error"))
         val sinBanco = enviar("POST", "/api/prueba-practica/front", """{"sector":"x","nivel":"jr","metaCargo":"QA","tipoPrueba":"ENT"}""", ana)

@@ -14,6 +14,7 @@ import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -38,6 +39,9 @@ interface RepositorioSesionEntrevista {
 
     /** Preguntas del banco que el usuario vio en sus últimas [sesiones] sesiones. */
     suspend fun preguntasRecientes(usuarioId: UUID, sesiones: Int): Set<UUID>
+
+    /** Para el historial de la app: puntaje = alternativas correctas sobre alternativas servidas. */
+    suspend fun listarResumenes(usuarioId: UUID, limite: Int): List<ResumenPrueba>
 }
 
 class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
@@ -149,6 +153,38 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             .toSet()
     }
 
+    override suspend fun listarResumenes(usuarioId: UUID, limite: Int): List<ResumenPrueba> = transaccion {
+        val filas = TablaSesionEntrevista.selectAll()
+            .where { TablaSesionEntrevista.usuarioId eq usuarioId }
+            .orderBy(TablaSesionEntrevista.fechaInicio to SortOrder.DESC)
+            .limit(limite)
+            .toList()
+        val alternativas = TablaSesionPreguntaRespuesta
+            .select(TablaSesionPreguntaRespuesta.sesionId, TablaSesionPreguntaRespuesta.puntaje)
+            .where {
+                (TablaSesionPreguntaRespuesta.sesionId inList filas.map { it[TablaSesionEntrevista.sesionId] }) and
+                    (TablaSesionPreguntaRespuesta.tipoPregunta eq TipoPregunta.OPCION_MULTIPLE.valorBd)
+            }
+            .groupBy { it[TablaSesionPreguntaRespuesta.sesionId] }
+        filas.map { fila ->
+            val id = fila[TablaSesionEntrevista.sesionId]
+            val estado = EstadoSesionEntrevista.desdeBd(fila[TablaSesionEntrevista.estado])
+            val delaSesion = alternativas[id].orEmpty()
+            val correctas = delaSesion.count { (it[TablaSesionPreguntaRespuesta.puntaje] ?: BigDecimal.ZERO) >= BigDecimal(100) }
+            ResumenPrueba(
+                id = id,
+                tipo = "entrevista",
+                cargoObjetivo = fila[TablaSesionEntrevista.cargoObjetivo],
+                nivel = nivelDe(fila),
+                estado = estado.valorBd,
+                puntaje = if (estado == EstadoSesionEntrevista.FINALIZADA) correctas else null,
+                puntajeTotal = delaSesion.size,
+                fechaInicio = fila[TablaSesionEntrevista.fechaInicio],
+                fechaFin = fila[TablaSesionEntrevista.fechaFin]
+            )
+        }
+    }
+
     // ---------- Apoyo (dentro de una transacción) ----------
 
     private fun existeEnProgreso(usuarioId: UUID): Boolean =
@@ -178,7 +214,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             this[TablaSesionPreguntaRespuesta.tipoPregunta] = pregunta.tipo.valorBd
             this[TablaSesionPreguntaRespuesta.categoriaHabilidad] = pregunta.categoria.valorBd
             this[TablaSesionPreguntaRespuesta.skillId] = pregunta.skillId
-            this[TablaSesionPreguntaRespuesta.opciones] = pregunta.opciones.map { OpcionSnapshot(it.id.toString(), it.texto, it.esCorrecta) }
+            this[TablaSesionPreguntaRespuesta.opciones] = pregunta.opciones.map { OpcionSnapshot(it.id.toString(), it.texto, it.esCorrecta, it.explicacion) }
             this[TablaSesionPreguntaRespuesta.orden] = (indice + 1).toShort()
         }
     }
