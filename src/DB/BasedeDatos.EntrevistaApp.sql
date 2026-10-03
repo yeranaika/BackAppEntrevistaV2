@@ -727,8 +727,17 @@ CREATE TABLE IF NOT EXISTS reporte_entrevista (
     -- 'generando' | 'listo' | 'error'
     estado_generacion         VARCHAR(15)  NOT NULL DEFAULT 'generando'
                               CHECK (estado_generacion IN ('generando', 'listo', 'error')),
-    error_detalle             TEXT,        -- Si estado_generacion='error', descripción del fallo
-    fecha_generacion          TIMESTAMPTZ NOT NULL DEFAULT now()
+    error_detalle             TEXT,        -- Si estado_generacion='error', código del fallo (sin detalles internos)
+    fecha_generacion          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Cómo se corrigieron las respuestas abiertas y, si fue con IA, modelo, tokens y costo
+    modo_evaluacion           VARCHAR(10)  NOT NULL DEFAULT 'freemium'
+                              CHECK (modo_evaluacion IN ('freemium', 'ia')),
+    modelo_llm                VARCHAR(60),
+    tokens_entrada            INTEGER,
+    tokens_salida             INTEGER,
+    costo_usd                 NUMERIC(8,6),
+    -- Primer intento + reintentos manuales (con tope)
+    intentos_generacion       SMALLINT     NOT NULL DEFAULT 0
 );
 
 -- ──────────────────────────────────────────────────────────────────────────────

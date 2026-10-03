@@ -50,7 +50,6 @@ import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import MODELOS.RepositorioMetricaVideoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
-import SERVICIOS.ProcesadorEntrevistaSinReporte
 import MODELOS.RepositorioNivelSkillExposed
 import MODELOS.RepositorioNivelacionExposed
 import MODELOS.RepositorioPracticaExposed
@@ -58,7 +57,15 @@ import MODELOS.RepositorioTestNivelacionExposed
 import SERVICIOS.CorrectorRespuestas
 import SERVICIOS.EvaluadorRespuesta
 import SERVICIOS.EvaluadorRespuestaFreemium
+import SERVICIOS.EvaluadorEntrevista
+import SERVICIOS.EvaluadorEntrevistaFreemium
+import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.ResolutorContextoPrueba
+import SERVICIOS.ServicioReporteEntrevista
+import SERVICIOS.VerificadorPremium
+import MODELOS.RepositorioReporteExposed
+import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
+import INTEGRACIONES.MODELO_OPENAI_POR_DEFECTO
 import SERVICIOS.ServicioNivelacion
 import SERVICIOS.ServicioPractica
 import SERVICIOS.ServicioPruebasApp
@@ -173,21 +180,43 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     private val repositorioTestNivelacion = RepositorioTestNivelacionExposed()
     private val resolutorContexto = ResolutorContextoPrueba(repositorioMercado, repositorioPerfil, repositorioObjetivo)
 
-    val servicioEntrevista = ServicioEntrevista(
+    // Corrección de respuestas abiertas: motor freemium para todos; en la entrevista, IA para premium si hay LLM.
+    val evaluadorRespuesta: EvaluadorRespuesta = EvaluadorRespuestaFreemium()
+    private val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluadorRespuesta)
+    private val evaluadorEntrevistaIa: EvaluadorEntrevista? = when {
+        configuracion.llm.openAiApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), MODELO_OPENAI_POR_DEFECTO, evaluadorEntrevistaGratis)
+        configuracion.llm.anthropicApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), MODELO_ANTHROPIC_POR_DEFECTO, evaluadorEntrevistaGratis)
+        else -> null
+    }
+    private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()
+    private val repositorioNivelSkill = RepositorioNivelSkillExposed()
+
+    val servicioReporte = ServicioReporteEntrevista(
+        reportes = RepositorioReporteExposed(),
         sesiones = repositorioSesionEntrevista,
-        metricas = RepositorioMetricaVideoExposed(),
-        selector = selectorPreguntas,
-        contexto = resolutorContexto,
-        procesador = ProcesadorEntrevistaSinReporte(),
+        metricas = repositorioMetricaVideo,
+        preguntas = repositorioPregunta,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        evaluadorGratis = evaluadorEntrevistaGratis,
+        evaluadorIa = evaluadorEntrevistaIa,
+        premium = VerificadorPremium { servicioSuscripcion.estado(it).esPremium },
         tareasSegundoPlano = tareasSegundoPlano
     )
 
-    // Corrección de respuestas abiertas: hoy el motor freemium; en premium se puede cambiar por un LLM.
-    val evaluadorRespuesta: EvaluadorRespuesta = EvaluadorRespuestaFreemium()
+    val servicioEntrevista = ServicioEntrevista(
+        sesiones = repositorioSesionEntrevista,
+        metricas = repositorioMetricaVideo,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        procesador = servicioReporte,
+        tareasSegundoPlano = tareasSegundoPlano
+    )
     private val corrector = CorrectorRespuestas(evaluadorRespuesta)
     private val repositorioPractica = RepositorioPracticaExposed()
     private val repositorioNivelacion = RepositorioNivelacionExposed()
-    private val repositorioNivelSkill = RepositorioNivelSkillExposed()
 
     val servicioPractica = ServicioPractica(
         practicas = repositorioPractica,

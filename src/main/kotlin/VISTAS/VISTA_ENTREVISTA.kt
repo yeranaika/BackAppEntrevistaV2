@@ -112,7 +112,7 @@ fun SesionEntrevista.aResultadoPractica(): RespuestaEnviarRespuestasPractica {
         feedbackGeneral = when {
             abiertasRespondidas == 0 -> "Respondiste correctamente $correctas de ${corregibles.size} preguntas de alternativas."
             else -> "Respondiste correctamente $correctas de ${corregibles.size} preguntas de alternativas. " +
-                "Tus $abiertasRespondidas respuestas abiertas quedaron guardadas para el reporte de feedback."
+                "Tus $abiertasRespondidas respuestas abiertas se están evaluando en tu reporte de feedback."
         }
     )
 }

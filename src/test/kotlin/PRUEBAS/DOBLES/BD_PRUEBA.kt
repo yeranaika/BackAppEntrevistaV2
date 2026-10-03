@@ -9,6 +9,7 @@ import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorMercado
 import CONTROLADORES.controladorRecordatorio
 import CONTROLADORES.controladorEntrevista
+import CONTROLADORES.controladorFeedback
 import CONTROLADORES.controladorNivelacion
 import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPruebaPractica
@@ -76,7 +77,13 @@ import MODELOS.RepositorioNivelSkillExposed
 import MODELOS.RepositorioNivelacionExposed
 import MODELOS.RepositorioPracticaExposed
 import MODELOS.RepositorioTestNivelacionExposed
+import MODELOS.RepositorioReporteExposed
 import MODELOS.TablaIntentoTest
+import MODELOS.TablaReporteEntrevista
+import MODELOS.TablaReporteSkillDetalle
+import SERVICIOS.EvaluadorEntrevistaFreemium
+import SERVICIOS.EvaluadorEntrevistaIa
+import SERVICIOS.ServicioReporteEntrevista
 import MODELOS.TablaMetricaVideo
 import MODELOS.TablaNivelSkillUsuario
 import MODELOS.TablaRespuestaPractica
@@ -135,7 +142,7 @@ object BdPrueba {
                 TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion,
                 TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo,
                 TablaTestNivelacion, TablaIntentoTest, TablaResultadoNivelacion, TablaSesionPractica, TablaRespuestaPractica,
-                TablaNivelSkillUsuario
+                TablaNivelSkillUsuario, TablaReporteEntrevista, TablaReporteSkillDetalle
             )
                 .forEach { SchemaUtils.createMissingTablesAndColumns(it) }
         }
@@ -223,6 +230,16 @@ class SistemaPrueba(
     val testsNivelacion = ServicioTestNivelacion(testsNivelacionRepo, preguntas, mercadoRepo)
     val pruebasApp = ServicioPruebasApp(entrevista, practica, nivelacion, sesionesEntrevista, practicasRepo, nivelacionesRepo)
 
+    // Reporte de feedback. En las pruebas se llama a reporte.procesar(...) a mano para que sea determinista.
+    val reportesRepo = RepositorioReporteExposed()
+    val premium = PremiumFalso()
+    val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluador)
+    val evaluadorEntrevistaIa = EvaluadorEntrevistaIa(proveedorIa, "gpt-4o-mini", evaluadorEntrevistaGratis)
+    val reporte = ServicioReporteEntrevista(
+        reportesRepo, sesionesEntrevista, metricasVideo, preguntas, mercadoRepo, nivelesSkill,
+        evaluadorEntrevistaGratis, evaluadorEntrevistaIa, premium, CoroutineScope(Dispatchers.Unconfined), reloj
+    )
+
     /** Inserta un cargo y una skill en el catálogo y devuelve sus ids. */
     fun crearCatalogo(nombreCargo: String = "Backend Developer", nombreSkill: String = "Kotlin"): Pair<UUID, UUID> {
         val cargoId = UUID.randomUUID()
@@ -274,6 +291,7 @@ class SistemaPrueba(
             controladorSuscripcion(suscripcion)
             controladorSalud()
             controladorEntrevista(entrevista)
+            controladorFeedback(reporte)
             controladorPractica(practica, pruebasApp, evaluador)
             controladorNivelacion(nivelacion, testsNivelacion)
             controladorPruebaPractica(pruebasApp)

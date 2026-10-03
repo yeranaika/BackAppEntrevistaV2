@@ -49,3 +49,30 @@ fun SistemaPrueba.sembrarBancoGeneral(tecnicas: Int = 5, blandas: Int = 3, nivel
     repeat(tecnicas) { sembrarPregunta(CategoriaHabilidad.TECNICA, nivel) }
     repeat(blandas) { sembrarPregunta(CategoriaHabilidad.BLANDA, nivel) }
 }
+
+/** Premium a gusto de la prueba. */
+class PremiumFalso(var esPremium: Boolean = false) : SERVICIOS.VerificadorPremium {
+    override suspend fun esPremium(usuarioId: UUID): Boolean = esPremium
+}
+
+/**
+ * LLM falso para evaluar entrevistas: lee los ids de las respuestas del mensaje de usuario y responde
+ * según [modo]: "valido" (puntaje fijo), "ids_incorrectos", "json_roto" o "caido" (503).
+ */
+class ProveedorEvaluacionFalso(var modo: String = "valido", private val puntaje: Int = 90) : INTEGRACIONES.ProveedorPreguntasIa {
+    val solicitudes = mutableListOf<INTEGRACIONES.SolicitudProveedorIa>()
+
+    override suspend fun generar(solicitud: INTEGRACIONES.SolicitudProveedorIa): INTEGRACIONES.RespuestaProveedorIa {
+        solicitudes += solicitud
+        if (modo == "caido") throw ERRORES.ErrorServicioExterno("provider_not_configured")
+        if (modo == "json_roto") return INTEGRACIONES.RespuestaProveedorIa("{no es json", 10, 5)
+        val datos = solicitud.instruccionUsuario.substringAfter("\n")
+        val ids = kotlinx.serialization.json.Json.parseToJsonElement(datos).let { it as kotlinx.serialization.json.JsonObject }["respuestas"]
+            .let { it as kotlinx.serialization.json.JsonArray }
+            .map { (it as kotlinx.serialization.json.JsonObject)["id"].toString().trim('"') }
+            .let { if (modo == "ids_incorrectos") it.map { UUID.randomUUID().toString() } else it }
+        val evaluaciones = ids.joinToString(",") { """{"id":"$it","puntaje":$puntaje,"observacion":"Buena respuesta","mejoras":["Da un ejemplo concreto"]}""" }
+        val contenido = """{"evaluaciones":[$evaluaciones],"fortalezas":["Comunicación clara"],"areas_mejora":["Profundizar en arquitectura"],"resumen":"Resumen de la IA."}"""
+        return INTEGRACIONES.RespuestaProveedorIa(contenido, 1000, 300)
+    }
+}

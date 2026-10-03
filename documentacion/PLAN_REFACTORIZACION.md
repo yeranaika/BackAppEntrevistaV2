@@ -272,7 +272,32 @@ Resultado:
 - `SERVICIO_NIVELACION`: corrige, asigna nivel, calcula brecha contra `cargo_skill` (`skills_gap` / `skills_ok`), marca `nivel_verificado`, actualiza `nivel_skill_usuario`.
 - `SERVICIO_PRACTICA`: corrige opción múltiple; evalúa abiertas con el motor freemium (interfaz `EvaluadorRespuesta`, intercambiable por LLM en premium).
 
-## Fase 7 — Creación de feedback
+## Fase 7 — Creación de feedback ✅ (rama `refactor/fase-7-feedback`)
+**Estado:** completada. 260 pruebas en verde (estables en 5 corridas seguidas) + E2E `PRUEBAS_E2E/PRUEBA_E2E_FASE_7_FEEDBACK.ps1`
+(23/23 sin IA) contra Postgres real; regresión E2E de las fases 1–6 en verde. Migración `018` aplicada a la BD local.
+
+Hecho:
+- `ServicioReporteEntrevista` (implementa `ProcesadorEntrevistaFinalizada`): reporte en segundo plano con puntajes técnico, blando
+  y de lenguaje corporal, radar por skill (`reporte_skill_detalle`), fortalezas, áreas de mejora, recomendaciones de skills del
+  cargo, resumen y la corrección de cada respuesta abierta (`feedback_ia_tecnico` / `feedback_ia_blando`).
+- Estrategias `EvaluadorEntrevista`: `EvaluadorEntrevistaFreemium` (sin costo) y `EvaluadorEntrevistaIa` (una sola llamada por
+  entrevista, JSON validado, las respuestas del candidato van como datos en el mensaje de usuario; si falla usa el freemium).
+  La IA se usa solo con premium y LLM configurado; modelo, tokens y costo quedan registrados (migración `018`).
+- Estado `generando → listo | error`; el error guarda solo un código; reintento manual con tope de 3 intentos. La toma del
+  reporte es una actualización condicional: dos generaciones de la misma entrevista nunca corren a la vez (ni pagan dos veces la IA).
+- `CONTROLADOR_FEEDBACK`: reporte de una entrevista, reintento, historial de reportes y progreso por skill.
+- Métricas de video resumidas en la BD (`AVG`), sin cargar miles de filas.
+- Se corrigió una prueba de la Fase 6 que fallaba al azar (~25 %) cuando la primera pregunta servida era abierta.
+
+Decisiones:
+- La entrevista suma puntaje a cada skill en `nivel_skill_usuario` pero no fija su nivel (eso lo decide la nivelación).
+- Un clip de video sin transcripción no se puede evaluar: no cuenta en el puntaje y se avisa en las áreas de mejora.
+- La práctica sigue con feedback inmediato freemium; el resumen de la nivelación sigue siendo determinista (sin IA).
+
+Pendiente para la app Android: no tiene pantalla de reporte; puede consumir `GET /api/v1/entrevistas/{id}/reporte`
+(el `pruebaId` de la entrevista es el id de la sesión).
+
+Plan original:
 **Hoy:** tablas `reporte_entrevista`, `reporte_skill_detalle` sin código. El feedback de práctica está solo en el evaluador freemium.
 
 Resultado:

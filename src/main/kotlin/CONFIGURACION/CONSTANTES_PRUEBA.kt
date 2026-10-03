@@ -28,3 +28,17 @@ const val HISTORIAL_PRUEBAS_LIMITE = 50
 
 /** Evaluación freemium suelta (/api/v1/practice/evaluate-freemium). */
 const val PALABRAS_CLAVE_MAXIMAS = 30
+
+/** Reporte de entrevista: peso de cada parte en el puntaje global (se reparte si una parte no se midió). */
+const val PESO_PUNTAJE_TECNICO = 0.5
+const val PESO_PUNTAJE_BLANDO = 0.3
+const val PESO_PUNTAJE_CORPORAL = 0.2
+
+/** Desde este puntaje (0-100) una skill o una parte de la entrevista cuenta como fortaleza. */
+const val UMBRAL_FORTALEZA = 75.0
+
+/** Generación del reporte: primer intento + reintentos manuales. */
+const val INTENTOS_MAXIMOS_REPORTE = 3
+
+/** Progreso por skill: últimos N puntos (skill × entrevista). */
+const val PUNTOS_PROGRESO_LIMITE = 200

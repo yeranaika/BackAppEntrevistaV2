@@ -4,6 +4,7 @@ import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorEntrevista
+import CONTROLADORES.controladorFeedback
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorMercado
 import CONTROLADORES.controladorNivelacion
@@ -41,6 +42,7 @@ fun Application.configurarRutas(d: ContenedorDependencias) {
 
         // Pruebas: entrevista, práctica y nivelación (API /api/v1 y contrato de la app Android)
         controladorEntrevista(d.servicioEntrevista)
+        controladorFeedback(d.servicioReporte)
         controladorPractica(d.servicioPractica, d.servicioPruebasApp, d.evaluadorRespuesta)
         controladorNivelacion(d.servicioNivelacion, d.servicioTestNivelacion)
         controladorPruebaPractica(d.servicioPruebasApp)

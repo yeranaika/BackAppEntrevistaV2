@@ -65,6 +65,7 @@ pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una gene
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1  # requiere migrations/015 y Redis; -ConLimites prueba el límite por IP
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_5_ENTREVISTA.ps1    # requiere migrations/016; arma su propio banco de preguntas
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_6_PRUEBA.ps1        # requiere migrations/017; práctica, nivelación y sincronización offline
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_7_FEEDBACK.ps1      # requiere migrations/018; -ConIa incluye una evaluación real con el LLM (cuesta)
 ```
 La Fase 4 usa también el contenedor `Entrevista_Redis`, no llama a las APIs de empleo ni publica versiones del EULA,
 y la sección de compras de Google Play necesita `GOOGLE_PLAY_BILLING_MOCK=true`. `-ConLimites` deja la IP sin poder
@@ -279,6 +280,23 @@ Fuentes en orden: JSearch → Remotive → Arbeitnow → dataset de contingencia
 - Cada pregunta guarda un snapshot (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.
 - Las entrevistas de otro usuario responden `404`.
 
+### 14. Reporte de feedback y progreso (`/api/v1`)
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/entrevistas/{id}/reporte` | `Bearer JWT` | Reporte de una entrevista finalizada: `generando`, `listo` o `error`. |
+| `POST` | `/api/v1/entrevistas/{id}/reporte/reintentar` | `Bearer JWT` | Vuelve a generar un reporte que terminó con error (`202`; hasta 3 intentos en total). |
+| `GET` | `/api/v1/reportes` | `Bearer JWT` | Historial de reportes. |
+| `GET` | `/api/v1/me/progreso` | `Bearer JWT` | Nivel y puntaje acumulado por skill, con su puntaje en cada entrevista. |
+
+- El reporte se genera en segundo plano al finalizar la entrevista: corrige las respuestas abiertas, calcula los puntajes
+  técnico, blando y de lenguaje corporal (promedio de las métricas de video), y arma el radar por skill, las fortalezas,
+  las áreas de mejora y las skills del cargo que conviene reforzar.
+- **Puntaje global:** técnico 50 %, blando 30 %, lenguaje corporal 20 % (si algo no se midió, su peso se reparte). Las preguntas sin responder cuentan 0.
+- **Evaluación de las respuestas abiertas:** motor freemium (sin costo) para todos; con IA para usuarios premium cuando hay
+  `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si la IA falla o responde algo inválido se usa el freemium: el reporte siempre sale.
+  El modelo, los tokens y el costo quedan en la BD y no se muestran al usuario.
+- Si la generación falla, el usuario ve un mensaje claro (`puedeReintentar`); el código del error queda solo en la BD.
+
 **App Android (`/api/prueba-practica`, mismos servicios por debajo):** `POST /front` crea la prueba según `tipoPrueba`:
 `ENT` entrevista, `PR` práctica técnica, `BL` práctica blanda, `NV` nivelación (con el JSON de siempre).
 `POST /{pruebaId}/respuestas` guarda las respuestas (acepta `respuestaAbierta` y `respuestaTexto`) y la cierra;
@@ -296,7 +314,7 @@ En la entrevista las abiertas quedan para el reporte de feedback (Fase 7); en pr
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `017` (idempotentes) sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `018` (idempotentes) sobre una BD existente:
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
 ```

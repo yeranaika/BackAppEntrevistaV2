@@ -40,6 +40,22 @@ private val jsonEstricto = Json { ignoreUnknownKeys = false; isLenient = false }
 
 enum class TipoProveedorIa { OPENAI, ANTHROPIC }
 
+/** Modelo barato de cada proveedor, el que se usa por defecto. */
+const val MODELO_OPENAI_POR_DEFECTO = "gpt-4o-mini"
+const val MODELO_ANTHROPIC_POR_DEFECTO = "claude-haiku-4-5"
+
+/** USD por token (entrada, salida). */
+private val COSTO_POR_TOKEN = mapOf(
+    MODELO_OPENAI_POR_DEFECTO to (0.00000015 to 0.00000060),
+    MODELO_ANTHROPIC_POR_DEFECTO to (0.000001 to 0.000005)
+)
+
+/** Costo de una llamada; 0 si el modelo no tiene precio cargado. */
+fun costoLlmUsd(modelo: String, tokensEntrada: Int?, tokensSalida: Int?): Double {
+    val (precioEntrada, precioSalida) = COSTO_POR_TOKEN[modelo] ?: (0.0 to 0.0)
+    return (tokensEntrada ?: 0) * precioEntrada + (tokensSalida ?: 0) * precioSalida
+}
+
 data class SolicitudProveedorIa(
     val prompt: String,
     val modelo: String,

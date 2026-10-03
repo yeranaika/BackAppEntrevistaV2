@@ -45,7 +45,9 @@ data class PreguntaSesion(
     val videoClipUrl: String?,
     val opcionElegidaId: String?,
     val puntaje: BigDecimal?,
-    val fechaRespuesta: Instant?
+    val fechaRespuesta: Instant?,
+    /** Corrección del reporte (feedback_ia_tecnico o feedback_ia_blando): { puntaje, observacion, mejoras, modo } */
+    val feedback: JsonObject? = null
 ) {
     val estaRespondida: Boolean get() = fechaRespuesta != null
     val opcionCorrecta: OpcionSnapshot? get() = opciones.firstOrNull { it.esCorrecta }

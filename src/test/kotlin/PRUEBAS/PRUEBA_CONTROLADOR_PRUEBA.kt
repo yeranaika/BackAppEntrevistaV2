@@ -239,7 +239,8 @@ class PruebaControladorPrueba {
         val id = intento.texto("intentoId")!!
         assertTrue(!creada.bodyAsText().contains("opcionCorrectaId") && intento["resultado"] == null)
 
-        val primera = intento["preguntas"]!!.jsonArray[0].jsonObject
+        // La selección es aleatoria: se elige una de alternativas (las abiertas no traen "opciones").
+        val primera = intento["preguntas"]!!.jsonArray.map { it.jsonObject }.first { it.texto("tipo") == "opcion_multiple" }
         val cuerpo = """{"respuestas":[{"preguntaId":"${primera.texto("preguntaId")}","opcionId":"${primera["opciones"]!!.jsonArray[0].jsonObject.texto("opcionId")}"}]}"""
         val respondida = enviar("POST", "/api/v1/nivelacion/$id/respuestas", cuerpo, ana).objeto()
         assertEquals("finalizada", respondida.texto("estado"))

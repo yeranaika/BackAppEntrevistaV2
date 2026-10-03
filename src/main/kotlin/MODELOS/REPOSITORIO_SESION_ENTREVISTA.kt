@@ -10,6 +10,8 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.avg
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -265,7 +267,8 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         videoClipUrl = this[TablaSesionPreguntaRespuesta.videoClipUrl],
         opcionElegidaId = this[TablaSesionPreguntaRespuesta.opcionElegidaId]?.toString(),
         puntaje = this[TablaSesionPreguntaRespuesta.puntaje],
-        fechaRespuesta = this[TablaSesionPreguntaRespuesta.fechaRespuesta]
+        fechaRespuesta = this[TablaSesionPreguntaRespuesta.fechaRespuesta],
+        feedback = this[TablaSesionPreguntaRespuesta.feedbackTecnico] ?: this[TablaSesionPreguntaRespuesta.feedbackBlando]
     )
 
     private fun entrevistaEnProgreso() =
@@ -275,7 +278,18 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 interface RepositorioMetricaVideo {
     /** Inserta el lote completo en una sola operación. Devuelve cuántas filas guardó. */
     suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int
+
+    /** Promedios de la sesión calculados en la BD (una entrevista puede tener miles de filas). null si no hay métricas. */
+    suspend fun resumir(sesionId: UUID): ResumenMetricasVideo?
 }
+
+data class ResumenMetricasVideo(
+    val cantidad: Long,
+    val contactoVisual: BigDecimal?,
+    val postura: BigDecimal?,
+    val confianza: BigDecimal?,
+    val expresionMasFrecuente: String?
+)
 
 class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
     override suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int = transaccion {
@@ -290,5 +304,24 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             this[TablaMetricaVideo.expresionDominante] = metrica.expresionDominante
         }
         metricas.size
+    }
+
+    override suspend fun resumir(sesionId: UUID): ResumenMetricasVideo? = transaccion {
+        val contacto = TablaMetricaVideo.contactoVisual.avg()
+        val postura = TablaMetricaVideo.postura.avg()
+        val confianza = TablaMetricaVideo.confianza.avg()
+        val cantidad = TablaMetricaVideo.metricaId.count()
+        val fila = TablaMetricaVideo.select(cantidad, contacto, postura, confianza)
+            .where { TablaMetricaVideo.sesionId eq sesionId }
+            .single()
+        if (fila[cantidad] == 0L) return@transaccion null
+        val conteoExpresion = TablaMetricaVideo.expresionDominante.count()
+        val expresion = TablaMetricaVideo.select(TablaMetricaVideo.expresionDominante, conteoExpresion)
+            .where { (TablaMetricaVideo.sesionId eq sesionId) and TablaMetricaVideo.expresionDominante.isNotNull() }
+            .groupBy(TablaMetricaVideo.expresionDominante)
+            .orderBy(conteoExpresion to SortOrder.DESC)
+            .limit(1)
+            .firstOrNull()?.get(TablaMetricaVideo.expresionDominante)
+        ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza], expresion)
     }
 }

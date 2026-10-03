@@ -7,6 +7,7 @@ import ERRORES.ErrorValidacion
 import ESQUEMAS.EsquemaJsonLoteLlm
 import ESQUEMAS.PreguntaLlm
 import ESQUEMAS.SolicitudGenerarPreguntas
+import INTEGRACIONES.costoLlmUsd
 import INTEGRACIONES.ProveedorPreguntasIa
 import INTEGRACIONES.RespuestaProveedorIa
 import INTEGRACIONES.SolicitudProveedorIa
@@ -34,12 +35,6 @@ private val MODELOS_PERMITIDOS = mapOf(
     "gpt-4o-mini" to "gpt-4o-mini",
     "claude-haiku-4-5" to "claude-haiku-4-5",
     "claude-3-5-haiku" to "claude-haiku-4-5"
-)
-
-/** USD por token (entrada, salida). */
-private val COSTO_POR_TOKEN = mapOf(
-    "gpt-4o-mini" to (0.00000015 to 0.00000060),
-    "claude-haiku-4-5" to (0.000001 to 0.000005)
 )
 
 data class PreguntaCreadaPorIa(
@@ -159,13 +154,12 @@ class ServicioGeneracionPregunta(
     private fun conCostos(contenidos: List<ContenidoPregunta>, modelo: String, respuesta: RespuestaProveedorIa): List<PreguntaGenerada> {
         val entrada = repartir(respuesta.tokensEntrada, contenidos.size)
         val salida = repartir(respuesta.tokensSalida, contenidos.size)
-        val (precioEntrada, precioSalida) = COSTO_POR_TOKEN[modelo] ?: (0.0 to 0.0)
         return contenidos.mapIndexed { i, contenido ->
             PreguntaGenerada(
                 contenido = contenido,
                 tokensEntrada = entrada[i],
                 tokensSalida = salida[i],
-                costoUsd = (entrada[i] ?: 0) * precioEntrada + (salida[i] ?: 0) * precioSalida
+                costoUsd = costoLlmUsd(modelo, entrada[i], salida[i])
             )
         }
     }
