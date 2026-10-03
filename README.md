@@ -49,126 +49,55 @@ docker compose -f src/DB/docker-compose.yml up -d
 
 ---
 
-## 📮 Colección de Postman
+## 🧪 Pruebas de punta a punta (E2E)
 
-Se incluye una colección completa lista para importar en Postman ubicada en:
-[`postman/EntrevistaAPP_API.postman_collection.json`](postman/EntrevistaAPP_API.postman_collection.json)
+Scripts en [`PRUEBAS_E2E/`](PRUEBAS_E2E) que recorren cada fase contra el **servidor levantado y Postgres real**.
+Crean usuarios `e2e_*@prueba.local` y los borran al terminar. Requieren PowerShell 7 y el contenedor `Entrevista_APP`.
 
-**Características:**
-- Incluye variables automáticas (`{{baseUrl}}`, `{{accessToken}}`, `{{refreshToken}}`, `{{adminToken}}`).
-- Los endpoints de **Login** y **Register** guardan automáticamente el `accessToken` y `refreshToken` para las siguientes peticiones.
-
----
-
-## 📖 Referencia Completa de Endpoints
-
-### 0. Sistema
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `GET` | `/health` | Pública | Healthcheck del servicio (retorna `OK`). |
-
----
-
-### 1. Autenticación Local & Sesiones (`/auth`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `POST` | `/auth/register` | Pública | Registro de usuario nuevo y perfil opcional. Retorna tokens JWT. | `{"email", "password", "nombre"?, "idioma"?, "telefono"?, "fechaNacimiento"?, "genero"?, "nivelExperiencia"?, "area"?, "pais"?, "notaObjetivos"?}` |
-| `POST` | `/auth/login` | Pública | Inicio de sesión con correo y contraseña. Retorna `accessToken` y `refreshToken`. | `{"email", "password"}` |
-| `POST` | `/auth/refresh` | Pública | Rotación de token: envía `refreshToken` y recibe un nuevo par de tokens. | `{"refreshToken"}` |
-| `POST` | `/auth/logout` | Pública | Cierre de sesión y revocación del `refreshToken`. | `{"refreshToken"}` |
-| `POST` | `/auth/request-reset` | Pública | Genera token de reseteo para desarrollo. | `{"email"}` |
-| `POST` | `/auth/confirm-reset` | Pública | Confirma reseteo en desarrollo con token y nueva contraseña. | `{"token", "code", "newPassword"}` |
+```powershell
+# 1) levantar el backend
+.\gradlew.bat run
+# 2) en otra terminal
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1                      # contra http://127.0.0.1:8080
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_1_LOGIN.ps1 -UrlBase http://127.0.0.1:8093
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_2_USUARIO.ps1   # requiere migrations/014 aplicada
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_3_PREGUNTAS.ps1  # -ConIa para incluir una generación real (cuesta)
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_4_INTEGRACIONES.ps1  # requiere migrations/015 y Redis; -ConLimites prueba el límite por IP
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_5_ENTREVISTA.ps1    # requiere migrations/016; arma su propio banco de preguntas
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_6_PRUEBA.ps1        # requiere migrations/017; práctica, nivelación y sincronización offline
+pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_7_FEEDBACK.ps1      # requiere migrations/018; -ConIa incluye una evaluación real con el LLM (cuesta)
+```
+La Fase 4 usa también el contenedor `Entrevista_Redis`, no llama a las APIs de empleo ni publica versiones del EULA,
+y la sección de compras de Google Play necesita `GOOGLE_PLAY_BILLING_MOCK=true`. `-ConLimites` deja la IP sin poder
+registrar cuentas durante unos minutos.
+Código de salida: `0` todo pasa, `1` alguna verificación falla, `2` el backend no responde.
 
 ---
 
-### 2. Autenticación con Google (`/auth/google`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `POST` | `/auth/google` | Pública | Login desde la App Android enviando el `idToken` de Google. | `{"idToken"}` |
-| `GET` | `/auth/google/start` | Pública | Inicia el flujo OAuth web de Google. | - |
-| `GET` | `/auth/google/callback` | Pública | Callback de retorno para OAuth web de Google. | Query params |
+## 📖 Documentación de la API y Postman
+
+Toda la documentación de la API está en [`docs/documentacion/`](docs/documentacion/):
+
+- [`docs/documentacion/API.md`](docs/documentacion/API.md): referencia completa (autenticación, formato de error, cada endpoint con su body de ejemplo y el catálogo de códigos de error).
+- [`docs/documentacion/postman/`](docs/documentacion/postman/): colección y entorno de Postman, listos para importar. Cómo usarlos: [`docs/documentacion/README.md`](docs/documentacion/README.md).
+
+Ambos se generan desde una sola definición con `python docs/documentacion/GENERAR_DOCUMENTACION.py`, así que no se desincronizan.
+**Contexto del proyecto (para devs y agentes):** [`docs/`](docs/) es una bóveda de Obsidian con la visión, el alcance,
+la arquitectura, una nota por tecnología, guías (puesta en marcha, convenciones, cómo agregar un endpoint), el estado y las
+decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes de IA leen además [`AGENTS.md`](AGENTS.md).
 
 ---
 
-### 3. Recuperación de Contraseña vía Email OTP (`/auth`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `POST` | `/auth/forgot-password` | Pública | Envía un código OTP de 6 dígitos al correo del usuario. | `{"correo"}` |
-| `POST` | `/auth/reset-password` | Pública | Valida el código OTP y actualiza la contraseña. | `{"correo", "codigo", "nuevaContrasena"}` |
-| `POST` | `/auth/change-password` | `Bearer JWT` | Cambio de contraseña para un usuario con sesión activa. | `{"nuevaContrasena"}` |
+## ⚙️ Variables de entorno de integraciones
+| Variable | Uso |
+|---|---|
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Caché y bloqueo de login. Si Redis cae la app sigue funcionando (sin caché). |
+| `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | API de empleo principal; sin ella se usan las fuentes gratuitas. |
+| `GOOGLE_PLAY_PACKAGE`, `GOOGLE_PLAY_SERVICE_JSON_B64` | Verificación real de compras (se validan al arrancar). |
+| `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
+| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
 
----
-
-### 4. Cuenta y Perfil del Usuario (`/me` y `/cuenta`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `GET` | `/me` | `Bearer JWT` | Retorna los datos del usuario autenticado, perfil y objetivo. | - |
-| `PUT` | `/me` | `Bearer JWT` | Actualiza datos básicos y demográficos (nombre, idioma, teléfono, fechaNacimiento, género). | `{"nombre"?, "idioma"?, "telefono"?, "fechaNacimiento"?, "genero"?}` |
-| `GET` | `/me/perfil` | `Bearer JWT` | Consulta el perfil del usuario (experiencia, área, país, accesibilidad). | - |
-| `PUT` | `/me/perfil` | `Bearer JWT` | Crea o actualiza el perfil del usuario. | `{"nivelExperiencia"?, "area"?, "pais"?, "notaObjetivos"?, "flagsAccesibilidad"?}` |
-| `GET` | `/me/objetivo` | `Bearer JWT` | Obtiene el objetivo de carrera actual. | - |
-| `PUT` | `/me/objetivo` | `Bearer JWT` | Crea o actualiza el objetivo de carrera. | `{"nombreCargo", "sector"?}` |
-| `DELETE` | `/me/objetivo` | `Bearer JWT` | Elimina el objetivo de carrera. | - |
-| `DELETE` | `/cuenta` | `Bearer JWT` | **Derecho al Olvido (GDPR)**: Elimina la cuenta y todos sus datos en cascada. | `{"confirmar": "eliminar"}` |
-
----
-
-### 5. Onboarding del Usuario (`/onboarding` y `/perfil/objetivo`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `POST` | `/onboarding` | `Bearer JWT` | Guarda toda la información inicial del onboarding (área, nivel, cargo objetivo). | `{"area", "nivelExperiencia", "nombreCargo", "descripcionObjetivo"?}` |
-| `GET` | `/onboarding` | `Bearer JWT` | Retorna los datos guardados del onboarding. | - |
-| `GET` | `/onboarding/status` | `Bearer JWT` | Consulta si el usuario completó el onboarding (`completed: true/false`). | - |
-| `PUT` | `/perfil/objetivo` | `Bearer JWT` | Actualización rápida de objetivo (área, metaCargo, nivel). | `{"area", "metaCargo", "nivel"}` |
-
----
-
-### 6. Recordatorios y Preferencias (`/recordatorios`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `GET` | `/recordatorios/preferencias` | `Bearer JWT` | Obtiene los días, hora y tipo de práctica configurados. | - |
-| `PUT` | `/recordatorios/preferencias` | `Bearer JWT` | Guarda las preferencias de recordatorios y notificaciones. | `{"diasSemana": ["lunes",...], "hora": "19:00", "tipoPractica": "simulacion_ia", "habilitado": true}` |
-
----
-
-### 7. Consentimientos Legales (`/consent` y `/me/consent`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `GET` | `/consent/current` | Pública | Obtiene el texto y versión del consentimiento legal vigente. | - |
-| `POST` | `/me/consent` | `Bearer JWT` | Registra la aceptación del consentimiento con sus alcances. | `{"version": "v1.0", "alcances": {"uso_datos_sesion": true, ...}}` |
-| `GET` | `/me/consent/latest` | `Bearer JWT` | Retorna el último consentimiento activo del usuario. | - |
-| `POST` | `/me/consent/revoke` | `Bearer JWT` | Revoca el consentimiento activo del usuario. | - |
-
----
-
-### 8. Billing y Suscripciones (`/billing`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `GET` | `/billing/status` | `Bearer JWT` | Estado actual de suscripción (es Premium, plan, vencimiento). | - |
-| `POST` | `/billing/google/verify` | `Bearer JWT` | Valida y activa compras realizadas vía Google Play Billing. | `{"product_id", "purchase_token", "purchase_time"}` |
-| `POST` | `/billing/code/redeem` | `Bearer JWT` | Canjea un código promocional o institucional. | `{"code"}` |
-| `POST` | `/billing/admin/codes` | `Bearer JWT (Admin)` | Crea códigos de suscripción (PROM, INST, GOOG). | `{"days", "label"?, "max_uses", "license_type", "expires_at"?}` |
-
----
-
-### 9. Sincronización Offline y Freemium (`/api/v1`)
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `POST` | `/api/v1/practice/evaluate-freemium` | Pública | Evaluación algorítmica de texto sin consumo de tokens de IA. | `{"preguntaId"?, "userText", "idealText", "expectedKeywords": [...]}` |
-| `POST` | `/api/v1/sync/attempts` | `Bearer JWT` | Sincronización por lotes de intentos de práctica realizados offline. | `{"attempts": [{"localAttemptId", "skillId", "modo", "puntajeTotal", "respuestas": [...]}]}` |
-
----
-
-### 10. Administración de Usuarios (`/admin`)
-*(Requiere JWT con rol `admin`)*
-
-| Método | Ruta | Auth | Descripción | Body (JSON) |
-|---|---|---|---|---|
-| `GET` | `/admin/usuarios` | `Bearer JWT (Admin)` | Lista todos los usuarios registrados en el sistema. | - |
-| `POST` | `/admin/users` | `Bearer JWT (Admin)` | Crea un nuevo usuario con rol especificado. | `{"correo", "contrasena", "nombre"?, "idioma"?, "rol": "admin"|"user"}` |
-| `POST` | `/admin/usuarios` | `Bearer JWT (Admin)` | Endpoint alternativo de creación de usuario. | `{"correo", "contrasena", "nombre"?, "idioma"?, "rol"}` |
-| `PATCH` | `/admin/usuarios/{usuarioId}/rol` | `Bearer JWT (Admin)` | Cambia el rol de un usuario (`user` o `admin`). | `{"nuevoRol": "admin"}` |
-| `PATCH` | `/admin/usuarios/{usuarioId}/activar` | `Bearer JWT (Admin)` | Reactiva una cuenta de usuario desactivada. | - |
-| `PATCH` | `/admin/usuarios/{usuarioId}/password` | `Bearer JWT (Admin)` | Resetea la contraseña de cualquier usuario. | `{"nuevaContrasena": "..."}` |
-| `DELETE` | `/admin/usuarios/{usuarioId}` | `Bearer JWT (Admin)` | Desactiva (soft delete) un usuario. | - |
-| `POST` | `/admin/consent/text` | `Bearer JWT (Admin)` | Publica una nueva versión del texto legal de consentimiento. | `{"version", "title", "body"}` |
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `018` (idempotentes) sobre una BD existente:
+```powershell
+Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
+```

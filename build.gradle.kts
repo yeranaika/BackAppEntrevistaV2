@@ -45,12 +45,11 @@ dependencies {
 
     //implementacion login google
     // Ktor (server + oauth + client HTTP para hablar con Google)
-    implementation("io.ktor:ktor-server-auth:3.+")
-    implementation("io.ktor:ktor-server-sessions:3.+")
-    implementation("io.ktor:ktor-client-cio:3.+")
-    implementation("io.ktor:ktor-client-content-negotiation:3.+")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.+")
-    implementation("io.ktor:ktor-client-logging-jvm:0.55.0")
+    implementation("io.ktor:ktor-server-auth:3.3.1")
+    implementation("io.ktor:ktor-server-sessions:3.3.1")
+    implementation("io.ktor:ktor-client-cio:3.3.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
 
     // Opción A (simple, recomendada por Google) para validar ID tokens:
     implementation("com.google.api-client:google-api-client:2.+")
@@ -90,9 +89,10 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.6")
 
     //
-    implementation("io.ktor:ktor-server-status-pages-jvm:3.0.0")
-    implementation("io.ktor:ktor-server-auth-jvm:3.0.0")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm:3.0.0")
+    implementation("io.ktor:ktor-server-status-pages-jvm:3.3.1")
+    implementation("io.ktor:ktor-server-rate-limit-jvm:3.3.1")
+    implementation("io.ktor:ktor-server-auth-jvm:3.3.1")
+    implementation("io.ktor:ktor-server-auth-jwt-jvm:3.3.1")
 
     // Email (Jakarta Mail para envío de correos)
     implementation("com.sun.mail:jakarta.mail:2.0.1")

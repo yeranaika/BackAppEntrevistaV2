@@ -1,0 +1,267 @@
+package CONFIGURACION
+
+import INTEGRACIONES.CacheRedis
+import INTEGRACIONES.ClienteCorreoSmtp
+import INTEGRACIONES.ClienteGooglePlay
+import INTEGRACIONES.ClienteGoogleIdentidad
+import INTEGRACIONES.ClienteMercadoLaboralHttp
+import INTEGRACIONES.ContadorIntentosCache
+import INTEGRACIONES.EnviadorCorreo
+import INTEGRACIONES.FuenteDocumentosLegalesArchivo
+import INTEGRACIONES.ProveedorAnthropic
+import INTEGRACIONES.ProveedorConResiliencia
+import INTEGRACIONES.ProveedorOpenAi
+import INTEGRACIONES.TipoProveedorIa
+import INTEGRACIONES.VerificadorCompraGoogle
+import INTEGRACIONES.VerificadorCompraSimulado
+import INTEGRACIONES.crearClienteHttpLlm
+import MODELOS.LectorCatalogoExposed
+import MODELOS.RepositorioConsentimientoExposed
+import MODELOS.RepositorioCuentaOAuth
+import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioGeneracionPreguntaIaExposed
+import MODELOS.RepositorioMercadoExposed
+import MODELOS.RepositorioObjetivoCarrera
+import MODELOS.RepositorioObjetivoCarreraExposed
+import MODELOS.RepositorioPerfil
+import MODELOS.RepositorioPerfilExposed
+import MODELOS.RepositorioPreguntaExposed
+import MODELOS.RepositorioRecordatorioExposed
+import MODELOS.RepositorioRecuperacionContrasena
+import MODELOS.RepositorioRecuperacionContrasenaExposed
+import MODELOS.RepositorioRefreshToken
+import MODELOS.RepositorioRefreshTokenExposed
+import MODELOS.RepositorioSuscripcionExposed
+import MODELOS.RepositorioTextoConsentimientoExposed
+import MODELOS.RepositorioUsuarioExposed
+import SERVICIOS.ServicioAdminUsuario
+import SERVICIOS.ServicioConsentimiento
+import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.ServicioLogin
+import SERVICIOS.ServicioMercado
+import SERVICIOS.ServicioOnboarding
+import SERVICIOS.ServicioPregunta
+import SERVICIOS.ServicioRecordatorio
+import SERVICIOS.ServicioRequisitosCargo
+import SERVICIOS.ServicioSuscripcion
+import SERVICIOS.ServicioTendenciasSkill
+import SERVICIOS.ServicioToken
+import SERVICIOS.ServicioUsuario
+import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioSesionEntrevistaExposed
+import MODELOS.RepositorioNivelSkillExposed
+import MODELOS.RepositorioNivelacionExposed
+import MODELOS.RepositorioPracticaExposed
+import MODELOS.RepositorioTestNivelacionExposed
+import SERVICIOS.CorrectorRespuestas
+import SERVICIOS.EvaluadorRespuesta
+import SERVICIOS.EvaluadorRespuestaFreemium
+import SERVICIOS.EvaluadorEntrevista
+import SERVICIOS.EvaluadorEntrevistaFreemium
+import SERVICIOS.EvaluadorEntrevistaIa
+import SERVICIOS.ResolutorContextoPrueba
+import SERVICIOS.ServicioReporteEntrevista
+import SERVICIOS.VerificadorPremium
+import MODELOS.RepositorioReporteExposed
+import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
+import INTEGRACIONES.MODELO_OPENAI_POR_DEFECTO
+import SERVICIOS.ServicioNivelacion
+import SERVICIOS.ServicioPractica
+import SERVICIOS.ServicioPruebasApp
+import SERVICIOS.ServicioTestNivelacion
+import SERVICIOS.SelectorPreguntas
+import SERVICIOS.ServicioEntrevista
+import SERVICIOS.TareaSincronizacionMercado
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+
+private const val PREFIJO_INTENTOS_LOGIN = "login:fallos:"
+
+/**
+ * Único lugar donde se construyen repositorios, integraciones y servicios.
+ * Cada instancia se crea una vez y se inyecta en las rutas por constructor.
+ */
+class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseable {
+
+    /** Tareas que no deben bloquear la respuesta HTTP (ej: enviar correos). Se cancelan al apagar. */
+    private val tareasSegundoPlano = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // ---------- Repositorios ----------
+    // Una sola instancia sirve a RepositorioUsuario y a LectorUsuarioSesion.
+    val repositorioUsuario = RepositorioUsuarioExposed()
+    val repositorioPerfil: RepositorioPerfil = RepositorioPerfilExposed()
+    val repositorioObjetivo: RepositorioObjetivoCarrera = RepositorioObjetivoCarreraExposed()
+    val repositorioRecuperacion: RepositorioRecuperacionContrasena = RepositorioRecuperacionContrasenaExposed()
+    val repositorioRefreshToken: RepositorioRefreshToken = RepositorioRefreshTokenExposed()
+    val repositorioCuentaOAuth: RepositorioCuentaOAuth = RepositorioCuentaOAuthExposed()
+    val repositorioPregunta = RepositorioPreguntaExposed()
+    val repositorioGeneracionPregunta = RepositorioGeneracionPreguntaIaExposed()
+    val lectorCatalogo = LectorCatalogoExposed()
+    // Una sola instancia sirve a LectorMercado y a EscritorMercado.
+    val repositorioMercado = RepositorioMercadoExposed()
+
+    // ---------- Integraciones externas (todas con tiempo máximo, reintentos y cortocircuito) ----------
+    val cache = CacheRedis(configuracion.redis)
+    val enviadorCorreo: EnviadorCorreo = ClienteCorreoSmtp(configuracion.correo)
+    val clienteMercadoLaboral = ClienteMercadoLaboralHttp(configuracion.mercadoLaboral)
+    val verificadorGoogle = ClienteGoogleIdentidad(configuracion.google.clientId)
+    private val clienteGooglePlay = if (configuracion.googlePlay.esSimulado) null else ClienteGooglePlay(configuracion.googlePlay)
+    val verificadorCompras: VerificadorCompraGoogle = clienteGooglePlay ?: VerificadorCompraSimulado()
+    val documentosLegales = FuenteDocumentosLegalesArchivo()
+
+    private val clienteHttpLlm = crearClienteHttpLlm()
+
+    // Siempre montados: sin API key responden 503 provider_not_configured.
+    val proveedoresIa = mapOf(
+        TipoProveedorIa.OPENAI to ProveedorConResiliencia(ProveedorOpenAi(configuracion.llm.openAiApiKey, clienteHttpLlm), "openai"),
+        TipoProveedorIa.ANTHROPIC to ProveedorConResiliencia(ProveedorAnthropic(configuracion.llm.anthropicApiKey, clienteHttpLlm), "anthropic")
+    )
+
+    // ---------- Servicios de negocio ----------
+    val servicioToken = ServicioToken(
+        repositorio = repositorioRefreshToken,
+        usuarios = repositorioUsuario,
+        jwt = configuracion.jwt
+    )
+
+    val servicioLogin = ServicioLogin(
+        usuarios = repositorioUsuario,
+        cuentasOAuth = repositorioCuentaOAuth,
+        verificadorGoogle = verificadorGoogle,
+        tokens = servicioToken,
+        intentosFallidos = ContadorIntentosCache(cache, PREFIJO_INTENTOS_LOGIN, MINUTOS_BLOQUEO_LOGIN * 60)
+    )
+
+    val servicioUsuario = ServicioUsuario(repositorioUsuario, repositorioPerfil, repositorioObjetivo, servicioToken)
+
+    val servicioOnboarding = ServicioOnboarding(repositorioPerfil, repositorioObjetivo)
+
+    val servicioContrasena = ServicioContrasena(
+        lectorUsuarios = repositorioUsuario,
+        usuarios = repositorioUsuario,
+        cuentasOAuth = repositorioCuentaOAuth,
+        codigos = repositorioRecuperacion,
+        correo = enviadorCorreo,
+        tokens = servicioToken,
+        tareasSegundoPlano = tareasSegundoPlano
+    )
+
+    val servicioAdminUsuario = ServicioAdminUsuario(repositorioUsuario, servicioContrasena, servicioToken)
+
+    val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
+
+    val servicioGeneracionPregunta = ServicioGeneracionPregunta(proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo)
+
+    val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, clienteMercadoLaboral)
+
+    val servicioMercado = ServicioMercado(repositorioMercado, repositorioMercado, servicioRequisitosCargo, cache)
+
+    val servicioTendencias = ServicioTendenciasSkill(
+        lector = repositorioMercado,
+        escritor = repositorioMercado,
+        clienteMercado = clienteMercadoLaboral,
+        requisitos = servicioRequisitosCargo,
+        alActualizar = { servicioMercado.invalidarCache() }
+    )
+
+    val servicioConsentimiento = ServicioConsentimiento(
+        RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentosLegales
+    )
+
+    val servicioRecordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
+
+    val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras)
+
+    private val selectorPreguntas = SelectorPreguntas(repositorioPregunta, repositorioMercado)
+    private val repositorioSesionEntrevista = RepositorioSesionEntrevistaExposed()
+    private val repositorioTestNivelacion = RepositorioTestNivelacionExposed()
+    private val resolutorContexto = ResolutorContextoPrueba(repositorioMercado, repositorioPerfil, repositorioObjetivo)
+
+    // Corrección de respuestas abiertas: motor freemium para todos; en la entrevista, IA para premium si hay LLM.
+    val evaluadorRespuesta: EvaluadorRespuesta = EvaluadorRespuestaFreemium()
+    private val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluadorRespuesta)
+    private val evaluadorEntrevistaIa: EvaluadorEntrevista? = when {
+        configuracion.llm.openAiApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), MODELO_OPENAI_POR_DEFECTO, evaluadorEntrevistaGratis)
+        configuracion.llm.anthropicApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), MODELO_ANTHROPIC_POR_DEFECTO, evaluadorEntrevistaGratis)
+        else -> null
+    }
+    private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()
+    private val repositorioNivelSkill = RepositorioNivelSkillExposed()
+
+    val servicioReporte = ServicioReporteEntrevista(
+        reportes = RepositorioReporteExposed(),
+        sesiones = repositorioSesionEntrevista,
+        metricas = repositorioMetricaVideo,
+        preguntas = repositorioPregunta,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        evaluadorGratis = evaluadorEntrevistaGratis,
+        evaluadorIa = evaluadorEntrevistaIa,
+        premium = VerificadorPremium { servicioSuscripcion.estado(it).esPremium },
+        tareasSegundoPlano = tareasSegundoPlano
+    )
+
+    val servicioEntrevista = ServicioEntrevista(
+        sesiones = repositorioSesionEntrevista,
+        metricas = repositorioMetricaVideo,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        procesador = servicioReporte,
+        tareasSegundoPlano = tareasSegundoPlano
+    )
+    private val corrector = CorrectorRespuestas(evaluadorRespuesta)
+    private val repositorioPractica = RepositorioPracticaExposed()
+    private val repositorioNivelacion = RepositorioNivelacionExposed()
+
+    val servicioPractica = ServicioPractica(
+        practicas = repositorioPractica,
+        preguntas = repositorioPregunta,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        corrector = corrector
+    )
+
+    val servicioNivelacion = ServicioNivelacion(
+        nivelaciones = repositorioNivelacion,
+        tests = repositorioTestNivelacion,
+        preguntas = repositorioPregunta,
+        selector = selectorPreguntas,
+        contexto = resolutorContexto,
+        mercado = repositorioMercado,
+        niveles = repositorioNivelSkill,
+        corrector = corrector
+    )
+
+    val servicioTestNivelacion = ServicioTestNivelacion(repositorioTestNivelacion, repositorioPregunta, repositorioMercado)
+
+    val servicioPruebasApp = ServicioPruebasApp(
+        entrevistas = servicioEntrevista,
+        practicas = servicioPractica,
+        nivelaciones = servicioNivelacion,
+        sesionesEntrevista = repositorioSesionEntrevista,
+        repositorioPracticas = repositorioPractica,
+        repositorioNivelaciones = repositorioNivelacion
+    )
+
+    private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)
+
+    fun iniciarTareasSegundoPlano() {
+        tareaMercado.iniciar()
+    }
+
+    override fun close() {
+        tareasSegundoPlano.cancel()
+        tareaMercado.close()
+        clienteMercadoLaboral.close()
+        clienteGooglePlay?.close()
+        clienteHttpLlm.close()
+        cache.close()
+    }
+}
