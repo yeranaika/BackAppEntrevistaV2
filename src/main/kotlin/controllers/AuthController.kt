@@ -4,6 +4,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -40,11 +41,10 @@ fun Route.authController(
     route("/auth") {
         post("/register") {
             try {
-                val req = call.receive<RegisterReq>()
+                val req = call.receiveJsonOrNull<RegisterReq>()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
                 val tokens = authService.register(req, issuer, audience, algorithm)
                 call.respond(HttpStatusCode.Created, LoginOk(tokens.accessToken, tokens.refreshToken))
-            } catch (_: ContentTransformationException) {
-                call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
             } catch (e: AuthService.EmailInUseException) {
                 call.respond(HttpStatusCode.Conflict, ErrorRes(e.publicCode))
             } catch (e: AuthService.AuthException) {
@@ -57,11 +57,10 @@ fun Route.authController(
 
         post("/login") {
             try {
-                val req = call.receive<LoginReq>()
+                val req = call.receiveJsonOrNull<LoginReq>()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
                 val tokens = authService.login(req, issuer, audience, algorithm)
                 call.respond(LoginOk(tokens.accessToken, tokens.refreshToken))
-            } catch (_: ContentTransformationException) {
-                call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
             } catch (e: AuthService.InactiveUserException) {
                 call.respond(HttpStatusCode.Forbidden, ErrorRes(e.publicCode))
             } catch (e: AuthService.BadCredentialsException) {
@@ -75,11 +74,10 @@ fun Route.authController(
         // Flujo MÓVIL (Android): recibe { idToken }, autoregistra/enlaza y devuelve LoginOk
         post("/google") {
             try {
-                val req = call.receive<GoogleLoginReq>()
+                val req = call.receiveJsonOrNull<GoogleLoginReq>()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
                 val tokens = authService.loginWithGoogle(req.idToken, issuer, audience, algorithm)
                 call.respond(HttpStatusCode.OK, LoginOk(tokens.accessToken, tokens.refreshToken))
-            } catch (_: ContentTransformationException) {
-                call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
             } catch (e: AuthService.GoogleTokenInvalidException) {
                 call.respond(HttpStatusCode.Unauthorized, ErrorRes(e.publicCode))
             } catch (e: AuthService.GoogleEmailNotVerifiedException) {
@@ -135,11 +133,10 @@ fun Route.authController(
             put {
                 try {
                     val userId = call.userIdFromJwt()
-                    val req = call.receive<UpdateProfileReq>()
+                    val req = call.receiveJsonOrNull<UpdateProfileReq>()
+                        ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
                     authService.updateProfile(userId, req)
                     call.respond(OkRes())
-                } catch (_: ContentTransformationException) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorRes("invalid_json"))
                 } catch (e: AuthService.UserNotFoundException) {
                     call.respond(HttpStatusCode.NotFound, ErrorRes(e.publicCode))
                 } catch (e: AuthService.AuthException) {
@@ -152,3 +149,17 @@ fun Route.authController(
         }
     }
 }
+
+/**
+ * Lee el body JSON o devuelve null si viene malformado o con tipos incorrectos.
+ * En Ktor 3 un JSON inválido llega como BadRequestException (no ContentTransformationException),
+ * así que ambos se traducen a 400 invalid_json en vez de caer al 500 genérico.
+ */
+private suspend inline fun <reified T : Any> ApplicationCall.receiveJsonOrNull(): T? =
+    try {
+        receive<T>()
+    } catch (_: BadRequestException) {
+        null
+    } catch (_: ContentTransformationException) {
+        null
+    }
