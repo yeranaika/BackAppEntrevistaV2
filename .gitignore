@@ -93,11 +93,11 @@ Desktop.ini
 
 # AI tool directories & helper scripts
 .kiro/
-.claude/
 .gemini/
 .cursor/
 /estructura.py
-/estructura_front.txt
+/estructura_front.txt
+
 
 # Obsidian: estado local de la boveda docs/ (cambia con cada uso)
 docs/.obsidian/workspace.json
