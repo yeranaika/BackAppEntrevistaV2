@@ -6,6 +6,7 @@ import ESQUEMAS.SolicitudContrasenaAdmin
 import ESQUEMAS.SolicitudCrearUsuarioAdmin
 import MIDDLEWARES.soloAdmin
 import SERVICIOS.ServicioAdminUsuario
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aRespuestaAdmin
@@ -62,5 +63,5 @@ fun Route.controladorAdminUsuario(servicio: ServicioAdminUsuario) {
 
 private suspend fun RoutingContext.crearUsuario(servicio: ServicioAdminUsuario) {
     val usuario = servicio.crear(call.receive<SolicitudCrearUsuarioAdmin>())
-    call.respond(HttpStatusCode.Created, usuario.aRespuestaCreado())
+    call.responderConMensaje(usuario.aRespuestaCreado(), "Usuario creado exitosamente", HttpStatusCode.Created)
 }

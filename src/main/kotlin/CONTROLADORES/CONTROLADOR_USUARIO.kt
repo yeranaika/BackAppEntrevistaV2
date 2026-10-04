@@ -12,6 +12,7 @@ import ESQUEMAS.SolicitudEliminarCuenta
 import ESQUEMAS.SolicitudRegistro
 import ESQUEMAS.aRespuesta
 import SERVICIOS.ServicioUsuario
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aRespuesta
 import io.ktor.http.*
@@ -40,7 +41,7 @@ fun Route.controladorUsuario(servicio: ServicioUsuario) {
                 val estado = if (error is ErrorConflicto) HttpStatusCode.Conflict else HttpStatusCode.UnprocessableEntity
                 return@post call.respond(estado, RespuestaErrorLegado(error.codigo))
             }
-            call.respond(HttpStatusCode.Created, tokens.aRespuesta())
+            call.responderConMensaje(tokens.aRespuesta(), "Cuenta creada exitosamente", HttpStatusCode.Created)
         }
     }
 
@@ -52,7 +53,7 @@ fun Route.controladorUsuario(servicio: ServicioUsuario) {
 
             put {
                 servicio.actualizarCuenta(call.usuarioIdDesdeJwt(), call.receive<SolicitudActualizarCuenta>())
-                call.respond(RespuestaOk())
+                call.respond(RespuestaOk("Datos de la cuenta actualizados"))
             }
 
             get("/perfil") {
@@ -61,7 +62,7 @@ fun Route.controladorUsuario(servicio: ServicioUsuario) {
 
             put("/perfil") {
                 servicio.actualizarPerfil(call.usuarioIdDesdeJwt(), call.receive<SolicitudActualizarPerfil>())
-                call.respond(RespuestaOk())
+                call.respond(RespuestaOk("Perfil actualizado"))
             }
         }
 

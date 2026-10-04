@@ -183,6 +183,37 @@ class PruebaControladorUsuario {
         assertEquals("jr", estado["data"]!!.jsonObject.texto("nivelExperiencia"))
     }
 
+    // ---------- Mensajes de éxito ----------
+
+    @Test
+    fun `las operaciones exitosas responden un mensaje para el usuario`() = testApplication {
+        montarApp()
+        val registro = cuerpo(enviar("POST", "/auth/register", """{"email":"luz@ejemplo.com","password":"Clave-segura-1"}"""))
+        assertEquals("Cuenta creada exitosamente", registro.texto("mensaje"))
+        assertTrue(registro.texto("accessToken")!!.isNotBlank())
+        val token = registro.texto("accessToken")!!
+
+        // Antes respondían {} (encodeDefaults=false omitía ok=true).
+        val cuenta = cuerpo(enviar("PUT", "/me", """{"nombre":"Luz"}""", token))
+        assertEquals("true", cuenta.texto("ok"))
+        assertEquals("Datos de la cuenta actualizados", cuenta.texto("mensaje"))
+        assertEquals("Perfil actualizado", cuerpo(enviar("PUT", "/me/perfil", """{"area":"TI"}""", token)).texto("mensaje"))
+
+        val objetivo = cuerpo(enviar("PUT", "/perfil/objetivo", """{"area":"TI","metaCargo":"Backend Developer","nivel":"jr"}""", token))
+        assertEquals("ok", objetivo.texto("status"))
+        assertEquals("Objetivo guardado", objetivo.texto("mensaje"))
+
+        val cargo = cuerpo(enviar("PUT", "/me/objetivo", """{"nombreCargo":"Data Analyst"}""", token))
+        assertEquals("Data Analyst", cargo.texto("nombreCargo"))
+        assertEquals("Cargo objetivo guardado", cargo.texto("mensaje"))
+        assertEquals("Cargo objetivo eliminado", cuerpo(enviar("DELETE", "/me/objetivo", token = token)).texto("mensaje"))
+
+        // Android lee `message` en los flujos de contraseña: viajan los dos campos.
+        val recuperar = cuerpo(enviar("POST", "/auth/forgot-password", """{"correo":"luz@ejemplo.com"}"""))
+        assertEquals(recuperar.texto("message"), recuperar.texto("mensaje"))
+        assertTrue(recuperar.texto("mensaje")!!.isNotBlank())
+    }
+
     // ---------- Borrado de cuenta ----------
 
     @Test

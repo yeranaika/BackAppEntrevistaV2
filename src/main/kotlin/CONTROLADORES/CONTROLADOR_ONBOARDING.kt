@@ -9,6 +9,7 @@ import ESQUEMAS.SolicitudObjetivo
 import ESQUEMAS.SolicitudObjetivoPerfil
 import ESQUEMAS.SolicitudOnboarding
 import SERVICIOS.ServicioOnboarding
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aRespuesta
 import io.ktor.server.auth.*
@@ -30,7 +31,7 @@ fun Route.controladorOnboarding(servicio: ServicioOnboarding) {
         put("/perfil/objetivo") {
             val solicitud = call.receive<SolicitudObjetivoPerfil>()
             servicio.guardarOnboarding(call.usuarioIdDesdeJwt(), solicitud.area, solicitud.nivel, solicitud.metaCargo)
-            call.respond(RespuestaEstado("ok"))
+            call.responderConMensaje(RespuestaEstado("ok"), "Objetivo guardado")
         }
 
         route("/onboarding") {
@@ -43,13 +44,8 @@ fun Route.controladorOnboarding(servicio: ServicioOnboarding) {
                     solicitud.nombreCargo,
                     solicitud.descripcionObjetivo
                 )
-                call.respond(
-                    RespuestaGuardarOnboarding(
-                        esExitoso = true,
-                        mensaje = "Información de onboarding guardada exitosamente",
-                        datos = resumen.aRespuesta()
-                    )
-                )
+                val mensaje = "Información de onboarding guardada exitosamente"
+                call.responderConMensaje(RespuestaGuardarOnboarding(esExitoso = true, mensaje = mensaje, datos = resumen.aRespuesta()), mensaje)
             }
 
             get {
@@ -72,12 +68,12 @@ fun Route.controladorOnboarding(servicio: ServicioOnboarding) {
             put {
                 val solicitud = call.receive<SolicitudObjetivo>()
                 val objetivo = servicio.guardarObjetivo(call.usuarioIdDesdeJwt(), solicitud.nombreCargo, solicitud.sector)
-                call.respond(objetivo.aRespuesta())
+                call.responderConMensaje(objetivo.aRespuesta(), "Cargo objetivo guardado")
             }
 
             delete {
                 servicio.eliminarObjetivo(call.usuarioIdDesdeJwt())
-                call.respond(RespuestaOk())
+                call.respond(RespuestaOk("Cargo objetivo eliminado"))
             }
         }
     }

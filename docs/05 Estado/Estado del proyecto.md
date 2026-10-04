@@ -19,7 +19,8 @@ actualizado: 2026-10-03
 | 5 | Simulación de entrevista + contrato Android | `refactor/fase-5-entrevista` | `f035361` | 211 · E2E 50 |
 | 6 | Práctica, nivelación, sincronización offline | `refactor/fase-6-prueba` | `9d15d1b` | 243 · E2E 39 |
 | 7 | Reporte de feedback y progreso por skill | `refactor/fase-7-feedback` | `75fdb3e` | 260 · E2E 23 |
-| Docs | `docs/documentacion/` (API.md + Postman) y esta bóveda | `refactor/documentacion-api` | `ae49742` + esta bóveda | — |
+| Docs | `docs/documentacion/` (API.md + Postman) y esta bóveda | `refactor/documentacion-api` | `ae49742` + esta bóveda | colección 78/78 |
+| Mensajes | `mensaje` en todo éxito de escritura (todas las fases) | `refactor/mensajes-exito` | — | 261 · colección 78/78 |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
@@ -28,6 +29,7 @@ Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLA
 - Fases 0–7 están en GitHub (`yeranaika/BackAppEntrevistaV2`). PR: fases 0–4 contra `main`, luego 5→4, 6→5, 7→6
   (descripciones en `pull-requests/`). Se fusionan **en orden**; al fusionar una, cambiar la base de la siguiente a `main`.
 - `refactor/documentacion-api` está en GitHub; su PR va contra `refactor/fase-7-feedback`.
+- `refactor/mensajes-exito` va encima de `refactor/documentacion-api`.
 - `gh` no tiene sesión en la máquina de desarrollo: los PR se crean desde el enlace *compare* de GitHub.
 
 ## Base de datos local

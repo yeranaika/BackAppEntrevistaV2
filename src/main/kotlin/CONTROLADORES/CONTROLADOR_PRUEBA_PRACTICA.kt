@@ -7,6 +7,7 @@ import SERVICIOS.PedidoPruebaApp
 import SERVICIOS.PruebaApp
 import SERVICIOS.RespuestaPrueba
 import SERVICIOS.ServicioPruebasApp
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
 import VISTAS.aIntentoApp
@@ -39,7 +40,7 @@ fun Route.controladorPruebaPractica(servicio: ServicioPruebasApp) {
                     is PruebaApp.Practica -> prueba.sesion.aPruebaPractica(sector)
                     is PruebaApp.Nivelacion -> prueba.intento.aPruebaPractica(sector)
                 }
-                call.respond(HttpStatusCode.Created, respuesta)
+                call.responderConMensaje(respuesta, "Prueba creada", HttpStatusCode.Created)
             }
 
             post("/{pruebaId}/respuestas") {
@@ -49,7 +50,7 @@ fun Route.controladorPruebaPractica(servicio: ServicioPruebasApp) {
                     is PruebaApp.Practica -> prueba.sesion.aResultadoPractica()
                     is PruebaApp.Nivelacion -> prueba.intento.aResultadoPractica(prueba.resultado!!)
                 }
-                call.respond(respuesta)
+                call.responderConMensaje(respuesta, "Respuestas enviadas; la prueba quedó terminada")
             }
 
             get("/intentos") {

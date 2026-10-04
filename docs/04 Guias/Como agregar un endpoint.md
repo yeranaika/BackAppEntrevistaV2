@@ -16,7 +16,8 @@ Ejemplo: `GET /api/v1/me/estadisticas`.
 3. **Servicio** — reglas en `SERVICIOS/SERVICIO_<ENTIDAD>.kt`; errores de dominio con código estable; dependencias por interfaz.
 4. **Vista** — `VISTAS/VISTA_<ENTIDAD>.kt`: `fun Modelo.aRespuesta() = RespuestaX(…)`.
 5. **Controlador** — ruta en `CONTROLADORES/CONTROLADOR_<ENTIDAD>.kt` con el comentario de rutas arriba; `authenticate("auth-jwt")`
-   y `soloAdmin { }` según corresponda.
+   y `soloAdmin { }` según corresponda. Si escribe datos, responder con `mensaje` (`responderConMensaje` o
+   `RespuestaOk("…")`) → [[Convenciones de codigo#Respuestas de éxito]].
 6. **Cablear** — instanciar en `CONFIGURACION/CONTENEDOR_DEPENDENCIAS.kt`, montar en `CONFIGURACION/CONFIGURACION_RUTAS.kt`
    y en `SistemaPrueba.montar` (`src/test/kotlin/PRUEBAS/DOBLES/BD_PRUEBA.kt`, incluida la tabla nueva).
 7. **Pruebas** — `PRUEBA_SERVICIO_*` (reglas, errores, concurrencia si aplica) y `PRUEBA_CONTROLADOR_*` (status, JSON, 401/403/404).

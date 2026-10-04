@@ -6,6 +6,7 @@ import ESQUEMAS.SolicitudCrearCodigo
 import ESQUEMAS.SolicitudVerificarCompra
 import MIDDLEWARES.soloAdmin
 import SERVICIOS.ServicioSuscripcion
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aRespuesta
 import io.ktor.http.*
@@ -26,7 +27,7 @@ fun Route.controladorSuscripcion(servicio: ServicioSuscripcion) {
             post("/google/verify") {
                 val solicitud = call.receive<SolicitudVerificarCompra>()
                 servicio.verificarCompraGoogle(call.usuarioIdDesdeJwt(), solicitud.productoId, solicitud.tokenCompra)
-                call.respond(RespuestaCompraVerificada(status = "premium_active"))
+                call.responderConMensaje(RespuestaCompraVerificada(status = "premium_active"), "Compra verificada; tu cuenta ya es premium")
             }
 
             get("/status") {
@@ -35,14 +36,18 @@ fun Route.controladorSuscripcion(servicio: ServicioSuscripcion) {
 
             post("/code/redeem") {
                 val solicitud = call.receive<SolicitudCanjearCodigo>()
-                call.respond(servicio.canjearCodigo(call.usuarioIdDesdeJwt(), solicitud.codigo).aRespuesta())
+                call.responderConMensaje(servicio.canjearCodigo(call.usuarioIdDesdeJwt(), solicitud.codigo).aRespuesta(), "Código canjeado; tu cuenta ya es premium")
             }
         }
 
         route("/admin") {
             soloAdmin {
                 post("/codes") {
-                    call.respond(HttpStatusCode.Created, servicio.crearCodigo(call.receive<SolicitudCrearCodigo>()).aRespuesta())
+                    call.responderConMensaje(
+                        servicio.crearCodigo(call.receive<SolicitudCrearCodigo>()).aRespuesta(),
+                        "Código promocional creado",
+                        HttpStatusCode.Created
+                    )
                 }
             }
         }

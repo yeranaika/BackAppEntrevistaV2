@@ -7,6 +7,7 @@ import MIDDLEWARES.soloAdmin
 import SERVICIOS.ServicioMercado
 import SERVICIOS.ServicioTendenciasSkill
 import UTILIDADES.enteroDeConsulta
+import UTILIDADES.responderConMensaje
 import UTILIDADES.uuidDeParametro
 import VISTAS.aRespuesta
 import io.ktor.http.*
@@ -53,21 +54,26 @@ fun Route.controladorMercado(mercado: ServicioMercado, tendencias: ServicioTende
     route("/admin/market") {
         soloAdmin {
             post("/sync-trends") {
-                call.respond(tendencias.sincronizar().aRespuesta())
+                val resultado = tendencias.sincronizar().aRespuesta()
+                call.responderConMensaje(resultado, resultado.message)
             }
 
             post("/cargos") {
                 val (cargo, generados) = mercado.crearCargo(call.receive<SolicitudCrearCargo>())
-                call.respond(HttpStatusCode.Created, RespuestaCargoCreado(cargo.aRespuesta(), generados?.aRespuesta()))
+                val mensaje = if (generados == null) "Cargo creado" else "Cargo creado con sus requisitos generados"
+                call.responderConMensaje(RespuestaCargoCreado(cargo.aRespuesta(), generados?.aRespuesta()), mensaje, HttpStatusCode.Created)
             }
 
             post("/cargos/{id}/generate-requirements") {
-                call.respond(mercado.regenerarRequisitos(call.uuidDeParametro("id")).aRespuesta())
+                call.responderConMensaje(mercado.regenerarRequisitos(call.uuidDeParametro("id")).aRespuesta(), "Requisitos del cargo regenerados")
             }
 
             post("/cargos/generate-all") {
                 val resultados = mercado.regenerarTodos()
-                call.respond(RespuestaGeneracionMasiva(resultados.size, resultados.map { it.aRespuesta() }))
+                call.responderConMensaje(
+                    RespuestaGeneracionMasiva(resultados.size, resultados.map { it.aRespuesta() }),
+                    "Requisitos regenerados para ${resultados.size} cargos"
+                )
             }
         }
     }

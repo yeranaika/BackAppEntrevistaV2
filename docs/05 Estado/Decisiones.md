@@ -58,4 +58,10 @@ Evita que una práctica fácil suba el nivel. El nivel del perfil no se cambia: 
 ## D14 · Alcance del trabajo: solo backend (2026-10)
 La app Android es solo referencia del contrato; no se proponen ni hacen cambios en ella desde este repositorio.
 
+## D15 · Mensaje de éxito como campo extra, sin envolver (2026-10)
+- **Contexto**: los errores traían texto para el usuario y los éxitos no; algunos llegaban como `{}`.
+- **Decisión**: todo éxito de `POST`/`PUT`/`PATCH`/`DELETE` agrega `mensaje` junto a los datos (`responderConMensaje`).
+- **Por qué**: envolver en `{datos, mensaje}` rompería a Android; un campo extra lo ignora (`ignoreUnknownKeys`).
+- **Consecuencias**: los `GET` no llevan mensaje; `message` se mantiene donde Android ya lo leía.
+
 Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]

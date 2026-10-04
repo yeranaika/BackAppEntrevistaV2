@@ -29,13 +29,23 @@ data class RespuestaErrorLegado(
     val error: String
 )
 
-/** Respuesta con texto para el usuario; Android la lee como `message`. */
+/**
+ * Éxito sin recurso que devolver, con texto para el usuario.
+ * `mensaje` es el campo estándar; `message` se mantiene porque Android lo lee en los flujos de contraseña.
+ */
 @Serializable
 data class RespuestaMensaje(
-    @SerialName("message") val mensaje: String
-)
+    val mensaje: String,
+    val message: String
+) {
+    constructor(mensaje: String) : this(mensaje, message = mensaje)
+}
 
+/** Éxito sin recurso. `ok` sin valor por defecto: con encodeDefaults=false un `true` por defecto no viajaría. */
 @Serializable
 data class RespuestaOk(
-    val ok: Boolean = true
-)
+    val ok: Boolean,
+    val mensaje: String
+) {
+    constructor(mensaje: String) : this(ok = true, mensaje = mensaje)
+}

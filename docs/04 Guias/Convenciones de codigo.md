@@ -43,6 +43,15 @@ mágicos (constantes), sin código comentado ni muerto, sin duplicados. Secretos
 Lanzar errores de dominio con **código estable en snake_case** y mensaje en español: `throw ErrorConflicto("entrevista_en_progreso", "Ya tienes…")`.
 Nunca `catch` vacío. Detalle en [[Manejo de errores y resiliencia]].
 
+## Respuestas de éxito
+Todo `POST`/`PUT`/`PATCH`/`DELETE` exitoso responde un `mensaje` en español para el usuario:
+- Con recurso: `call.responderConMensaje(recurso.aRespuesta(), "Pregunta aprobada")` (agrega `mensaje` junto a los datos;
+  estado opcional, ej. `HttpStatusCode.Created`).
+- Sin recurso: `call.respond(RespuestaOk("Perfil actualizado"))` → `{"ok": true, "mensaje": "…"}`.
+- `RespuestaMensaje("…")` cuando Android ya lee `message` (viajan `mensaje` y `message`).
+- Ojo: con `encodeDefaults = false` un campo con valor por defecto no viaja si no cambia; por eso `RespuestaOk` no
+  tiene defaults. `docs/documentacion/GENERAR_DOCUMENTACION.py --probar` falla si un éxito de escritura no trae `mensaje`.
+
 ## Pruebas
 Cada servicio con su `PRUEBA_SERVICIO_*` y cada contrato HTTP con su `PRUEBA_CONTROLADOR_*` → [[Pruebas]].
 

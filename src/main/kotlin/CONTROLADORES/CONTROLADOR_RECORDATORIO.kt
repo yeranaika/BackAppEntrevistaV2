@@ -2,6 +2,7 @@ package CONTROLADORES
 
 import ESQUEMAS.SolicitudRecordatorio
 import SERVICIOS.ServicioRecordatorio
+import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aRespuesta
 import io.ktor.server.auth.*
@@ -25,7 +26,7 @@ fun Route.controladorRecordatorio(servicio: ServicioRecordatorio) {
                 val guardado = servicio.guardar(
                     call.usuarioIdDesdeJwt(), solicitud.diasSemana, solicitud.hora, solicitud.tipoPractica, solicitud.habilitado
                 )
-                call.respond(guardado.aRespuesta())
+                call.responderConMensaje(guardado.aRespuesta(), "Preferencias de recordatorio guardadas")
             }
         }
     }
