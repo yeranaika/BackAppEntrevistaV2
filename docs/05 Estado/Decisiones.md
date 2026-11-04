@@ -65,3 +65,8 @@ La app Android es solo referencia del contrato; no se proponen ni hacen cambios 
 - **Consecuencias**: los `GET` no llevan mensaje; `message` se mantiene donde Android ya lo leía.
 
 Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
+
+## D16 · Readiness separada de liveness para el calentamiento HTTP (2026-11)
+- **Decisión**: `/health` permanece como liveness; `/ready` informa 503 durante el calentamiento del evaluador freemium y 200 cuando termina o falla.
+- **Por qué**: el despliegue debe enviar tráfico tras el calentamiento, pero un calentamiento fallido no debe dejar el servicio indisponible permanentemente.
+- **Consecuencias**: Railway debe usar `/ready` como healthcheck; `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento. `CallLogging` excluye `/health`, `/ready` y `/api/v1/practice/evaluate-freemium`.

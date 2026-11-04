@@ -21,6 +21,7 @@ actualizado: 2026-10-03
 | 7 | Reporte de feedback y progreso por skill | `refactor/fase-7-feedback` | `75fdb3e` | 260 · E2E 23 |
 | Docs | `docs/documentacion/` (API.md + Postman) y esta bóveda | `refactor/documentacion-api` | `ae49742` + esta bóveda | colección 78/78 |
 | Mensajes | `mensaje` en todo éxito de escritura (todas las fases) | `refactor/mensajes-exito` | — | 261 · colección 78/78 |
+| Disponibilidad Freemium | `/ready` espera el calentamiento, `/health` conserva liveness y se filtran sus logs | `codex/freemium-main-port` | `6de97b2` + filtro de logs | 265 pruebas · colección generada con 106 solicitudes |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
