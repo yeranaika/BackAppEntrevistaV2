@@ -88,12 +88,19 @@ Estado del servicio.
 | Método | Ruta | Auth | Qué hace |
 |---|---|---|---|
 | `GET` | `/health` | Pública | Salud |
+| `GET` | `/ready` | Pública | Disponibilidad |
 
 ### Salud
 
 `GET /health` · Pública · responde `200`
 
-Responde `OK` si la base de datos responde y `503 db_no_disponible` si no. Lo usa el supervisor / balanceador.
+Liveness del proceso: responde `OK` mientras el servidor siga vivo, aunque una dependencia esté fallando. No usar como healthcheck de disponibilidad.
+
+### Disponibilidad
+
+`GET /ready` · Pública · responde `200`
+
+Responde `503 {"status":"warming"}` durante el calentamiento HTTP Freemium y `200 {"status":"ready"}` al terminar. Configura el healthcheck de Railway para consultar esta ruta.
 
 ## 01 · Autenticación
 

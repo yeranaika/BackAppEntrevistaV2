@@ -27,6 +27,7 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | No | API de empleo principal |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | No | IA (generación de preguntas y evaluación premium) |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP |
+| `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.
 
@@ -41,8 +42,9 @@ for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -
 
 ## 3. Ejecutar
 ```bash
-./gradlew run                       # http://localhost:8080 ; GET /health → OK
+./gradlew run                       # http://localhost:8080 ; GET /health → OK ; GET /ready → 200 al terminar el calentamiento
 ```
+En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `OK` mientras el proceso esté vivo. `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
 
 ## 4. Probar
 ```bash

@@ -11,6 +11,8 @@ import io.ktor.server.routing.IgnoreTrailingSlash
 import MIDDLEWARES.configurarSeguridad
 import CONFIGURACION.configurarLimiteSolicitudes
 import CONFIGURACION.configurarRutas
+import CONFIGURACION.crearEstadoFreemiumReadiness
+import CONFIGURACION.configurarCalentamientoFreemium
 
 fun main(args: Array<String>) = EngineMain.main(args)
 
@@ -33,6 +35,8 @@ fun Application.module() {
         log.warn("OPENAI_API_KEY y ANTHROPIC_API_KEY no configurados: generate-ai responderá 503 provider_not_configured.")
     }
 
-    configurarRutas(dependencias)
+    val disponibilidad = crearEstadoFreemiumReadiness()
+    configurarRutas(dependencias, disponibilidad)
+    configurarCalentamientoFreemium(configuracion.jwt, disponibilidad)
     configurarMonitoreo()
 }

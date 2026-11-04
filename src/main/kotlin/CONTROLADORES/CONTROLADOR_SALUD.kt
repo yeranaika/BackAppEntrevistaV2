@@ -1,31 +1,18 @@
 package CONTROLADORES
 
-import ESQUEMAS.RespuestaError
-import UTILIDADES.transaccion
+import CONFIGURACION.EstadoFreemiumReadiness
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.jetbrains.exposed.sql.transactions.TransactionManager
-import org.slf4j.LoggerFactory
 
-private val log = LoggerFactory.getLogger("CONTROLADOR_SALUD")
+/** Liveness: un fallo de una dependencia no debe reiniciar el proceso. */
+fun Route.controladorSalud(disponibilidad: EstadoFreemiumReadiness) {
+    get("/health") { call.respondText("OK") }
 
-/**
- * GET /health   "OK" si la base de datos responde; 503 si no (para el supervisor / balanceador).
- * Redis no se incluye: la aplicación funciona sin caché.
- */
-fun Route.controladorSalud() {
-    get("/health") {
-        val baseDisponible = try {
-            transaccion { TransactionManager.current().exec("SELECT 1") { it.next() } } == true
-        } catch (e: Exception) {
-            log.error("La base de datos no responde", e)
-            false
-        }
-        if (baseDisponible) {
-            call.respondText("OK")
-        } else {
-            call.respond(HttpStatusCode.ServiceUnavailable, RespuestaError.conMensaje("db_no_disponible", "La base de datos no está disponible"))
-        }
+    get("/ready") {
+        val listo = disponibilidad.estaListo()
+        val estado = if (listo) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+        val cuerpo = if (listo) """{"status":"ready"}""" else """{"status":"warming"}"""
+        call.respondText(cuerpo, ContentType.Application.Json, estado)
     }
 }

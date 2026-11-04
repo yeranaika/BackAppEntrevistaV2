@@ -289,7 +289,7 @@ class SistemaPrueba(
             controladorConsentimiento(consentimiento, documentos)
             controladorRecordatorio(recordatorio)
             controladorSuscripcion(suscripcion)
-            controladorSalud()
+            controladorSalud(CONFIGURACION.EstadoFreemiumReadiness(0))
             controladorEntrevista(entrevista)
             controladorFeedback(reporte)
             controladorPractica(practica, pruebasApp, evaluador)

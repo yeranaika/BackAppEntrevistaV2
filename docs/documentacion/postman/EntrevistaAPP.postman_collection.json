@@ -148,7 +148,27 @@
                 "health"
               ]
             },
-            "description": "Responde `OK` si la base de datos responde y `503 db_no_disponible` si no. Lo usa el supervisor / balanceador.",
+            "description": "Liveness del proceso: responde `OK` mientras el servidor siga vivo, aunque una dependencia esté fallando. No usar como healthcheck de disponibilidad.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Disponibilidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            },
+            "description": "Responde `503 {\"status\":\"warming\"}` durante el calentamiento HTTP Freemium y `200 {\"status\":\"ready\"}` al terminar. Configura el healthcheck de Railway para consultar esta ruta.",
             "auth": {
               "type": "noauth"
             }

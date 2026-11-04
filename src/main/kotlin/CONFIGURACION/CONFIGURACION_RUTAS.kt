@@ -20,9 +20,9 @@ import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
 
 /** Monta todas las rutas con las dependencias ya construidas en el contenedor. */
-fun Application.configurarRutas(d: ContenedorDependencias) {
+fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: EstadoFreemiumReadiness) {
     routing {
-        controladorSalud()
+        controladorSalud(disponibilidad)
 
         // Cuentas y sesión
         controladorLogin(d.servicioLogin)

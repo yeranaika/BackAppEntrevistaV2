@@ -63,7 +63,9 @@ def primero_de_alternativas(lista, campo_id, campo_opciones, campo_opcion_id):
 CARPETAS = [
     ("00 · Sistema", "Estado del servicio.", [
         req("Salud", "GET", "/health", PUBLICA, desc="""
-Responde `OK` si la base de datos responde y `503 db_no_disponible` si no. Lo usa el supervisor / balanceador."""),
+Liveness del proceso: responde `OK` mientras el servidor siga vivo, aunque una dependencia esté fallando. No usar como healthcheck de disponibilidad."""),
+        req("Disponibilidad", "GET", "/ready", PUBLICA, desc="""
+Responde `503 {\"status\":\"warming\"}` durante el calentamiento HTTP Freemium y `200 {\"status\":\"ready\"}` al terminar. Configura el healthcheck de Railway para consultar esta ruta."""),
     ]),
     ("01 · Autenticación", "Registro, login con correo o Google, rotación y cierre de sesión. "
      "Los requests de login guardan `accessToken` y `refreshToken` automáticamente.", [
