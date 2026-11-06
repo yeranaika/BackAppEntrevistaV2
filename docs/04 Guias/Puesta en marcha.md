@@ -27,6 +27,7 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | No | API de empleo principal |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | No | IA (generación de preguntas y evaluación premium) |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP |
+| `LIMITE_EVALUACIONES_IA_MENSUAL` | No (30) | Reportes con IA por usuario premium y mes (UTC); al llegar al tope el reporte sale con el motor freemium; `0` = sin IA |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.

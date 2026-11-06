@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [decisiones, adr]
-actualizado: 2026-10-03
+actualizado: 2026-11-06
 ---
 
 # Decisiones
@@ -70,3 +70,15 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Decisión**: `/health` permanece como liveness; `/ready` informa 503 durante el calentamiento del evaluador freemium y 200 cuando termina o falla.
 - **Por qué**: el despliegue debe enviar tráfico tras el calentamiento, pero un calentamiento fallido no debe dejar el servicio indisponible permanentemente.
 - **Consecuencias**: Railway debe usar `/ready` como healthcheck; `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento. `CallLogging` excluye `/health`, `/ready` y `/api/v1/practice/evaluate-freemium`.
+
+## D17 · Tope mensual de evaluaciones con IA para premium (2026-11)
+- **Contexto**: cada reporte evaluado con IA cuesta tokens y un usuario premium no tenía límite.
+- **Decisión**: `LIMITE_EVALUACIONES_IA_MENSUAL` (por defecto 30; `0` = sin IA) por usuario y mes calendario UTC. Al
+  llegar al tope el reporte se genera igual con el motor freemium: sin error y sin cambios en el contrato de Android.
+- **Por qué**: el reporte siempre debe salir (D09). El cupo se **reserva** en la BD antes de llamar al LLM, bloqueando
+  la fila del usuario (D08) con `READ COMMITTED` explícito, para que dos reportes simultáneos no superen el tope.
+- **Consecuencias**: se cuentan evaluaciones con IA **entregadas** (reportes `listo` con modo `ia`), no llamadas pagadas;
+  si la IA cae al freemium o el reporte termina en error, el cupo se devuelve. Un reporte `generando` con modo `ia` es
+  una reserva que caduca a los 10 minutos (servidor reiniciado a mitad). Una evaluación con IA queda con la fecha de su
+  reserva, así cuenta en el mes en que tomó el cupo aunque termine pasada la medianoche. Sin migración. El mes se corta a medianoche
+  UTC (20:00 o 21:00 del último día en Chile). El usuario todavía no ve cuántas le quedan (pendiente con Android).

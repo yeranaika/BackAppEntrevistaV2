@@ -1,5 +1,6 @@
 package PRUEBAS
 
+import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ESQUEMAS.SolicitudRegistro
@@ -24,18 +25,25 @@ import SERVICIOS.RespuestaUsuario
 import SERVICIOS.ServicioReporteEntrevista
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import java.math.BigDecimal
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+private val ENERO: Instant = Instant.parse("2026-01-01T00:00:00Z")
+private val FEBRERO: Instant = Instant.parse("2026-02-01T00:00:00Z")
 
 class PruebaServicioReporte {
     private val sistema = SistemaPrueba()
@@ -91,10 +99,16 @@ class PruebaServicioReporte {
         sistema.reportesRepo.buscarPorSesion(sesion.id)!!
     }
 
-    private fun servicioCon(evaluadorIa: EvaluadorEntrevista?) = ServicioReporteEntrevista(
+    private fun servicioCon(evaluadorIa: EvaluadorEntrevista?, tope: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO) = ServicioReporteEntrevista(
         sistema.reportesRepo, sistema.sesionesEntrevista, sistema.metricasVideo, sistema.preguntas, sistema.mercadoRepo, sistema.nivelesSkill,
-        sistema.evaluadorEntrevistaGratis, evaluadorIa, sistema.premium, CoroutineScope(Dispatchers.IO), sistema.reloj
+        sistema.evaluadorEntrevistaGratis, evaluadorIa, sistema.premium, CoroutineScope(Dispatchers.IO), sistema.reloj,
+        evaluacionesIaMensuales = tope
     )
+
+    private fun ia(proveedor: ProveedorEvaluacionFalso) = EvaluadorEntrevistaIa(proveedor, "gpt-4o-mini", sistema.evaluadorEntrevistaGratis)
+
+    /** Evaluaciones con IA entregadas a [usuario] en enero de 2026 (el mes en que arranca el reloj de prueba). */
+    private fun usadasEnEnero(usuario: UUID = ana): Long = runBlocking { sistema.reportesRepo.contarEvaluacionesIa(usuario, ENERO, FEBRERO) }
 
     private fun esperarFin(sesionId: UUID): ReporteEntrevista = runBlocking {
         withTimeout(10_000) {
@@ -231,6 +245,152 @@ class PruebaServicioReporte {
         servicio.procesar(sesion)
         assertEquals(1, proveedor.solicitudes.size, "no paga dos veces la misma evaluación")
         assertEquals(1, sistema.reportesRepo.buscarPorSesion(sesion.id)!!.intentos)
+    }
+
+    // ---------- Tope mensual de IA (D17) ----------
+
+    @Test
+    fun `con el tope mensual alcanzado el premium recibe el reporte freemium sin llamar al LLM`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 2)
+
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+        val tercero = generar(entrevistaFinalizada(), servicio)
+
+        assertEquals(EstadoReporte.LISTO, tercero.estado, "el reporte sale igual, sin error")
+        assertEquals(ModoEvaluacion.FREEMIUM, tercero.modo)
+        assertNull(tercero.uso, "sin costo registrado")
+        assertTrue(!tercero.resumen.isNullOrBlank())
+        assertEquals(2, proveedor.solicitudes.size, "el LLM solo se pagó dos veces")
+        assertEquals(2, usadasEnEnero())
+    }
+
+    @Test
+    fun `al cambiar de mes el premium vuelve a tener evaluaciones con IA`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo)
+        sistema.reloj.adelantar(Duration.ofDays(31))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "en febrero el cupo empieza de nuevo")
+        assertEquals(2, proveedor.solicitudes.size)
+    }
+
+    @Test
+    fun `el tope es por usuario`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        val beto = nuevoUsuario("beto@ejemplo.com")
+
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "ana agotó su cupo")
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(usuario = beto), servicio).modo, "beto conserva el suyo")
+    }
+
+    @Test
+    fun `con tope cero nunca se llama al LLM aunque sea premium`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val reporte = generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 0))
+        assertEquals(EstadoReporte.LISTO, reporte.estado)
+        assertEquals(ModoEvaluacion.FREEMIUM, reporte.modo)
+        assertTrue(proveedor.solicitudes.isEmpty())
+    }
+
+    @Test
+    fun `una evaluacion con IA que cae al freemium no consume cupo`() {
+        val proveedor = ProveedorEvaluacionFalso("caido")
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(0, usadasEnEnero(), "el usuario no recibió IA")
+        proveedor.modo = "valido"
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "el cupo seguía disponible")
+        assertEquals(1, usadasEnEnero())
+    }
+
+    @Test
+    fun `un reporte en error libera su cupo y el reintento respeta el tope`() = runBlocking<Unit> {
+        var falla = true
+        var llamadasIa = 0
+        val evaluador = EvaluadorEntrevista { contexto ->
+            llamadasIa++
+            if (falla) error("se cayó la BD a mitad del reporte") else sistema.evaluadorEntrevistaGratis.evaluar(contexto)
+        }
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(evaluador, tope = 1)
+        val sesion = entrevistaFinalizada()
+
+        val conError = generar(sesion, servicio)
+        assertEquals(EstadoReporte.ERROR, conError.estado)
+        assertEquals(1, llamadasIa, "tenía cupo: se usó la IA")
+        assertEquals(ModoEvaluacion.FREEMIUM, conError.modo, "el cupo reservado se devolvió")
+
+        // Con el cupo libre, otra entrevista sí recibe IA y lo agota.
+        val proveedor = ProveedorEvaluacionFalso()
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 1)).modo)
+
+        falla = false
+        servicio.reintentar(ana, sesion.id)
+        val listo = esperarFin(sesion.id)
+        assertEquals(EstadoReporte.LISTO, listo.estado, "el reintento funciona aunque el tope ya esté usado")
+        assertEquals(1, llamadasIa, "el reintento no volvió a llamar a la IA: el cupo del mes ya estaba agotado")
+        assertEquals(ModoEvaluacion.FREEMIUM, listo.modo)
+        assertEquals(1, usadasEnEnero())
+    }
+
+    @Test
+    fun `una evaluacion reservada al final del mes cuenta en ese mes aunque termine en el siguiente`() {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        // La llamada al LLM tarda 1 minuto: la reserva es el 31 de enero y el resultado se guarda el 1 de febrero.
+        val lenta = EvaluadorEntrevista { contexto -> sistema.reloj.adelantar(Duration.ofMinutes(1)); ia(proveedor).evaluar(contexto) }
+        val servicio = servicioCon(lenta, tope = 1)
+        sistema.reloj.adelantar(Duration.between(ENERO, FEBRERO).minusSeconds(10))
+
+        val cruzada = generar(entrevistaFinalizada(), servicio)
+
+        assertEquals(ModoEvaluacion.IA, cruzada.modo)
+        assertTrue(cruzada.fecha < FEBRERO, "queda con la fecha de la reserva: ${cruzada.fecha}")
+        assertEquals(1, usadasEnEnero())
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 1)).modo, "febrero empieza con su cupo completo")
+    }
+
+    @Test
+    fun `dos reportes simultaneos del mismo usuario no superan el tope`() = runBlocking<Unit> {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        val sesiones = listOf(entrevistaFinalizada(), entrevistaFinalizada())
+
+        sesiones.map { async(Dispatchers.IO) { servicio.procesar(it) } }.awaitAll()
+
+        val modos = sesiones.map { sistema.reportesRepo.buscarPorSesion(it.id)!! }.onEach { assertEquals(EstadoReporte.LISTO, it.estado) }.map { it.modo }
+        assertEquals(1, modos.count { it == ModoEvaluacion.IA }, modos.toString())
+        assertEquals(1, modos.count { it == ModoEvaluacion.FREEMIUM }, modos.toString())
+        assertEquals(1, proveedor.solicitudes.size)
+    }
+
+    @Test
+    fun `una reserva huerfana de hace mas de diez minutos no cuenta`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        // El servidor se reinició a mitad de la generación: el reporte quedó 'generando' con el cupo reservado.
+        val huerfana = entrevistaFinalizada()
+        val ahora = sistema.reloj.instant()
+        sistema.reportesRepo.crearPendiente(huerfana.id, ahora)
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3))
+        assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
+
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "la reserva todavía está vigente")
+        sistema.reloj.adelantar(Duration.ofMinutes(11))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "pasados 10 minutos la reserva ya no cuenta")
     }
 
     // ---------- Errores y reintentos ----------

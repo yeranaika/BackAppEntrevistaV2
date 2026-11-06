@@ -13,7 +13,8 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   `mensaje`; las 5 respuestas que llegaban `{}` ahora responden `{"ok": true, "mensaje": "…"}`.
 - [x] **Probar la colección de Postman contra el servidor** (2026-10-03): 78 de 78 requests OK; se corrigió el `area` de los ejemplos.
 - [ ] **Límite por IP en Redis**: hoy vive en memoria de cada instancia; con varias instancias se puede superar.
-- [ ] **Tope mensual de evaluaciones con IA por usuario** premium (hoy sin límite; cada reporte cuesta tokens).
+- [x] **Tope mensual de evaluaciones con IA por usuario** premium (2026-11-06, rama `feature/tope-mensual-ia`, D17):
+  `LIMITE_EVALUACIONES_IA_MENSUAL` (30 por defecto); al llegar al tope el reporte sale con el motor freemium.
 - [ ] **Apagado ordenado**: un reporte o correo en curso se corta si el servidor se detiene (cola de trabajos o espera al cerrar).
 - [x] **CI (R12)** (2026-11-06, rama `ci/github-actions`): GitHub Actions corre `./gradlew test` (JDK 21, H2, sin
   servicios externos) en cada push a `main` y en cada PR; si falla sube el reporte de pruebas. Local: 265/265.
@@ -28,6 +29,8 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Transcripción de audio (STT)** para preguntas de video: hoy un clip sin transcripción no se evalúa.
 - [ ] Endpoint para que un admin vea costos de IA (tokens y USD por día) desde `reporte_entrevista` y `pregunta_generacion_ia`.
 - [ ] `.env.example`: agregar `LIMITE_REGISTROS_POR_IP` y `LIMITE_RECUPERACIONES_POR_IP`.
+- [ ] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (campo opcional nuevo, coordinado con Android).
+- [ ] **Descontar del tope las llamadas pagadas que responden mal** (hoy no descuentan cupo; requiere registrar sus tokens).
 
 ## Baja
 - [ ] Revisar dependencias sin uso (`poi-ooxml`, `bcrypt`, `google-api-client:2.+` con versión dinámica).

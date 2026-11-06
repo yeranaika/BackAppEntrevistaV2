@@ -96,6 +96,7 @@ decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes 
 | `GOOGLE_PLAY_PACKAGE`, `GOOGLE_PLAY_SERVICE_JSON_B64` | Verificación real de compras (se validan al arrancar). |
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
+| `LIMITE_EVALUACIONES_IA_MENSUAL` | Reportes con IA por usuario premium y mes calendario UTC (por defecto 30; 0 = sin IA). Al llegar al tope el reporte sale con el motor freemium. |
 
 **Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `018` (idempotentes) sobre una BD existente:
 ```powershell

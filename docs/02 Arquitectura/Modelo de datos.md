@@ -21,7 +21,7 @@ van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
 | Mercado | `cargo`, `skill`, `cargo_skill`, `skill_tendencia` | `cargo_skill.nivel_requerido`, `peso`, `obligatoria` |
 | Banco de preguntas | `pregunta`, `opcion_pregunta`, `pregunta_generacion_ia` | Solo `estado = 'aprobada'` se sirve a usuarios; trazabilidad y costo de la IA |
 | Entrevista | `sesion_entrevista`, `sesion_pregunta_respuesta`, `metrica_video` | Snapshot de cada pregunta; índice único de una sesión en curso por usuario |
-| Feedback | `reporte_entrevista`, `reporte_skill_detalle` | `estado_generacion`, `modo_evaluacion`, modelo/tokens/costo, `intentos_generacion` |
+| Feedback | `reporte_entrevista`, `reporte_skill_detalle` | `estado_generacion`, `modo_evaluacion`, modelo/tokens/costo, `intentos_generacion`. `modo_evaluacion='ia'` con estado `generando` es un cupo del tope mensual reservado (D17; caduca a los 10 min) |
 | Nivelación | `test_nivelacion`, `intento_test`, `resultado_nivelacion` | `respuestas_detalle` (JSONB) guarda preguntas servidas y corrección |
 | Práctica | `sesion_practica`, `respuesta_practica` | `preguntas_snap` (JSONB); `id_local` único para sincronización offline |
 | Progreso | `nivel_skill_usuario` | Puntaje acumulado (promedio) y nivel evaluado por skill |

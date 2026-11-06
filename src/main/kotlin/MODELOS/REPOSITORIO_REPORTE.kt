@@ -9,7 +9,9 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
@@ -20,6 +22,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.sql.Connection
 import java.time.Instant
 import java.util.UUID
 
@@ -41,7 +44,28 @@ interface RepositorioReporte {
     /** Guarda el reporte, su detalle por skill y la corrección de cada respuesta abierta, todo junto. */
     suspend fun guardarResultado(sesionId: UUID, resultado: ResultadoReporte)
 
+    /** Deja el reporte en 'error'. Si tenía un cupo de IA reservado lo devuelve (modo freemium): no se entregó IA. */
     suspend fun marcarError(sesionId: UUID, detalle: String, fecha: Instant)
+
+    /** Reportes listos y evaluados con IA de [usuarioId] cuya fecha de generación está en [desde, hasta). */
+    suspend fun contarEvaluacionesIa(usuarioId: UUID, desde: Instant, hasta: Instant): Long
+
+    /**
+     * Reserva un cupo del tope mensual de IA (D17). Si el usuario tiene menos de [tope] evaluaciones con IA en
+     * [desde, hasta) —listas, o reservadas en reportes que siguen generando desde [vigentesDesde], sin contar este—,
+     * marca el reporte de [sesionId] (que debe estar en 'generando') con modo ia y fecha [fecha] y devuelve true.
+     * Bloquea la fila del usuario (D08) para que dos reservas simultáneas no superen el tope. El modo definitivo lo
+     * escribe después guardarResultado (freemium si la IA cayó al respaldo) o marcarError.
+     */
+    suspend fun reservarEvaluacionIa(
+        sesionId: UUID,
+        usuarioId: UUID,
+        tope: Int,
+        desde: Instant,
+        hasta: Instant,
+        vigentesDesde: Instant,
+        fecha: Instant
+    ): Boolean
 
     suspend fun listarDeUsuario(usuarioId: UUID, limite: Int): List<ResumenReporte>
 
@@ -135,8 +159,52 @@ class RepositorioReporteExposed : RepositorioReporte {
                 it[estado] = EstadoReporte.ERROR.valorBd
                 it[errorDetalle] = detalle.take(LARGO_MAXIMO_ERROR)
                 it[fechaGeneracion] = fecha
+                // Un reporte con error no entregó IA: devuelve el cupo que pudo haber reservado.
+                it[modoEvaluacion] = ModoEvaluacion.FREEMIUM.valorBd
             }
         }
+    }
+
+    override suspend fun contarEvaluacionesIa(usuarioId: UUID, desde: Instant, hasta: Instant): Long = transaccion {
+        reporteConSesion().select(TablaReporteEntrevista.reporteId).where {
+            (TablaSesionEntrevista.usuarioId eq usuarioId) and
+                (TablaReporteEntrevista.modoEvaluacion eq ModoEvaluacion.IA.valorBd) and
+                (TablaReporteEntrevista.estado eq EstadoReporte.LISTO.valorBd) and
+                (TablaReporteEntrevista.fechaGeneracion greaterEq desde) and
+                (TablaReporteEntrevista.fechaGeneracion less hasta)
+        }.count()
+    }
+
+    // READ COMMITTED explícito: después de esperar el bloqueo, el conteo tiene que ver la reserva que otra transacción
+    // acaba de confirmar. Es el nivel por defecto de Postgres, pero en H2 (pruebas) el por defecto es más estricto.
+    override suspend fun reservarEvaluacionIa(
+        sesionId: UUID,
+        usuarioId: UUID,
+        tope: Int,
+        desde: Instant,
+        hasta: Instant,
+        vigentesDesde: Instant,
+        fecha: Instant
+    ): Boolean = transaccion(Connection.TRANSACTION_READ_COMMITTED) {
+        TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq usuarioId }.forUpdate().toList()
+        val listas = TablaReporteEntrevista.estado eq EstadoReporte.LISTO.valorBd
+        val reservadasVigentes = (TablaReporteEntrevista.estado eq EstadoReporte.GENERANDO.valorBd) and
+            (TablaReporteEntrevista.fechaGeneracion greaterEq vigentesDesde)
+        val usadas = reporteConSesion().select(TablaReporteEntrevista.reporteId).where {
+            (TablaSesionEntrevista.usuarioId eq usuarioId) and
+                (TablaReporteEntrevista.sesionId neq sesionId) and
+                (TablaReporteEntrevista.modoEvaluacion eq ModoEvaluacion.IA.valorBd) and
+                (TablaReporteEntrevista.fechaGeneracion greaterEq desde) and
+                (TablaReporteEntrevista.fechaGeneracion less hasta) and
+                (listas or reservadasVigentes)
+        }.count()
+        if (usadas >= tope) return@transaccion false
+        TablaReporteEntrevista.update({
+            (TablaReporteEntrevista.sesionId eq sesionId) and (TablaReporteEntrevista.estado eq EstadoReporte.GENERANDO.valorBd)
+        }) {
+            it[modoEvaluacion] = ModoEvaluacion.IA.valorBd
+            it[fechaGeneracion] = fecha
+        } > 0
     }
 
     override suspend fun listarDeUsuario(usuarioId: UUID, limite: Int): List<ResumenReporte> = transaccion {

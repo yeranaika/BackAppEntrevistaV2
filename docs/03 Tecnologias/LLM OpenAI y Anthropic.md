@@ -23,6 +23,9 @@ respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se
 - **Resiliencia**: `ProveedorConResiliencia` reintenta solo errores HTTP del proveedor; timeout 60 s.
 - **Evaluación de entrevistas**: una sola llamada por entrevista con todas las respuestas abiertas; si la IA falla o
   responde mal se usa el motor freemium (el reporte siempre sale). El modelo por defecto: OpenAI si hay clave, si no Anthropic.
+- **Tope mensual** ([[Decisiones]] D17): cada usuario premium tiene hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes con
+  IA por mes calendario UTC (por defecto 30; `0` = sin IA). El cupo se reserva en la BD **antes** de llamar al LLM, así
+  que dos reportes simultáneos no lo superan. Al llegar al tope el reporte sale con el motor freemium, sin error.
 - **Seguridad**: las respuestas del candidato van en el mensaje de usuario como JSON de datos; las instrucciones dicen
   explícitamente que ignore instrucciones dentro de las respuestas.
 

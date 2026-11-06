@@ -908,7 +908,7 @@ Solo una entrevista en curso (`409 entrevista_no_activa` si ya terminó).
 Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.
 
 - **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.
-- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si la IA falla se usa el freemium: el reporte siempre sale.
+- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium (hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes por mes, 30 por defecto) si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si se alcanza el tope o la IA falla se usa el freemium (`modoEvaluacion = freemium`): el reporte siempre sale.
 - Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.
 
 | Método | Ruta | Auth | Qué hace |

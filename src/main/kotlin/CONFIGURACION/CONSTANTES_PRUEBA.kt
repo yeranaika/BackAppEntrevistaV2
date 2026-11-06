@@ -1,5 +1,9 @@
 package CONFIGURACION
 
+import java.time.Duration
+import java.time.ZoneId
+import java.time.ZoneOffset
+
 /** Una respuesta abierta (0-100) cuenta como correcta desde este puntaje. */
 const val UMBRAL_RESPUESTA_CORRECTA = 60.0
 
@@ -39,6 +43,18 @@ const val UMBRAL_FORTALEZA = 75.0
 
 /** Generación del reporte: primer intento + reintentos manuales. */
 const val INTENTOS_MAXIMOS_REPORTE = 3
+
+/** Reporte de entrevista: evaluaciones con IA por usuario premium en cada mes calendario. 0 = sin IA. Se cambia con LIMITE_EVALUACIONES_IA_MENSUAL (D17). */
+const val EVALUACIONES_IA_MENSUALES_POR_DEFECTO = 30
+
+/** Zona en la que se corta el mes del tope de IA: UTC, como el resto de las fechas (TIMESTAMPTZ). */
+val ZONA_CORTE_CUOTA_IA: ZoneId = ZoneOffset.UTC
+
+/**
+ * Una reserva de IA en un reporte que sigue "generando" deja de contar pasado este tiempo (el servidor se reinició
+ * a mitad de la generación). La llamada al LLM tiene un tope de ~70 s, así que una generación real nunca dura tanto.
+ */
+val VIGENCIA_RESERVA_IA: Duration = Duration.ofMinutes(10)
 
 /** Progreso por skill: últimos N puntos (skill × entrevista). */
 const val PUNTOS_PROGRESO_LIMITE = 200
