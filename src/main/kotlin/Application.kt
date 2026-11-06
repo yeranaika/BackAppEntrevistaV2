@@ -23,11 +23,12 @@ fun Application.module() {
     configurarCors()
     configurarSerializacion()
     configurarErrores()
-    configurarLimiteSolicitudes(configuracion.limites)
     configurarBaseDatos(configuracion.baseDatos)
     configurarSeguridad()
 
     val dependencias = ContenedorDependencias(configuracion)
+    // Después de crear la caché (el contador se comparte entre instancias por Redis) y antes de las rutas.
+    configurarLimiteSolicitudes(configuracion.limites, dependencias.cache)
     dependencias.iniciarTareasSegundoPlano()
     monitor.subscribe(ApplicationStopped) { dependencias.close() }
 

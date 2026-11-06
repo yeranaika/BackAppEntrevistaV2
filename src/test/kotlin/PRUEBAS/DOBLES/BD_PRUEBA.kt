@@ -163,7 +163,9 @@ class SistemaPrueba(
     val clienteMercado: ClienteMercadoLaboralFalso = ClienteMercadoLaboralFalso(emptyMap()),
     val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso(),
     val procesadorEntrevista: ProcesadorEntrevistaGrabador = ProcesadorEntrevistaGrabador(),
-    val reloj: RelojAjustable = RelojAjustable()
+    val reloj: RelojAjustable = RelojAjustable(),
+    /** Caché compartida (hace de Redis): los contadores del límite por IP usan el [reloj] de la prueba. */
+    val cache: CacheEnMemoria = CacheEnMemoria { reloj.millis() }
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -192,7 +194,6 @@ class SistemaPrueba(
         mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
     )
 
-    val cache = CacheEnMemoria()
     val mercadoRepo = RepositorioMercadoExposed()
     val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, clienteMercado)
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
@@ -256,7 +257,7 @@ class SistemaPrueba(
         // La misma serialización que producción: el contrato JSON depende de ella.
         configurarSerializacion()
         configurarErrores()
-        configurarLimiteSolicitudes(limites)
+        configurarLimiteSolicitudes(limites, cache)
         install(Authentication) {
             jwt("auth-jwt") {
                 verifier(JWT.require(JWT_PRUEBA.algoritmo).withIssuer(JWT_PRUEBA.emisor).withAudience(JWT_PRUEBA.audiencia).build())

@@ -13,7 +13,7 @@ actualizado: 2026-10-03
 | Roles | `user` / `admin`; `soloAdmin { }` responde 401 sin token y 403 sin rol. El rol se relee al rotar tokens |
 | Recursos ajenos | Responden **404** (no se revela que existen) |
 | Login | 5 contraseñas incorrectas bloquean el correo 15 min (contador en Redis, compartido entre instancias) |
-| Límite por IP | Registro 30/10 min, recuperación 5/15 min (en memoria por instancia → ver [[Pendientes y deuda tecnica]]) |
+| Límite por IP | Registro 30/10 min, recuperación 5/15 min, **compartido entre instancias en Redis** (D18); si Redis cae, cada instancia limita en memoria. La IP es la de la conexión, o la de `CABECERA_IP_CLIENTE` (X-Real-IP en Railway) solo si es una IP literal válida; nunca `X-Forwarded-For`, cuyo primer valor controla el cliente (D19) |
 | Recuperación | Código de 6 dígitos, 15 min, intentos limitados; misma respuesta exista o no la cuenta |
 | Pagos | Solo se guarda el **hash** del token de Google Play; un pago no activa dos cuentas |
 | IA | Las respuestas del candidato van como **datos** en el mensaje de usuario, nunca en las instrucciones (limita inyección de prompts). Modelo, tokens y costo no se exponen |
