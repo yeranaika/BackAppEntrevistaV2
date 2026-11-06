@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [decisiones, adr]
-actualizado: 2026-10-03
+actualizado: 2026-11-06
 ---
 
 # Decisiones
@@ -70,3 +70,26 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Decisión**: `/health` permanece como liveness; `/ready` informa 503 durante el calentamiento del evaluador freemium y 200 cuando termina o falla.
 - **Por qué**: el despliegue debe enviar tráfico tras el calentamiento, pero un calentamiento fallido no debe dejar el servicio indisponible permanentemente.
 - **Consecuencias**: Railway debe usar `/ready` como healthcheck; `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento. `CallLogging` excluye `/health`, `/ready` y `/api/v1/practice/evaluate-freemium`.
+
+## D18 · Límite por IP compartido en Redis, con respaldo en memoria (2026-11)
+- **Contexto**: el límite por IP vivía en la memoria de cada instancia: con N instancias el cupo real era N veces el configurado.
+- **Decisión**: un contador de ventana fija en Redis (`limite:<nombre>:<ip>`, script Lua atómico) que comparten todas
+  las instancias, a través de un `RateLimiter` propio para el plugin de Ktor. Si Redis no responde, cada instancia
+  aplica el mismo límite en su memoria (el comportamiento anterior).
+- **Por qué**: dejar pasar todo con Redis caído (*fail-open*) quitaría la protección contra registros masivos y envío
+  de correos justo cuando hay problemas; bloquear todo (*fail-closed*) impediría registrarse. El respaldo en memoria
+  degrada a lo que ya había. Un error del script no abre el cortocircuito de la caché (no apaga el mercado ni el login).
+- **Consecuencias**: el contrato del 429 (`demasiadas_solicitudes`) no cambia; `Retry-After` se redondea hacia arriba.
+  El bloqueo de login (`Cache.incrementar`) usa el mismo script y deja de tener la carrera INCR/EXPIRE.
+  Hay **un limitador por límite, no uno por IP**: la IP viaja en el contexto de la corrutina de la solicitud. Así el
+  plugin de Ktor, que solo limpia su registro cuando acepta una solicitud, no acumula en memoria las IPs que una
+  instancia ve ya bloqueadas; el respaldo en memoria por IP se purga solo tras una ventana sin uso.
+
+## D19 · IP del cliente: la conexión, o una cabecera de confianza validada (2026-11)
+- **Contexto**: detrás del proxy de Railway, la conexión TCP trae la IP del proxy: todos los usuarios compartirían un cupo.
+- **Decisión**: por defecto se usa la conexión (`request.local.remoteAddress`, sin DNS inverso). Con
+  `CABECERA_IP_CLIENTE=X-Real-IP` se usa esa cabecera **solo si trae una IP literal válida**; `X-Forwarded-For` no se
+  admite porque su primer valor lo controla el cliente. IPv6 cuenta por su `/64`.
+- **Por qué**: si el proxy no sobrescribe la cabecera, cualquiera podría inventarse una IP nueva en cada solicitud y
+  saltarse el límite. Hay que comprobarlo antes de activarla (prueba de humo en [[Puesta en marcha]]).
+- **Consecuencias**: mientras la variable esté vacía, en Railway el cupo es global (compartido por todos los usuarios).

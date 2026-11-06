@@ -68,8 +68,22 @@ data class ConfiguracionLlm(
 /** Solicitudes permitidas por IP en cada ventana (ver CONFIGURACION_LIMITE_SOLICITUDES). */
 data class ConfiguracionLimites(
     val registrosPorIp: Int,
-    val recuperacionesPorIp: Int
-)
+    val recuperacionesPorIp: Int,
+    /**
+     * Cabecera en la que el proxy de confianza escribe la IP del cliente (en Railway: X-Real-IP). null = la conexión
+     * TCP directa. Solo se activa tras comprobar que el proxy la sobrescribe (si no, el cliente podría falsificarla).
+     */
+    val cabeceraIpCliente: String? = null
+) {
+    init {
+        cabeceraIpCliente?.let {
+            require(Regex("^[A-Za-z0-9-]+$").matches(it)) { "CABECERA_IP_CLIENTE inválida: $it" }
+            require(!it.equals("X-Forwarded-For", ignoreCase = true)) {
+                "CABECERA_IP_CLIENTE no admite X-Forwarded-For (el cliente controla su primer valor): usa X-Real-IP"
+            }
+        }
+    }
+}
 
 /** Toda la configuración externa de la aplicación, leída una sola vez al arrancar. */
 data class ConfiguracionGeneral(
@@ -154,7 +168,8 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         ),
         limites = ConfiguracionLimites(
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),
-            recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO)
+            recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO),
+            cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() }
         )
     )
 }

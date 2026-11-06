@@ -95,7 +95,8 @@ decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes 
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | API de empleo principal; sin ella se usan las fuentes gratuitas. |
 | `GOOGLE_PLAY_PACKAGE`, `GOOGLE_PLAY_SERVICE_JSON_B64` | Verificación real de compras (se validan al arrancar). |
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
-| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). |
+| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). Se comparten entre instancias en Redis. |
+| `CABECERA_IP_CLIENTE` | Cabecera con la IP real del cliente puesta por el proxy (en Railway `X-Real-IP`, tras la prueba de humo). Vacía = IP de la conexión. |
 
 **Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `018` (idempotentes) sobre una BD existente:
 ```powershell

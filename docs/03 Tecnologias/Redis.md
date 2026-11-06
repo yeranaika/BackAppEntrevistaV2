@@ -2,13 +2,14 @@
 tipo: tecnologia
 tags: [tecnologia, redis, cache]
 version: Redis 7 · Jedis 5.2.0
-actualizado: 2026-10-03
+actualizado: 2026-11-06
 ---
 
 # Redis
 
-**Para qué**: caché del catálogo del mercado y **contador compartido** del bloqueo de login. No es fuente de verdad:
-si Redis cae, la app sigue funcionando (*fail-open*).
+**Para qué**: caché del catálogo del mercado y **contadores compartidos** entre instancias: bloqueo de login y límite
+por IP (D18). No es fuente de verdad: si Redis cae, la app sigue funcionando (la caché y el bloqueo de login hacen
+*fail-open*; el límite por IP pasa a la memoria de cada instancia, nunca se quita).
 
 | | |
 |---|---|
@@ -23,8 +24,14 @@ si Redis cae, la app sigue funcionando (*fail-open*).
 | `mercado:matriz:*` | Matriz de skills de un cargo | 12 h |
 | `mercado:tendencias*` | Skills en tendencia | según consulta |
 | `login:fallos:<correo>` | Contraseñas incorrectas seguidas | 15 min |
+| `limite:registro:<ip>` | Registros desde esa IP (`POST /auth/register`) | 10 min desde el primero |
+| `limite:recuperacion:<ip>` | Códigos de recuperación pedidos desde esa IP | 15 min desde el primero |
 
 Crear un cargo o sincronizar tendencias **invalida** `mercado:*`.
+
+**Contadores** (`login:fallos:*`, `limite:*`): un script Lua atómico (`INCRBY` + `PTTL`, y `PEXPIRE` solo si la clave
+no tiene vencimiento) en `CacheRedis.contarEnVentana`. Es una ventana fija: los rechazos suman pero no la alargan, y
+una clave huérfana sin TTL se repara sola. Una IPv6 cuenta por su bloque `/64`.
 
 ## Detalles
 - Las llamadas a Jedis corren en `Dispatchers.IO` (no bloquean los hilos de Ktor) con política de resiliencia
@@ -35,6 +42,9 @@ Crear un cargo o sincronizar tendencias **invalida** `mercado:*`.
 ```bash
 docker exec Entrevista_Redis redis-cli KEYS "mercado:*"
 docker exec Entrevista_Redis redis-cli TTL "login:fallos:usuario@ejemplo.com"
+docker exec Entrevista_Redis redis-cli --scan --pattern "limite:*"      # IPs con contador activo
+docker exec Entrevista_Redis redis-cli PTTL "limite:registro:203.0.113.7"
+docker exec Entrevista_Redis redis-cli DEL "limite:registro:203.0.113.7" # desbloquear una IP a mano
 ```
 
 Relacionado: [[Manejo de errores y resiliencia]] · [[APIs de empleo]]

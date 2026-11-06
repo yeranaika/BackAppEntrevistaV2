@@ -26,7 +26,8 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | No | Caché (por defecto `localhost:6379`) |
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | No | API de empleo principal |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | No | IA (generación de preguntas y evaluación premium) |
-| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP |
+| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP (compartidos entre instancias en Redis) |
+| `CABECERA_IP_CLIENTE` | No (vacía) | Cabecera con la IP real del cliente puesta por el proxy. En Railway `X-Real-IP`, **solo tras la prueba de humo** (abajo) |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.
@@ -45,6 +46,13 @@ for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -
 ./gradlew run                       # http://localhost:8080 ; GET /health → OK ; GET /ready → 200 al terminar el calentamiento
 ```
 En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `OK` mientras el proceso esté vivo. `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
+
+### Prueba de humo antes de activar `CABECERA_IP_CLIENTE` (Railway, staging)
+Comprueba que el proxy **sobrescribe** `X-Real-IP` (si no, cualquiera podría inventarse una IP y saltarse el límite, D19):
+1. Con `CABECERA_IP_CLIENTE=X-Real-IP`, enviar 31 `POST /auth/register` con cuerpo inválido (responde 422: no crea
+   datos ni manda correos; el límite corre antes y cuenta igual), cada uno con un `X-Real-IP` falso distinto.
+2. Si la 31.ª responde **429**, el proxy reemplaza la cabecera: es seguro dejarla. Si no, **volver a dejarla vacía**.
+3. Desbloquear la IP al terminar: `redis-cli --scan --pattern 'limite:*'` y `DEL` de esa clave.
 
 ## 4. Probar
 ```bash

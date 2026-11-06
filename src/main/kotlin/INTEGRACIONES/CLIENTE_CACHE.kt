@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import redis.clients.jedis.Jedis
 import redis.clients.jedis.JedisPool
 import redis.clients.jedis.JedisPoolConfig
+import redis.clients.jedis.exceptions.JedisDataException
 import redis.clients.jedis.params.ScanParams
 import java.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -32,7 +33,31 @@ interface Cache {
     /** Incrementa un contador que vence en [ttlSegundos]; null si la caché no está disponible. */
     suspend fun incrementar(clave: String, ttlSegundos: Long): Long?
     suspend fun borrar(clave: String)
+
+    /**
+     * Suma [cantidad] a un contador de ventana fija de [ventanaMs] y devuelve el total y los ms que le quedan a la ventana.
+     * Es atómico: si la clave no vence (nueva, o huérfana sin TTL), la ventana empieza ahora; los incrementos posteriores
+     * no la alargan. null si la caché no está disponible.
+     */
+    suspend fun contarEnVentana(clave: String, ventanaMs: Long, cantidad: Int = 1): ConteoVentana?
 }
+
+/** Los dos primeros segmentos de una clave ("limite:registro:<ip>" → "limite:registro"), sin el dato personal del final. */
+internal fun prefijoParaLog(clave: String): String = clave.split(':').take(2).joinToString(":")
+
+/** Conteo de una ventana fija y los milisegundos que le quedan. */
+data class ConteoVentana(val conteo: Long, val restanteMs: Long)
+
+// Atómico en Redis: suma y, si la clave no tiene vencimiento (nueva o huérfana), le pone la ventana.
+private const val SCRIPT_CONTAR_EN_VENTANA = """
+local conteo = redis.call('INCRBY', KEYS[1], ARGV[2])
+local restante = redis.call('PTTL', KEYS[1])
+if restante < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+  restante = tonumber(ARGV[1])
+end
+return {conteo, restante}
+"""
 
 /** Cache-aside: lee de la caché o calcula, guarda y devuelve. */
 suspend fun <T> Cache.obtenerOCalcular(
@@ -100,10 +125,21 @@ class CacheRedis(config: ConfiguracionRedis) : Cache, AutoCloseable {
         }
     }
 
-    override suspend fun incrementar(clave: String, ttlSegundos: Long): Long? = usar(null) { jedis ->
-        val valor = jedis.incr(clave)
-        if (valor == 1L) jedis.expire(clave, ttlSegundos)
-        valor
+    // Antes era INCR y luego EXPIRE en dos pasos: si algo fallaba entre medio, la clave quedaba sin vencimiento.
+    override suspend fun incrementar(clave: String, ttlSegundos: Long): Long? =
+        contarEnVentana(clave, ttlSegundos * 1000)?.conteo
+
+    override suspend fun contarEnVentana(clave: String, ventanaMs: Long, cantidad: Int): ConteoVentana? = usar(null) { jedis ->
+        try {
+            val respuesta = jedis.eval(SCRIPT_CONTAR_EN_VENTANA, listOf(clave), listOf(ventanaMs.toString(), cantidad.toString())) as List<*>
+            ConteoVentana(respuesta[0] as Long, respuesta[1] as Long)
+        } catch (e: JedisDataException) {
+            // Error del script o tipo de clave incorrecto: Redis responde, así que no debe abrir el cortocircuito compartido.
+            // Al log van solo los dos primeros segmentos ("limite:registro", "login:fallos"): lo que sigue es una IP o un
+            // correo (datos personales). No sirve cortar en el último ':', porque una IPv6 lleva ':' por dentro.
+            log.error("El contador en ventana falló para {}: {}", prefijoParaLog(clave), e.message)
+            null
+        }
     }
 
     /** Jedis es bloqueante: corre en el pool de IO, con la política de resiliencia y sin propagar fallas. */
