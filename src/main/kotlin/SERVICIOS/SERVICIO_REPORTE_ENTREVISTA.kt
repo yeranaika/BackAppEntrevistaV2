@@ -1,5 +1,6 @@
 package SERVICIOS
 
+import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import CONFIGURACION.HISTORIAL_PRUEBAS_LIMITE
 import CONFIGURACION.INTENTOS_MAXIMOS_REPORTE
 import CONFIGURACION.PESO_PUNTAJE_BLANDO
@@ -8,6 +9,8 @@ import CONFIGURACION.PESO_PUNTAJE_TECNICO
 import CONFIGURACION.PUNTOS_PROGRESO_LIMITE
 import CONFIGURACION.UMBRAL_FORTALEZA
 import CONFIGURACION.UMBRAL_NIVEL_LOGRADO
+import CONFIGURACION.VIGENCIA_RESERVA_IA
+import CONFIGURACION.ZONA_CORTE_CUOTA_IA
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
@@ -35,12 +38,15 @@ import MODELOS.ResumenMetricasVideo
 import MODELOS.ResumenReporte
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Clock
+import java.time.Instant
+import java.time.YearMonth
 import java.util.UUID
 
 /** ¿El usuario tiene premium? (decide si sus respuestas se evalúan con IA). */
@@ -62,7 +68,7 @@ private val EXPRESIONES_A_TRABAJAR = setOf("nervioso", "distraido", "confuso")
 
 /**
  * Reporte de feedback de la entrevista (Fase 7). Se genera en segundo plano al finalizar:
- * corrige las respuestas abiertas (motor freemium, o IA si el usuario es premium), calcula los puntajes
+ * corrige las respuestas abiertas (motor freemium, o IA si el usuario es premium y le queda cupo en el mes, D17), calcula los puntajes
  * técnico, blando y de lenguaje corporal, arma el detalle por skill (radar), fortalezas, áreas de mejora
  * y recomendaciones, y acumula el puntaje de cada skill en nivel_skill_usuario.
  * Estado: generando → listo | error, con reintento manual (hasta [INTENTOS_MAXIMOS_REPORTE] intentos).
@@ -79,9 +85,19 @@ class ServicioReporteEntrevista(
     private val evaluadorIa: EvaluadorEntrevista?,
     private val premium: VerificadorPremium,
     private val tareasSegundoPlano: CoroutineScope,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    /** Tope de evaluaciones con IA por usuario premium y mes calendario (D17); 0 = sin IA. */
+    private val evaluacionesIaMensuales: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 ) : ProcesadorEntrevistaFinalizada {
     private val log = LoggerFactory.getLogger(ServicioReporteEntrevista::class.java)
+
+    init {
+        log.info(
+            "Reporte de entrevista: IA {} · tope mensual por usuario premium: {}",
+            if (evaluadorIa == null) "desactivada (sin API key)" else "activa",
+            evaluacionesIaMensuales
+        )
+    }
 
     /** Se llama al finalizar la entrevista (ya en segundo plano). */
     override suspend fun procesar(sesion: SesionEntrevista) {
@@ -148,7 +164,9 @@ class ServicioReporteEntrevista(
 
     private suspend fun calcular(sesion: SesionEntrevista): ResultadoReporte {
         val abiertas = sesion.preguntas.filter { it.tipo != TipoPregunta.OPCION_MULTIPLE && !it.transcripcion.isNullOrBlank() }
-        val evaluador = if (evaluadorIa != null && premium.esPremium(sesion.usuarioId)) evaluadorIa else evaluadorGratis
+        // Primero lo barato; la reserva del cupo (que bloquea al usuario en la BD) va al final.
+        val reservaIa = if (evaluadorIa != null && abiertas.isNotEmpty() && premium.esPremium(sesion.usuarioId)) reservarCupoIa(sesion) else null
+        val evaluador = if (reservaIa != null) evaluadorIa!! else evaluadorGratis
         val evaluacion = evaluador.evaluar(ContextoEvaluacionEntrevista(sesion.cargoObjetivo, sesion.nivel, abiertas.map { aEvaluar(it) }))
         val porPregunta = evaluacion.evaluaciones.associateBy { it.preguntaSesionId }
 
@@ -185,8 +203,41 @@ class ServicioReporteEntrevista(
                     EvaluacionPreguntaSesion(pregunta.id, pregunta.categoria, decimal(it.puntaje), it.observacion, it.mejoras, evaluacion.modo)
                 }
             },
-            fecha = reloj.instant()
+            // Una evaluación con IA queda con la fecha de su reserva: así cuenta en el mes en que tomó el cupo aunque la
+            // llamada al LLM termine pasada la medianoche del último día (si no, se cobraría en el mes siguiente).
+            fecha = reservaIa?.takeIf { evaluacion.modo == ModoEvaluacion.IA } ?: reloj.instant()
         )
+    }
+
+    /**
+     * Toma un cupo del tope mensual de IA (D17) y devuelve el instante de la reserva, que fija el mes al que se cobra.
+     * null si el usuario ya lo agotó, si el tope es 0 o si la reserva falla: en todos esos casos el reporte sale igual,
+     * con el motor freemium (D09).
+     */
+    private suspend fun reservarCupoIa(sesion: SesionEntrevista): Instant? {
+        if (evaluacionesIaMensuales <= 0) return null
+        val ahora = reloj.instant()
+        val mes = YearMonth.from(ahora.atZone(ZONA_CORTE_CUOTA_IA))
+        val desde = mes.atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
+        val hasta = mes.plusMonths(1).atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
+        val reservada = try {
+            reportes.reservarEvaluacionIa(
+                sesion.id, sesion.usuarioId, evaluacionesIaMensuales, desde, hasta, ahora.minus(VIGENCIA_RESERVA_IA), ahora
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("No se pudo reservar la evaluación con IA de la entrevista {}; se usa el motor freemium", sesion.id, e)
+            return null
+        }
+        if (!reservada) {
+            log.info(
+                "Tope mensual de evaluaciones con IA alcanzado: usuario {} ({} por mes, {}); la entrevista {} se evalúa con el motor freemium",
+                sesion.usuarioId, evaluacionesIaMensuales, mes, sesion.id
+            )
+            return null
+        }
+        return ahora
     }
 
     private suspend fun aEvaluar(pregunta: PreguntaSesion): RespuestaAbiertaAEvaluar {

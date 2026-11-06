@@ -60,7 +60,9 @@ data class ConfiguracionMercadoLaboral(
 
 data class ConfiguracionLlm(
     val openAiApiKey: String,
-    val anthropicApiKey: String
+    val anthropicApiKey: String,
+    /** Tope mensual de evaluaciones con IA por usuario premium; 0 = sin IA (D17). */
+    val evaluacionesIaMensuales: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 ) {
     val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank()
 }
@@ -150,7 +152,9 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         ),
         llm = ConfiguracionLlm(
             openAiApiKey = lector.opcional("OPENAI_API_KEY").orEmpty(),
-            anthropicApiKey = lector.opcional("ANTHROPIC_API_KEY").orEmpty()
+            anthropicApiKey = lector.opcional("ANTHROPIC_API_KEY").orEmpty(),
+            // Un valor negativo se toma como 0: ante la duda no se gasta en IA.
+            evaluacionesIaMensuales = lector.entero("LIMITE_EVALUACIONES_IA_MENSUAL", EVALUACIONES_IA_MENSUALES_POR_DEFECTO).coerceAtLeast(0)
         ),
         limites = ConfiguracionLimites(
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),

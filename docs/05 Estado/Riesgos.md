@@ -10,7 +10,7 @@ actualizado: 2026-10-03
 | Riesgo | Impacto | Prob. | Mitigación en el backend | Estado |
 |---|---|---|---|---|
 | Caída o cambio de un proveedor de IA | Muy alto | Media | Interfaz intercambiable (OpenAI/Anthropic); motor freemium de respaldo; el reporte siempre sale | Mitigado |
-| Costo de tokens fuera de presupuesto | Alto | Media | IA solo premium, 1 llamada por entrevista, costo registrado, E2E con IA solo opt-in | Parcial → falta tope mensual ([[Pendientes y deuda tecnica]]) |
+| Costo de tokens fuera de presupuesto | Alto | Media | IA solo premium, 1 llamada por entrevista, costo registrado, E2E con IA solo opt-in, tope mensual por usuario (D17) | Mitigado; el tope cuenta evaluaciones entregadas: una llamada pagada que responde mal no descuenta cupo (acotado a 3 intentos por entrevista) |
 | Latencia del feedback > 5 s | Alto | Alta | Práctica/nivelación con corrección local (ms); entrevista asíncrona con estado `generando` | Mitigado |
 | Filtración de datos personales | Alto | Baja | Argon2id, JWT, 404 en recursos ajenos, hash de tokens, errores sin detalles → [[Seguridad]] | Mitigado; falta TLS en el despliegue |
 | APIs de empleo caídas o sin cuota | Medio | Media | Cadena de respaldo + dataset local; sincronización semanal | Mitigado |

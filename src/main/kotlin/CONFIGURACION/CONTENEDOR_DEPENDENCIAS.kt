@@ -203,7 +203,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         evaluadorGratis = evaluadorEntrevistaGratis,
         evaluadorIa = evaluadorEntrevistaIa,
         premium = VerificadorPremium { servicioSuscripcion.estado(it).esPremium },
-        tareasSegundoPlano = tareasSegundoPlano
+        tareasSegundoPlano = tareasSegundoPlano,
+        evaluacionesIaMensuales = configuracion.llm.evaluacionesIaMensuales
     )
 
     val servicioEntrevista = ServicioEntrevista(
