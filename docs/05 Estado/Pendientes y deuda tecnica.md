@@ -15,7 +15,10 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Límite por IP en Redis**: hoy vive en memoria de cada instancia; con varias instancias se puede superar.
 - [ ] **Tope mensual de evaluaciones con IA por usuario** premium (hoy sin límite; cada reporte cuesta tokens).
 - [ ] **Apagado ordenado**: un reporte o correo en curso se corta si el servidor se detiene (cola de trabajos o espera al cerrar).
-- [ ] **CI (R12)**: GitHub Actions con `./gradlew test`, más Ktlint y Detekt.
+- [x] **CI (R12)** (2026-11-06, rama `ci/github-actions`): GitHub Actions corre `./gradlew test` (JDK 21, H2, sin
+  servicios externos) en cada push a `main` y en cada PR; si falla sube el reporte de pruebas. Local: 265/265.
+- [ ] **Ktlint y Detekt en CI**: requieren configurar reglas compatibles con las convenciones (archivos en MAYÚSCULAS,
+  nombres en español) antes de activarlos; con la configuración por defecto fallarían desde el primer día.
 - [ ] **Revisión de código** de las ramas antes de fusionar a `main`.
 
 ## Media
