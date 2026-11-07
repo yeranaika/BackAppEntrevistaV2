@@ -29,7 +29,8 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **IA para premium en práctica y nivelación** (hoy solo freemium; la interfaz `EvaluadorRespuesta` lo permite).
 - [ ] **Resumen de nivelación con IA** para premium (hoy determinista).
 - [ ] **Transcripción de audio (STT)** para preguntas de video: hoy un clip sin transcripción no se evalúa.
-- [ ] Endpoint para que un admin vea costos de IA (tokens y USD por día) desde `reporte_entrevista` y `pregunta_generacion_ia`.
+- [x] Endpoint para que un admin vea costos de IA (2026-11-06, rama `feature/costos-ia-admin`): `GET /api/v1/admin/costos-ia`
+  por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. Falta mostrarlo en el panel web.
 - [x] `.env.example`: agregar `LIMITE_REGISTROS_POR_IP` y `LIMITE_RECUPERACIONES_POR_IP` (2026-11-06, con `CABECERA_IP_CLIENTE`).
 - [ ] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (campo opcional nuevo, coordinado con Android).
 - [ ] **Descontar del tope las llamadas pagadas que responden mal** (hoy no descuentan cupo; requiere registrar sus tokens).

@@ -72,6 +72,8 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import MODELOS.LectorCostosIaExposed
+import SERVICIOS.ServicioCostosIa
 import SERVICIOS.TareaRescateReportes
 import SERVICIOS.TareaSincronizacionMercado
 import UTILIDADES.TareasSegundoPlano
@@ -153,6 +155,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
 
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo)
+    /** Gasto en IA para el admin (reportes con IA y generación de preguntas). */
+    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed())
 
     val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, clienteMercadoLaboral)
 

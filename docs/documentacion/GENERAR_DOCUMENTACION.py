@@ -320,6 +320,11 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Desactivar usuario", "DELETE", "/admin/usuarios/{{usuarioId}}", ADMIN, omitir_en_prueba=True,
             desc="⚠️ No borra: desactiva y cierra sus sesiones. `PATCH /admin/usuarios/{id}/activar` lo reactiva."),
         req("Reactivar usuario", "PATCH", "/admin/usuarios/{{usuarioId}}/activar", ADMIN, omitir_en_prueba=True),
+        req("Costos de IA", "GET", "/api/v1/admin/costos-ia", ADMIN, consulta=[("desde", "2026-11-01"), ("hasta", "2026-11-30")],
+            desc="Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. "
+                 "Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. "
+                 "`fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). "
+                 "Costos en USD con 6 decimales."),
     ]),
     ("17 · Cierre de sesión", "", [
         req("Cerrar sesión", "POST", "/auth/logout", PUBLICA, body={"refreshToken": "{{refreshToken}}"}, desc="Revoca el refresh token."),

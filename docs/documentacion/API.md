@@ -1232,6 +1232,7 @@ Solo admin.
 | `PATCH` | `/admin/usuarios/{{usuarioId}}/password` | Admin | Restablecer contraseña |
 | `DELETE` | `/admin/usuarios/{{usuarioId}}` | Admin | Desactivar usuario |
 | `PATCH` | `/admin/usuarios/{{usuarioId}}/activar` | Admin | Reactivar usuario |
+| `GET` | `/api/v1/admin/costos-ia` | Admin | Costos de IA |
 
 ### Listar usuarios
 
@@ -1283,6 +1284,12 @@ Alias antiguo: `POST /admin/users`.
 ### Reactivar usuario
 
 `PATCH /admin/usuarios/{{usuarioId}}/activar` · Admin · responde `200`
+
+### Costos de IA
+
+`GET /api/v1/admin/costos-ia?desde=2026-11-01&hasta=2026-11-30` · Admin · responde `200`
+
+Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. `fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). Costos en USD con 6 decimales.
 
 ## 17 · Cierre de sesión
 
@@ -1377,7 +1384,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 138 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 139 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1451,6 +1458,7 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
 | 400 | `pregunta_repetida` | Cada pregunta se responde una sola vez |
 | 400 | `pregunta_sesion_id_invalido` | El id de la pregunta no es válido |
+| 400 | `rango_invalido` | La fecha 'hasta' no puede ser anterior a 'desde' |
 | 400 | `respuesta_ideal_o_rubrica_requerida` | Indica una respuesta ideal o una rúbrica para evaluarla |
 | 400 | `respuesta_muy_larga` | La respuesta admite hasta … caracteres |
 | 400 | `respuesta_requerida` | Escribe tu respuesta |

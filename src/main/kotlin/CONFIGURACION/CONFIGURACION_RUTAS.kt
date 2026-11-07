@@ -2,6 +2,7 @@ package CONFIGURACION
 
 import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
+import CONTROLADORES.controladorCostosIa
 import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorEntrevista
 import CONTROLADORES.controladorFeedback
@@ -36,6 +37,7 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
 
         // Banco de preguntas e IA
         controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta)
+        controladorCostosIa(d.servicioCostosIa)
 
         // Mercado laboral: cargos, skills y tendencias
         controladorMercado(d.servicioMercado, d.servicioTendencias)

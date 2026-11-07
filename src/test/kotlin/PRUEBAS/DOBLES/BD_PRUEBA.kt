@@ -4,6 +4,7 @@ import CONFIGURACION.ConfiguracionLimites
 import CONFIGURACION.configurarErrores
 import CONFIGURACION.configurarLimiteSolicitudes
 import CONFIGURACION.configurarSerializacion
+import CONTROLADORES.controladorCostosIa
 import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorMercado
@@ -189,6 +190,7 @@ class SistemaPrueba(
     val catalogo = LectorCatalogoExposed()
     val preguntas = RepositorioPreguntaExposed()
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
+    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), reloj)
     val pregunta = ServicioPregunta(preguntas, catalogo)
     val generacion = ServicioGeneracionPregunta(
         mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
@@ -286,6 +288,7 @@ class SistemaPrueba(
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
             controladorPregunta(pregunta, generacion)
+            controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)
             controladorRecordatorio(recordatorio)
