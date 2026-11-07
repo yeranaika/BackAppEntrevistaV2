@@ -130,9 +130,10 @@ try {
     }
     Probar 'sin emociones (RNF10, D22): la expresión no se guarda y los gestos de emoción se descartan' {
         $r = Llamar-Api POST "$BASE/$sesionId/metricas" @{ metricas = @(@{ timestampMs = 99000; expresion = 'feliz'; gestos = @{ sonrisa = 1; toca_cara = 0.5 } }) } -Token $ana
-        $r.Estado -eq 201 -and
+        # La fila debe existir y conservar toca_cara: si no, la consulta da '' y la prueba falla (no pasa por omisión).
+        $r.Estado -eq 201 -and $r.Json.insertadas -eq 1 -and
             (Ejecutar-Sql "select count(*) from app.metrica_video where sesion_id = '$sesionId' and expresion_dominante is not null") -eq '0' -and
-            (Ejecutar-Sql "select gestos_detectados::text from app.metrica_video where sesion_id = '$sesionId' and timestamp_ms = 99000") -notmatch 'sonrisa'
+            (Ejecutar-Sql "select (gestos_detectados ? 'toca_cara') || '|' || (gestos_detectados ? 'sonrisa') from app.metrica_video where sesion_id = '$sesionId' and timestamp_ms = 99000") -eq 'true|false'
     }
     Probar 'lote de más de 300 → 400 lote_invalido' {
         (Llamar-Api POST "$BASE/$sesionId/metricas" @{ metricas = @(0..300 | ForEach-Object { @{ timestampMs = $_ } }) } -Token $ana).Json.error -eq 'lote_invalido'
