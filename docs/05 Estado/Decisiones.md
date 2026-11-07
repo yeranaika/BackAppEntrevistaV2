@@ -105,6 +105,8 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Por qué**: si el proxy no sobrescribe la cabecera, cualquiera podría inventarse una IP nueva en cada solicitud y
   saltarse el límite. Hay que comprobarlo antes de activarla (prueba de humo en [[Puesta en marcha]]).
 - **Consecuencias**: mientras la variable esté vacía, en Railway el cupo es global (compartido por todos los usuarios).
+  La IP se resuelve una vez por solicitud y también es la que se guarda como evidencia del consentimiento
+  (`ip_origen`). Por lo mismo, **no** se agrega límite por IP al login hasta activar la cabecera.
 
 ## D20 · Apagado ordenado: espera con tope en ApplicationStopping y rescate persistente (2026-11)
 - **Contexto**: al reiniciar (cada despliegue en Railway) se cancelaban de golpe los reportes y correos en curso. Un

@@ -1,6 +1,7 @@
 package UTILIDADES
 
 import io.ktor.server.application.ApplicationCall
+import io.ktor.util.AttributeKey
 import java.net.InetAddress
 
 private val IPV4 = Regex("""^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$""")
@@ -51,3 +52,13 @@ fun ApplicationCall.ipCliente(cabeceraConfiable: String?): String {
     val conexion = request.local.remoteAddress
     return normalizarIp(conexion) ?: conexion.trim().lowercase().take(LARGO_MAXIMO_IP).ifEmpty { "desconocida" }
 }
+
+/** La IP del cliente ya resuelta para esta solicitud (la pone CONFIGURACION_LIMITE_SOLICITUDES, una vez por solicitud). */
+val ClaveIpCliente = AttributeKey<String>("ip-cliente")
+
+/**
+ * IP del cliente de esta solicitud, resuelta igual que para el límite por IP (conexión, o la cabecera de confianza
+ * configurada). Para guardarla como evidencia (por ejemplo, ip_origen del consentimiento). Si no se resolvió antes,
+ * usa la conexión.
+ */
+fun ApplicationCall.ipDelCliente(): String = attributes.getOrNull(ClaveIpCliente) ?: ipCliente(cabeceraConfiable = null)

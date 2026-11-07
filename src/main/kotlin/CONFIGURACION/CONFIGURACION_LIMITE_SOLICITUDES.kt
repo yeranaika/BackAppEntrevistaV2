@@ -3,6 +3,7 @@ package CONFIGURACION
 import INTEGRACIONES.Cache
 import INTEGRACIONES.IpDeLaLlamada
 import INTEGRACIONES.LimitadorVentanaCompartida
+import UTILIDADES.ClaveIpCliente
 import UTILIDADES.claveLimiteIp
 import UTILIDADES.ipCliente
 import io.ktor.server.application.*
@@ -46,9 +47,12 @@ private class AvisoEspaciado(private val cadaMs: Long = 60_000) {
  */
 fun Application.configurarLimiteSolicitudes(limites: ConfiguracionLimites, cache: Cache) {
     val aviso = AvisoEspaciado()
-    // La IP de cada solicitud viaja en el contexto de su corrutina hasta el limitador (uno solo por límite, no uno por IP).
+    // La IP de cada solicitud se resuelve una sola vez: queda en los atributos de la llamada (ipDelCliente, por ejemplo
+    // para el consentimiento) y viaja en el contexto de su corrutina hasta el limitador (uno solo por límite, no por IP).
     intercept(ApplicationCallPipeline.Plugins) {
-        withContext(IpDeLaLlamada(claveLimiteIp(call.ipCliente(limites.cabeceraIpCliente)))) { proceed() }
+        val ip = call.ipCliente(limites.cabeceraIpCliente)
+        call.attributes.put(ClaveIpCliente, ip)
+        withContext(IpDeLaLlamada(claveLimiteIp(ip))) { proceed() }
     }
     install(RateLimit) {
         limitePorIp(LIMITE_REGISTRO, "registro", limites.registrosPorIp, VENTANA_REGISTRO, cache, aviso)

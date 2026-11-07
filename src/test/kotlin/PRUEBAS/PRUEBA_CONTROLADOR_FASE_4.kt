@@ -1,6 +1,7 @@
 package PRUEBAS
 
 import CONFIGURACION.ConfiguracionLimites
+import MODELOS.TablaConsentimiento
 import ESQUEMAS.SolicitudRegistro
 import MODELOS.ROL_ADMIN
 import PRUEBAS.DOBLES.SistemaPrueba
@@ -24,6 +25,9 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import io.ktor.client.request.header
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -105,6 +109,37 @@ class PruebaControladorFase4 {
         assertEquals("version_no_encontrada", enviar("POST", "/me/consent", """{"version":"9.9.9","alcances":{"uso_datos":true}}""", ana).objeto().texto("error"))
         assertEquals("true", enviar("POST", "/me/consent/revoke", token = ana).objeto().texto("revoked"))
         assertEquals(HttpStatusCode.NotFound, enviar("POST", "/me/consent/revoke", token = ana).status)
+    }
+
+    /** Otorga el consentimiento de [token] enviando [ipEnCabecera] en X-Real-IP y devuelve la ip_origen guardada. */
+    private suspend fun ApplicationTestBuilder.ipGuardadaAlConsentir(token: String, ipEnCabecera: String): String? {
+        val version = enviar("GET", "/consent/current").objeto().texto("version")!!
+        val respuesta = client.post("/me/consent") {
+            bearerAuth(token)
+            header("X-Real-IP", ipEnCabecera)
+            contentType(ContentType.Application.Json)
+            setBody("""{"version":"$version","alcances":{"uso_datos":true}}""")
+        }
+        assertEquals(HttpStatusCode.Created, respuesta.status)
+        return transaction { TablaConsentimiento.selectAll().single()[TablaConsentimiento.ipOrigen] }
+    }
+
+    @Test
+    fun `el consentimiento guarda la IP real del cliente con la cabecera de confianza`() = testApplication {
+        val sistema = SistemaPrueba(limites = ConfiguracionLimites(1_000, 1_000, cabeceraIpCliente = "X-Real-IP"))
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        assertEquals("203.0.113.9", ipGuardadaAlConsentir(ana, "203.0.113.9"), "la del cliente, no la del proxy")
+    }
+
+    @Test
+    fun `sin cabecera de confianza el consentimiento ignora la IP que manda el cliente`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        val guardada = ipGuardadaAlConsentir(ana, "198.51.100.77")
+        assertTrue(guardada != "198.51.100.77", "una cabecera inventada no es evidencia: se guarda la conexión ($guardada)")
+        assertTrue(!guardada.isNullOrBlank())
     }
 
     @Test

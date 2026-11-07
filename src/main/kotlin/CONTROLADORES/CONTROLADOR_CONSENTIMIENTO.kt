@@ -10,6 +10,7 @@ import INTEGRACIONES.DOCUMENTO_TERMINOS
 import INTEGRACIONES.FuenteDocumentosLegales
 import MIDDLEWARES.soloAdmin
 import SERVICIOS.ServicioConsentimiento
+import UTILIDADES.ipDelCliente
 import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import VISTAS.aDocumentoLegal
@@ -18,7 +19,6 @@ import VISTAS.aRespuestaTexto
 import VISTAS.aVersionEula
 import io.ktor.http.*
 import io.ktor.server.auth.*
-import io.ktor.server.plugins.origin
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -56,7 +56,8 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
         route("/me/consent") {
             post {
                 val solicitud = call.receive<SolicitudConsentimiento>()
-                val consentimiento = servicio.otorgar(call.usuarioIdDesdeJwt(), solicitud.version, solicitud.alcances, call.request.origin.remoteHost)
+                // La IP real del cliente (no la del proxy, y sin DNS inverso): es evidencia del consentimiento.
+                val consentimiento = servicio.otorgar(call.usuarioIdDesdeJwt(), solicitud.version, solicitud.alcances, call.ipDelCliente())
                 call.responderConMensaje(
                     consentimiento.aRespuesta(servicio.alcancesComoMapa(consentimiento)),
                     "Consentimiento registrado",

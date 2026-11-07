@@ -33,9 +33,13 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [x] `.env.example`: agregar `LIMITE_REGISTROS_POR_IP` y `LIMITE_RECUPERACIONES_POR_IP` (2026-11-06, con `CABECERA_IP_CLIENTE`).
 - [ ] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (campo opcional nuevo, coordinado con Android).
 - [ ] **Descontar del tope las llamadas pagadas que responden mal** (hoy no descuentan cupo; requiere registrar sus tokens).
-- [ ] **IP del consentimiento**: `CONTROLADOR_CONSENTIMIENTO` guarda `ip_origen` con `origin.remoteHost` (detrás del proxy es la IP
-  del proxy y puede hacer DNS inverso); usar `ipCliente()` como el límite por IP.
-- [ ] **Límite por IP en `/auth/login` y `/auth/reset-password`** (hoy solo hay bloqueo por correo en el login).
+- [x] **IP del consentimiento** (2026-11-06, rama `feature/ip-consentimiento-y-limites`): `ip_origen` usa la misma IP
+  que el límite por IP (`ipDelCliente()`, resuelta una vez por solicitud): sin DNS inverso y, con `CABECERA_IP_CLIENTE`,
+  la del cliente y no la del proxy.
+- [ ] **Límite por IP en `/auth/login` y `/auth/reset-password`**: **solo después de activar `CABECERA_IP_CLIENTE`**.
+  Mientras todos lleguen con la IP del proxy, un límite por IP en el login sería un tope global: una sala de clases
+  bloquearía el ingreso de todos. Hoy el login ya tiene bloqueo por correo (5 intentos) y el código de recuperación,
+  tope de intentos por código.
 - [ ] **Correo de recuperación sin reintento**: si el envío se corta por un apagado, no se reenvía solo (el usuario pide otro).
 - [ ] **Entrevistas finalizadas hace más de 24 h sin reporte** (datos anteriores a la Fase 7 o caídas largas): no las
   rescata la tarea periódica; decidir un relleno único por SQL.
