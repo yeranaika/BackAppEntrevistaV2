@@ -366,6 +366,33 @@ class PruebaServicioEntrevista {
         assertEquals(30, transaction { TablaMetricaVideo.selectAll().count() }, "los lotes rechazados no guardan nada")
     }
 
+    @Test
+    fun `un lote reenviado no duplica las metricas`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral()
+        val sesion = iniciar()
+        val lote = (0 until 20).map { metrica(it * 500L) }
+        assertEquals(20, servicio.registrarMetricas(ana, sesion.id, lote))
+
+        assertEquals(0, servicio.registrarMetricas(ana, sesion.id, lote), "el mismo lote otra vez no guarda nada")
+        val solapado = (15 until 25).map { metrica(it * 500L, contacto = "10") }
+        assertEquals(5, servicio.registrarMetricas(ana, sesion.id, solapado), "solo las 5 que faltaban")
+        val repetidasEnElLote = listOf(metrica(50_000, contacto = "11"), metrica(50_000, contacto = "99"))
+        assertEquals(1, servicio.registrarMetricas(ana, sesion.id, repetidasEnElLote))
+
+        assertEquals(26, transaction { TablaMetricaVideo.selectAll().count() })
+        val contactoDe = { ms: Long ->
+            transaction {
+                TablaMetricaVideo.selectAll().where { TablaMetricaVideo.timestampMs eq ms }.single()[TablaMetricaVideo.contactoVisual]
+            }
+        }
+        assertEquals(BigDecimal("80.50"), contactoDe(7_500), "una métrica ya guardada no se pisa")
+        assertEquals(BigDecimal("10.00"), contactoDe(12_000))
+        assertEquals(BigDecimal("11.00"), contactoDe(50_000), "dentro del lote vale la primera")
+
+        val otra = run { servicio.cancelar(ana, sesion.id); iniciar() }
+        assertEquals(20, servicio.registrarMetricas(ana, otra.id, lote), "el mismo instante en otra sesión sí se guarda")
+    }
+
     // ---------- Historial ----------
 
     @Test

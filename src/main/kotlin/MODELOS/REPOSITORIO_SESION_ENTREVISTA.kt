@@ -277,6 +277,10 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 
 interface RepositorioMetricaVideo {
     /** Inserta el lote completo en una sola operación. Devuelve cuántas filas guardó. */
+    /**
+     * Guarda el lote y devuelve cuántas métricas eran nuevas. Es idempotente: una métrica con un timestampMs que la
+     * sesión ya tiene (un lote reenviado) se ignora, y dentro del lote vale la primera de cada timestampMs (D21).
+     */
     suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int
 
     /** Promedios de la sesión calculados en la BD (una entrevista puede tener miles de filas). null si no hay métricas. */
@@ -292,8 +296,24 @@ data class ResumenMetricasVideo(
 )
 
 class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
-    override suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int = transaccion {
-        TablaMetricaVideo.batchInsert(metricas, shouldReturnGeneratedValues = false) { metrica ->
+    override suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int {
+        val unicas = metricas.distinctBy { it.timestampMs }
+        return try {
+            insertarNuevas(sesionId, unicas)
+        } catch (e: ExposedSQLException) {
+            // Otro envío del mismo lote entró entre la lectura y la inserción: se reintenta una vez y ya se filtra.
+            if (e.sqlState != SQLSTATE_VALOR_DUPLICADO) throw e
+            insertarNuevas(sesionId, unicas)
+        }
+    }
+
+    private suspend fun insertarNuevas(sesionId: UUID, metricas: List<MetricaVideo>): Int = transaccion {
+        val existentes = TablaMetricaVideo.select(TablaMetricaVideo.timestampMs)
+            .where { (TablaMetricaVideo.sesionId eq sesionId) and (TablaMetricaVideo.timestampMs inList metricas.map { it.timestampMs }) }
+            .mapTo(HashSet()) { it[TablaMetricaVideo.timestampMs] }
+        val nuevas = metricas.filterNot { it.timestampMs in existentes }
+        if (nuevas.isEmpty()) return@transaccion 0
+        TablaMetricaVideo.batchInsert(nuevas, shouldReturnGeneratedValues = false) { metrica ->
             this[TablaMetricaVideo.metricaId] = UUID.randomUUID()
             this[TablaMetricaVideo.sesionId] = sesionId
             this[TablaMetricaVideo.timestampMs] = metrica.timestampMs
@@ -303,7 +323,7 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             this[TablaMetricaVideo.gestos] = metrica.gestos
             this[TablaMetricaVideo.expresionDominante] = metrica.expresionDominante
         }
-        metricas.size
+        nuevas.size
     }
 
     override suspend fun resumir(sesionId: UUID): ResumenMetricasVideo? = transaccion {

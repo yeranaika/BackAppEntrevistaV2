@@ -47,6 +47,7 @@ van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
 | `017_practica_nivelacion.sql` | Práctica por cargo, preguntas servidas, `id_local`, nivelación sin onboarding; corrige default de `skill_tendencia` |
 | `018_reporte_entrevista.sql` | Modo de evaluación, modelo, tokens, costo e intentos del reporte |
 | `019_rescate_reportes.sql` | `intento_id` del reporte (cada intento de generación escribe solo lo suyo) e índices parciales para el rescate de reportes interrumpidos (D20) |
+| `020_metricas_video_idempotentes.sql` | Borra métricas de video duplicadas y crea el índice único `(sesion_id, timestamp_ms)`: un lote reenviado no se guarda dos veces (D21) |
 
 Todas son **idempotentes** (se pueden correr dos veces). Al crear una nueva: actualizar también el esquema base y
 verificar sobre una BD vacía (`createdb`, esquema, migraciones, `dropdb`). Ver [[Puesta en marcha]].

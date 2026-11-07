@@ -229,7 +229,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Enviar métricas de video", "POST", "/api/v1/entrevistas/{{sesionId}}/metricas",
             body={"metricas": [{"timestampMs": 0, "contactoVisual": 80.5, "postura": 70, "confianza": 65, "expresion": "seguro"},
                                {"timestampMs": 500, "contactoVisual": 78, "postura": 72, "confianza": 66, "gestos": {"toca_cara": False}, "expresion": "neutral"}]},
-            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso)."),
+            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0)."),
         req("Detalle de la entrevista", "GET", "/api/v1/entrevistas/{{sesionId}}", desc="La corrección se muestra recién al terminar."),
         req("Finalizar entrevista", "POST", "/api/v1/entrevistas/{{sesionId}}/finalizar",
             desc="Requiere al menos una respuesta. Lanza en segundo plano el reporte de feedback."),

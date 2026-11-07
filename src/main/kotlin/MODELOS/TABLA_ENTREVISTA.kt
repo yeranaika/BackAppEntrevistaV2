@@ -60,4 +60,10 @@ object TablaMetricaVideo : Table("metrica_video") {
     val expresionDominante = varchar("expresion_dominante", 20).nullable()
 
     override val primaryKey = PrimaryKey(metricaId)
+
+    init {
+        // Una métrica por instante de la sesión: un lote reenviado (la app reintenta si no recibe la respuesta)
+        // no se guarda dos veces (migración 020, D21).
+        uniqueIndex("uq_metrica_video_sesion_ms", sesionId, timestampMs)
+    }
 }

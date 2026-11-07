@@ -126,3 +126,17 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   máximo de 3. Un despliegue puede tardar hasta ~3 min en retirar la instancia vieja si hay reportes con IA en curso.
   El correo de recuperación cortado no se reenvía solo (el usuario pide otro). **Migración 019** (columna `intento_id`
   e índices): aplicarla **antes** de desplegar este código.
+
+## D21 · Métricas de video idempotentes por (sesión, timestampMs) (2026-11)
+- **Contexto**: la app reenvía un lote de métricas si no recibe la respuesta (red lenta, tiempo máximo al tocar
+  «Terminar»). El backend generaba un `metrica_id` nuevo por fila, así que el lote quedaba guardado dos veces y
+  pesaba el doble en el promedio de lenguaje corporal del reporte.
+- **Decisión**: una métrica por instante de la sesión. Índice único `(sesion_id, timestamp_ms)` (migración 020, que
+  también borra los duplicados existentes y el índice simple que queda redundante). `insertarLote` filtra los
+  `timestampMs` que la sesión ya tiene y, dentro del lote, se queda con la primera de cada `timestampMs`; si otro
+  envío entra justo entre la lectura y la inserción (violación del índice), reintenta una vez.
+- **Por qué**: la app ya manda una métrica por ventana de 500 ms con `timestampMs` = inicio de la ventana, así que el
+  par identifica la métrica sin cambiar el contrato (no hace falta un `loteId`). Una métrica ya guardada no se pisa.
+- **Consecuencias**: `POST /metricas` sigue respondiendo `201`; `insertadas` cuenta solo las nuevas (0 si el lote ya
+  estaba). Un cliente que mande dos métricas distintas con el mismo `timestampMs` pierde la segunda. **Migración
+  020**: aplicarla antes de desplegar.

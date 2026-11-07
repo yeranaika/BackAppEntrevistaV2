@@ -2678,7 +2678,7 @@
                 "metricas"
               ]
             },
-            "description": "Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso).",
+            "description": "Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"metricas\": [\n    {\n      \"timestampMs\": 0,\n      \"contactoVisual\": 80.5,\n      \"postura\": 70,\n      \"confianza\": 65,\n      \"expresion\": \"seguro\"\n    },\n    {\n      \"timestampMs\": 500,\n      \"contactoVisual\": 78,\n      \"postura\": 72,\n      \"confianza\": 66,\n      \"gestos\": {\n        \"toca_cara\": false\n      },\n      \"expresion\": \"neutral\"\n    }\n  ]\n}",
