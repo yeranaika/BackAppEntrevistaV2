@@ -28,6 +28,7 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | No | IA (generación de preguntas y evaluación premium) |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP (compartidos entre instancias en Redis) |
 | `LIMITE_EVALUACIONES_IA_MENSUAL` | No (30) | Reportes con IA por usuario premium y mes (UTC); al llegar al tope el reporte sale con el motor freemium; `0` = sin IA |
+| `APAGADO_ESPERA_TAREAS_SEGUNDOS` | No (150) | Al apagar, espera a los reportes y correos en curso antes de cortarlos (D20) |
 | `CABECERA_IP_CLIENTE` | No (vacía) | Cabecera con la IP real del cliente puesta por el proxy. En Railway `X-Real-IP`, **solo tras la prueba de humo** (abajo) |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 
@@ -39,7 +40,7 @@ cd src/DB && docker compose up -d        # primera vez: crea el esquema y carga 
 ```
 Si la BD ya existía de antes, aplicar las migraciones pendientes (son idempotentes):
 ```bash
-for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
+for m in migrations/01{4,5,6,7,8,9}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
 ```
 
 ## 3. Ejecutar
@@ -47,6 +48,14 @@ for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -
 ./gradlew run                       # http://localhost:8080 ; GET /health → OK ; GET /ready → 200 al terminar el calentamiento
 ```
 En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `OK` mientras el proceso esté vivo. `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
+
+### Apagado ordenado en Railway (D20)
+- `railway.json` fija `deploy.drainingSeconds: 200`: Railway espera hasta 200 s entre SIGTERM y SIGKILL (por defecto da 0).
+  La espera de tareas (150 s) más los cierres caben con margen. Si se cambia una, revisar la otra.
+- El proceso de **Java tiene que recibir la señal**: el comando de inicio debe ejecutar java directamente (`java -jar …`
+  o el script de `installDist`, que termina en `exec`), nunca un `sh -c` que no la reenvíe.
+- Aunque el proceso muera sin aviso, nada queda colgado: al arrancar y cada 5 min los reportes interrumpidos pasan a
+  `error` reintentable.
 
 ### Prueba de humo antes de activar `CABECERA_IP_CLIENTE` (Railway, staging)
 Comprueba que el proxy **sobrescribe** `X-Real-IP` (si no, cualquiera podría inventarse una IP y saltarse el límite, D19):

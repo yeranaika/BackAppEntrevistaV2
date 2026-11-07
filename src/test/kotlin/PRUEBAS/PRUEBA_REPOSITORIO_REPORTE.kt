@@ -41,7 +41,7 @@ class PruebaRepositorioReporte {
         val p = sesion.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
         sistema.entrevista.responderYFinalizar(usuario, sesion.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id)))
         repo.crearPendiente(sesion.id, A_MEDIO_MES)
-        assertTrue(repo.tomarParaGenerar(sesion.id, 3))
+        assertTrue(repo.tomarParaGenerar(sesion.id, 3, A_MEDIO_MES))
         sesion.id
     }
 
@@ -125,5 +125,64 @@ class PruebaRepositorioReporte {
 
         assertEquals(3, exitos, "ni más reservas que el tope ni menos por errores de bloqueo")
         assertEquals(3, reportes.count { repo.buscarPorSesion(it)!!.modo == ModoEvaluacion.IA })
+    }
+
+    // ---------- Apagado ordenado (D20) ----------
+
+    @Test
+    fun `tomarParaGenerar fecha el inicio del intento`() = runBlocking<Unit> {
+        val sesion = reporteGenerando()
+        repo.marcarError(sesion, "error_interno", INICIO_MES)
+        val ahora = Instant.parse("2026-01-20T08:00:00Z")
+        assertTrue(repo.tomarParaGenerar(sesion, 3, ahora))
+        assertEquals(ahora, repo.buscarPorSesion(sesion)!!.fecha, "el rescate sabe que este intento recién empezó")
+    }
+
+    @Test
+    fun `marcarInterrumpido solo actua sobre reportes en generacion y nunca deja intentos negativos`() = runBlocking<Unit> {
+        val listo = reporteGenerando()
+        repo.guardarResultado(listo, resultado(ModoEvaluacion.IA, A_MEDIO_MES))
+        repo.marcarInterrumpido(listo, A_MEDIO_MES)
+        assertEquals(EstadoReporte.LISTO, repo.buscarPorSesion(listo)!!.estado, "un reporte listo no se toca")
+
+        val sesion = runBlocking {
+            val s = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "QA"))
+            val p = s.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
+            sistema.entrevista.responderYFinalizar(ana, s.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id))).id
+        }
+        repo.crearPendiente(sesion, A_MEDIO_MES) // generando, sin intentos todavía
+        repo.marcarInterrumpido(sesion, A_MEDIO_MES)
+        val interrumpido = repo.buscarPorSesion(sesion)!!
+        assertEquals(EstadoReporte.ERROR, interrumpido.estado)
+        assertEquals(0, interrumpido.intentos)
+    }
+
+    @Test
+    fun `una generacion abandonada no pisa al reintento que vino despues`() = runBlocking<Unit> {
+        val sesion = reporteGenerando()
+        repo.marcarError(sesion, "error_interno", A_MEDIO_MES)
+        val viejo = UUID.randomUUID()
+        assertTrue(repo.tomarParaGenerar(sesion, 3, A_MEDIO_MES, viejo))
+        repo.marcarInterrumpido(sesion, A_MEDIO_MES) // el rescate la dio por abandonada
+        val nuevo = UUID.randomUUID()
+        assertTrue(repo.tomarParaGenerar(sesion, 3, A_MEDIO_MES, nuevo)) // el usuario reintentó
+
+        assertFalse(repo.guardarResultado(sesion, resultado(ModoEvaluacion.IA, A_MEDIO_MES), viejo), "la vieja despierta: no guarda")
+        assertEquals(EstadoReporte.GENERANDO, repo.buscarPorSesion(sesion)!!.estado)
+        assertTrue(repo.guardarResultado(sesion, resultado(ModoEvaluacion.FREEMIUM, A_MEDIO_MES), nuevo))
+
+        repo.marcarError(sesion, "error_interno", A_MEDIO_MES, viejo) // la vieja falla después
+        repo.marcarInterrumpido(sesion, A_MEDIO_MES, viejo)
+        val reporte = repo.buscarPorSesion(sesion)!!
+        assertEquals(EstadoReporte.LISTO, reporte.estado, "el resultado del reintento queda intacto")
+        assertEquals(ModoEvaluacion.FREEMIUM, reporte.modo)
+    }
+
+    @Test
+    fun `guardarResultado no pisa un reporte que ya no esta en generacion`() = runBlocking<Unit> {
+        val sesion = reporteGenerando()
+        repo.marcarInterrumpido(sesion, A_MEDIO_MES) // el rescate lo dio por abandonado
+        assertFalse(repo.guardarResultado(sesion, resultado(ModoEvaluacion.IA, A_MEDIO_MES)), "una generación zombi no guarda")
+        assertEquals(EstadoReporte.ERROR, repo.buscarPorSesion(sesion)!!.estado)
     }
 }

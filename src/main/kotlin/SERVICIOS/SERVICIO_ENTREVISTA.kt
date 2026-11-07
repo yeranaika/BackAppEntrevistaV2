@@ -27,6 +27,7 @@ import MODELOS.ResultadoRegistroRespuestas
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
@@ -156,6 +157,8 @@ class ServicioEntrevista(
         tareasSegundoPlano.launch {
             try {
                 procesador.procesar(finalizada)
+            } catch (e: CancellationException) {
+                throw e // apagado: no es un error; el reporte queda reintentable (D20)
             } catch (e: Exception) {
                 log.error("No se pudo procesar la entrevista finalizada {}", sesionId, e)
             }

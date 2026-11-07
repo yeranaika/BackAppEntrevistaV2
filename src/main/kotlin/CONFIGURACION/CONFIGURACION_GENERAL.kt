@@ -4,6 +4,8 @@ import com.auth0.jwt.algorithms.Algorithm
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.server.application.*
 import io.ktor.util.AttributeKey
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 private const val PUERTO_REDIS_POR_DEFECTO = 6379
 private const val PUERTO_SMTP_POR_DEFECTO = 465
@@ -87,6 +89,9 @@ data class ConfiguracionLimites(
     }
 }
 
+/** Apagado ordenado (D20): cuánto se espera a los reportes y correos en curso antes de cancelarlos. */
+data class ConfiguracionApagado(val esperaTareas: Duration = ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO.seconds)
+
 /** Toda la configuración externa de la aplicación, leída una sola vez al arrancar. */
 data class ConfiguracionGeneral(
     val baseDatos: ConfiguracionBaseDatos,
@@ -97,7 +102,8 @@ data class ConfiguracionGeneral(
     val correo: ConfiguracionCorreo,
     val mercadoLaboral: ConfiguracionMercadoLaboral,
     val llm: ConfiguracionLlm,
-    val limites: ConfiguracionLimites
+    val limites: ConfiguracionLimites,
+    val apagado: ConfiguracionApagado = ConfiguracionApagado()
 )
 
 private val ClaveConfiguracion = AttributeKey<ConfiguracionGeneral>("configuracion-general")
@@ -174,6 +180,10 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),
             recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO),
             cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() }
+        ),
+        apagado = ConfiguracionApagado(
+            // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).
+            esperaTareas = lector.entero("APAGADO_ESPERA_TAREAS_SEGUNDOS", ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO).coerceIn(0, 600).seconds
         )
     )
 }

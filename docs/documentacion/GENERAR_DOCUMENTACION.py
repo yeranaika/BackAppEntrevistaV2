@@ -239,7 +239,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
     ]),
     ("11 · Feedback", "Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.\n\n- **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.\n- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium (hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes por mes, 30 por defecto) si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si se alcanza el tope o la IA falla se usa el freemium (`modoEvaluacion = freemium`): el reporte siempre sale.\n- Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.", [
         req("Reporte de la entrevista", "GET", "/api/v1/entrevistas/{{sesionId}}/reporte",
-            desc="`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar."),
+            desc="`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar. Un reporte que se cortó por un reinicio del servidor pasa a `error` reintentable (al instante si el apagado fue ordenado; si no, en unos 15 min como máximo)."),
         req("Reintentar reporte", "POST", "/api/v1/entrevistas/{{sesionId}}/reporte/reintentar", espera=[202, 409],
             desc="Solo si terminó con error (hasta 3 intentos). `409 reporte_no_reintentable`."),
         req("Mis reportes", "GET", "/api/v1/reportes"),

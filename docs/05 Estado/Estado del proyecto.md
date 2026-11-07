@@ -23,6 +23,8 @@ actualizado: 2026-11-06
 | Mensajes | `mensaje` en todo éxito de escritura (todas las fases) | `refactor/mensajes-exito` | — | 261 · colección 78/78 |
 | Disponibilidad Freemium | `/ready` espera el calentamiento, `/health` conserva liveness y se filtran sus logs | `codex/freemium-main-port` | `6de97b2` + filtro de logs | 265 pruebas · colección generada con 106 solicitudes |
 | Tope mensual de IA | Cupo de reportes con IA por usuario premium y mes (`LIMITE_EVALUACIONES_IA_MENSUAL`, D17); al agotarlo, motor freemium | `feature/tope-mensual-ia` | (ver git log) | 281 pruebas · 6 mutaciones detectadas · revisión adversarial |
+| Integración | Las tres ramas anteriores (CI, tope de IA, límite por IP) juntas y verificadas | `integracion/backend-v2` | (ver git log) | 305 pruebas |
+| Apagado ordenado | Espera con tope al apagar, reporte cortado reintentable y rescate periódico (D20) | `feature/apagado-ordenado` | (ver git log) | 323 pruebas · 13 mutaciones detectadas · revisión adversarial |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].

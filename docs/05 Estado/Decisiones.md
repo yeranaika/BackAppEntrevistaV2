@@ -105,3 +105,22 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Por qué**: si el proxy no sobrescribe la cabecera, cualquiera podría inventarse una IP nueva en cada solicitud y
   saltarse el límite. Hay que comprobarlo antes de activarla (prueba de humo en [[Puesta en marcha]]).
 - **Consecuencias**: mientras la variable esté vacía, en Railway el cupo es global (compartido por todos los usuarios).
+
+## D20 · Apagado ordenado: espera con tope en ApplicationStopping y rescate persistente (2026-11)
+- **Contexto**: al reiniciar (cada despliegue en Railway) se cancelaban de golpe los reportes y correos en curso. Un
+  reporte cortado quedaba en `generando` **para siempre**: nada lo retomaba y la app no permitía reintentarlo.
+- **Decisión**: (1) en `ApplicationStopping` —Netty ya no acepta solicitudes y la BD y Redis siguen abiertos— se
+  esperan las tareas en curso hasta `APAGADO_ESPERA_TAREAS_SEGUNDOS` (150) y después se cancelan; (2) un reporte
+  cancelado por el apagado queda en `error` con `generacion_interrumpida`, el intento descontado y el cupo de IA
+  devuelto; (3) `TareaRescateReportes`, al arrancar y cada 5 min, hace lo mismo con los reportes en `generando` cuyo
+  intento empezó hace más de 10 min y crea el reporte en `error` de las entrevistas finalizadas (10 min – 24 h) que se
+  quedaron sin él; (4) `railway.json` da 200 s de drenado (Railway da 0 por defecto).
+- **Por qué**: la espera evita perder trabajo, pero el proceso puede morir igual (SIGKILL, OOM): la consistencia la
+  garantiza el rescate, apoyado en la BD. No se regenera solo: no se gasta IA sin que el usuario lo pida y no hace
+  falta coordinar instancias; el usuario ve el mismo «Generar de nuevo» de siempre (sin cambios en Android).
+- **Consecuencias**: `tomarParaGenerar` fecha el inicio del intento (si no, el rescate podría robar un reintento
+  vivo). Cada intento tiene un `intento_id`: el resultado y el error solo los escribe el intento dueño, así una
+  generación que el rescate dio por abandonada no pisa a un reintento posterior. El intento cortado no cuenta para el
+  máximo de 3. Un despliegue puede tardar hasta ~3 min en retirar la instancia vieja si hay reportes con IA en curso.
+  El correo de recuperación cortado no se reenvía solo (el usuario pide otro). **Migración 019** (columna `intento_id`
+  e índices): aplicarla **antes** de desplegar este código.

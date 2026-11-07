@@ -922,7 +922,7 @@ Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso 
 
 `GET /api/v1/entrevistas/{{sesionId}}/reporte` · Usuario · responde `200`
 
-`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar.
+`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar. Un reporte que se cortó por un reinicio del servidor pasa a `error` reintentable (al instante si el apagado fue ordenado; si no, en unos 15 min como máximo).
 
 ### Reintentar reporte
 

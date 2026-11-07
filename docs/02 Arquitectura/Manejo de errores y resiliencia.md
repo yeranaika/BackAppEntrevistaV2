@@ -44,5 +44,10 @@ dispatcher de IO). `GET /health` hace `SELECT 1` (503 si falla).
 
 ## Procesos en segundo plano
 Nunca lanzan hacia afuera: registran el error y dejan el estado persistido (ej. reporte en `error` con su código).
+La única excepción es la **cancelación por apagado** (D20): no es un error, no se registra como tal y se relanza.
+Antes, el reporte cortado queda en `error` con el código `generacion_interrumpida`: el intento no cuenta, el cupo de
+IA se devuelve y la app muestra el botón de reintentar de siempre. Para distinguirla de un timeout interno se mira
+si la corrutina sigue activa (`e is CancellationException && !isActive`). Si el proceso muere sin aviso (SIGKILL),
+`TareaRescateReportes` deja esos reportes igual de reintentables al arrancar y cada 5 minutos.
 
 Relacionado: [[Seguridad]] · [[Arquitectura general]] · [[Redis]]

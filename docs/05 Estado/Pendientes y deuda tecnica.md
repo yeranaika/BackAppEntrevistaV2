@@ -16,7 +16,8 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   instancias con respaldo en memoria si Redis cae. Falta activar `CABECERA_IP_CLIENTE=X-Real-IP` en Railway tras la prueba de humo.
 - [x] **Tope mensual de evaluaciones con IA por usuario** premium (2026-11-06, rama `feature/tope-mensual-ia`, D17):
   `LIMITE_EVALUACIONES_IA_MENSUAL` (30 por defecto); al llegar al tope el reporte sale con el motor freemium.
-- [ ] **Apagado ordenado**: un reporte o correo en curso se corta si el servidor se detiene (cola de trabajos o espera al cerrar).
+- [x] **Apagado ordenado** (2026-11-06, rama `feature/apagado-ordenado`, D20): espera con tope en ApplicationStopping,
+  reporte cortado queda reintentable y rescate periódico de los que quedaron en `generando`. `railway.json` con 200 s de drenado.
 - [x] **CI (R12)** (2026-11-06, rama `ci/github-actions`): GitHub Actions corre `./gradlew test` (JDK 21, H2, sin
   servicios externos) en cada push a `main` y en cada PR; si falla sube el reporte de pruebas. Local: 265/265.
 - [ ] **Ktlint y Detekt en CI**: requieren configurar reglas compatibles con las convenciones (archivos en MAYÚSCULAS,
@@ -35,6 +36,9 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **IP del consentimiento**: `CONTROLADOR_CONSENTIMIENTO` guarda `ip_origen` con `origin.remoteHost` (detrás del proxy es la IP
   del proxy y puede hacer DNS inverso); usar `ipCliente()` como el límite por IP.
 - [ ] **Límite por IP en `/auth/login` y `/auth/reset-password`** (hoy solo hay bloqueo por correo en el login).
+- [ ] **Correo de recuperación sin reintento**: si el envío se corta por un apagado, no se reenvía solo (el usuario pide otro).
+- [ ] **Entrevistas finalizadas hace más de 24 h sin reporte** (datos anteriores a la Fase 7 o caídas largas): no las
+  rescata la tarea periódica; decidir un relleno único por SQL.
 
 ## Baja
 - [ ] Revisar dependencias sin uso (`poi-ooxml`, `bcrypt`, `google-api-client:2.+` con versión dinámica).

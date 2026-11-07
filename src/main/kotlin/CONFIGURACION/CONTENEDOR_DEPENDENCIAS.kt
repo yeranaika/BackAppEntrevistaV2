@@ -72,11 +72,10 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import SERVICIOS.TareaRescateReportes
 import SERVICIOS.TareaSincronizacionMercado
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import UTILIDADES.TareasSegundoPlano
+import kotlin.time.Duration
 
 private const val PREFIJO_INTENTOS_LOGIN = "login:fallos:"
 
@@ -86,8 +85,8 @@ private const val PREFIJO_INTENTOS_LOGIN = "login:fallos:"
  */
 class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseable {
 
-    /** Tareas que no deben bloquear la respuesta HTTP (ej: enviar correos). Se cancelan al apagar. */
-    private val tareasSegundoPlano = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Tareas que no deben bloquear la respuesta HTTP (reportes, correos). Al apagar se esperan: ver detenerTareas (D20). */
+    private val tareasSegundoPlano = TareasSegundoPlano()
 
     // ---------- Repositorios ----------
     // Una sola instancia sirve a RepositorioUsuario y a LectorUsuarioSesion.
@@ -252,14 +251,28 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     )
 
     private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)
+    private val tareaRescate = TareaRescateReportes(servicioReporte)
 
     fun iniciarTareasSegundoPlano() {
         tareaMercado.iniciar()
+        tareaRescate.iniciar()
+    }
+
+    /**
+     * Apagado ordenado (D20). Se llama en ApplicationStopping: Netty ya no atiende solicitudes, pero la BD y Redis siguen
+     * abiertos. Para las tareas periódicas y espera hasta [espera] a los reportes y correos en curso; lo que no termine
+     * queda reintentable.
+     */
+    suspend fun detenerTareas(espera: Duration) {
+        tareaMercado.detener()
+        tareaRescate.detener()
+        tareasSegundoPlano.esperarYCerrar(espera)
     }
 
     override fun close() {
-        tareasSegundoPlano.cancel()
+        tareasSegundoPlano.cancelar()
         tareaMercado.close()
+        tareaRescate.close()
         clienteMercadoLaboral.close()
         clienteGooglePlay?.close()
         clienteHttpLlm.close()

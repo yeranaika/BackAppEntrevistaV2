@@ -643,6 +643,9 @@ CREATE INDEX IF NOT EXISTS idx_sesion_usuario
 -- Un usuario tiene como máximo una sesión en progreso
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sesion_activa_unica
     ON sesion_entrevista(usuario_id) WHERE estado = 'en_progreso';
+-- Rescate de entrevistas finalizadas sin reporte tras una caída (D20, migración 019)
+CREATE INDEX IF NOT EXISTS idx_sesion_entrevista_finalizada
+    ON sesion_entrevista(fecha_fin) WHERE estado = 'finalizada';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 
@@ -737,8 +740,13 @@ CREATE TABLE IF NOT EXISTS reporte_entrevista (
     tokens_salida             INTEGER,
     costo_usd                 NUMERIC(8,6),
     -- Primer intento + reintentos manuales (con tope)
-    intentos_generacion       SMALLINT     NOT NULL DEFAULT 0
+    intentos_generacion       SMALLINT     NOT NULL DEFAULT 0,
+    -- Intento de generación en curso: solo ese intento escribe el resultado (D20, migración 019)
+    intento_id                UUID
 );
+-- Rescate de reportes interrumpidos por un apagado sin aviso (D20, migración 019)
+CREATE INDEX IF NOT EXISTS idx_reporte_generando
+    ON reporte_entrevista(fecha_generacion) WHERE estado_generacion = 'generando';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- Desglose del reporte por skill (para el gráfico de radar en la app)

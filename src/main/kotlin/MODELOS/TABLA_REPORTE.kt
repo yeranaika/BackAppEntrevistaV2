@@ -29,6 +29,8 @@ object TablaReporteEntrevista : Table("reporte_entrevista") {
     val tokensSalida = integer("tokens_salida").nullable()
     val costoUsd = decimal("costo_usd", 8, 6).nullable()
     val intentos = short("intentos_generacion").default(0)
+    /** Identifica el intento de generación en curso: solo ese intento puede escribir el resultado (D20). */
+    val intentoId = uuid("intento_id").nullable()
     val fechaGeneracion = timestamp("fecha_generacion")
 
     override val primaryKey = PrimaryKey(reporteId)

@@ -97,9 +97,10 @@ decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes 
 | `GOOGLE_PLAY_BILLING_MOCK` | `true` para simular compras válidas por 30 días (desarrollo). |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | Cambian los límites por IP (por defecto 30 y 5). Se comparten entre instancias en Redis. |
 | `LIMITE_EVALUACIONES_IA_MENSUAL` | Reportes con IA por usuario premium y mes calendario UTC (por defecto 30; 0 = sin IA). Al llegar al tope el reporte sale con el motor freemium. |
+| `APAGADO_ESPERA_TAREAS_SEGUNDOS` | Al apagar, cuánto se espera a los reportes y correos en curso (por defecto 150; máx. 600). Debe caber en el drenado de Railway (`railway.json`: 200 s). |
 | `CABECERA_IP_CLIENTE` | Cabecera con la IP real del cliente puesta por el proxy (en Railway `X-Real-IP`, tras la prueba de humo). Vacía = IP de la conexión. |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `018` (idempotentes) sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `019` (idempotentes) sobre una BD existente:
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
 ```

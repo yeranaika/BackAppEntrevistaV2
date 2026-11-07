@@ -1,5 +1,6 @@
 package PRUEBAS
 
+import CONFIGURACION.CODIGO_GENERACION_INTERRUMPIDA
 import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
@@ -23,10 +24,14 @@ import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.PedidoEntrevista
 import SERVICIOS.RespuestaUsuario
 import SERVICIOS.ServicioReporteEntrevista
+import UTILIDADES.TareasSegundoPlano
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -41,6 +46,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 private val ENERO: Instant = Instant.parse("2026-01-01T00:00:00Z")
 private val FEBRERO: Instant = Instant.parse("2026-02-01T00:00:00Z")
@@ -385,12 +391,141 @@ class PruebaServicioReporte {
         val huerfana = entrevistaFinalizada()
         val ahora = sistema.reloj.instant()
         sistema.reportesRepo.crearPendiente(huerfana.id, ahora)
-        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3))
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3, ahora))
         assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
 
         assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "la reserva todavía está vigente")
         sistema.reloj.adelantar(Duration.ofMinutes(11))
         assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "pasados 10 minutos la reserva ya no cuenta")
+    }
+
+    // ---------- Apagado ordenado y rescate (D20) ----------
+
+    /** Deja el reporte de [sesion] tomado para generar ahora ('generando', un intento más). */
+    private fun tomado(sesion: SesionEntrevista): ReporteEntrevista = runBlocking {
+        sistema.reportesRepo.crearPendiente(sesion.id, sistema.reloj.instant())
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant()))
+        sistema.reportesRepo.buscarPorSesion(sesion.id)!!
+    }
+
+    private fun reporteDe(sesion: SesionEntrevista) = runBlocking { sistema.reportesRepo.buscarPorSesion(sesion.id)!! }
+
+    @Test
+    fun `un apagado a mitad deja el reporte reintentable al instante`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        var bloquear = true
+        val empezo = CompletableDeferred<Unit>()
+        val lento = EvaluadorEntrevista { contexto ->
+            if (bloquear) { empezo.complete(Unit); awaitCancellation() }
+            sistema.evaluadorEntrevistaGratis.evaluar(contexto)
+        }
+        val servicio = servicioCon(lento)
+        val sesion = entrevistaFinalizada()
+        val tareas = TareasSegundoPlano(Dispatchers.IO)
+        tareas.launch { servicio.procesar(sesion) }
+        empezo.await()
+        assertEquals(ModoEvaluacion.IA, reporteDe(sesion).modo, "tenía un cupo de IA reservado")
+
+        assertEquals(1, tareas.esperarYCerrar(0.seconds), "apagado sin tiempo de espera")
+
+        val interrumpido = reporteDe(sesion)
+        assertEquals(EstadoReporte.ERROR, interrumpido.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, interrumpido.errorDetalle)
+        assertEquals(ModoEvaluacion.FREEMIUM, interrumpido.modo, "el cupo de IA se devolvió")
+        assertEquals(0, interrumpido.intentos, "el intento cortado no cuenta")
+
+        bloquear = false
+        servicio.reintentar(ana, sesion.id)
+        assertEquals(EstadoReporte.LISTO, esperarFin(sesion.id).estado, "el usuario lo genera de nuevo")
+    }
+
+    @Test
+    fun `un timeout interno sigue siendo un error normal`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val conTimeout = EvaluadorEntrevista { withTimeout(1) { delay(1_000) }; error("inalcanzable") }
+        val reporte = generar(entrevistaFinalizada(), servicioCon(conTimeout))
+        assertEquals(EstadoReporte.ERROR, reporte.estado)
+        assertEquals("error_interno", reporte.errorDetalle, "no se confunde con un apagado")
+        assertEquals(1, reporte.intentos, "este intento sí cuenta")
+    }
+
+    @Test
+    fun `el rescate deja reintentable un reporte abandonado pasados diez minutos`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        sistema.reloj.adelantar(Duration.ofMinutes(9))
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "a los 9 minutos todavía puede estar generándose")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(1, sistema.reporte.rescatarInterrumpidos())
+
+        val rescatado = reporteDe(sesion)
+        assertEquals(EstadoReporte.ERROR, rescatado.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, rescatado.errorDetalle)
+        assertEquals(ModoEvaluacion.FREEMIUM, rescatado.modo)
+        assertEquals(0, rescatado.intentos)
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "una segunda pasada no hace nada")
+    }
+
+    @Test
+    fun `el rescate no toca un reintento recien tomado`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        sistema.reportesRepo.marcarError(sesion.id, "error_interno", sistema.reloj.instant())
+        sistema.reloj.adelantar(Duration.ofHours(3))
+        // El usuario reintenta ahora: el intento queda fechado ahora, no hace 3 horas.
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant()))
+
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos())
+        assertEquals(EstadoReporte.GENERANDO, reporteDe(sesion).estado)
+    }
+
+    @Test
+    fun `un intento interrumpido no cuenta para el maximo de reintentos`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        repeat(2) {
+            sistema.reportesRepo.marcarError(sesion.id, "error_interno", sistema.reloj.instant())
+            sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant())
+        }
+        assertEquals(3, reporteDe(sesion).intentos, "el tercer intento se cortó por una caída")
+        sistema.reloj.adelantar(Duration.ofMinutes(11))
+        sistema.reporte.rescatarInterrumpidos()
+
+        assertEquals(2, reporteDe(sesion).intentos)
+        sistema.reporte.reintentar(ana, sesion.id) // no responde reintentos_agotados
+        assertEquals(EstadoReporte.LISTO, esperarFin(sesion.id).estado)
+    }
+
+    @Test
+    fun `el rescate crea el reporte de una entrevista finalizada que se quedo sin el`() = runBlocking<Unit> {
+        val antigua = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofHours(25))
+        val huerfana = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofMinutes(6))
+        val reciente = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofMinutes(5))
+        val enCurso = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+
+        assertEquals(1, sistema.reporte.rescatarInterrumpidos())
+
+        val rescatado = reporteDe(huerfana)
+        assertEquals(EstadoReporte.ERROR, rescatado.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, rescatado.errorDetalle)
+        assertEquals(0, rescatado.intentos)
+        listOf(antigua, reciente).forEach { assertNull(sistema.reportesRepo.buscarPorSesion(it.id), "fuera de la ventana") }
+        assertNull(sistema.reportesRepo.buscarPorSesion(enCurso.id), "una entrevista en curso no se toca")
+    }
+
+    @Test
+    fun `el rescate no toca reportes terminados`() = runBlocking<Unit> {
+        val lista = entrevistaFinalizada().also { generar(it) }
+        val conError = entrevistaFinalizada().also { tomado(it) }
+        sistema.reportesRepo.marcarError(conError.id, "error_interno", sistema.reloj.instant())
+        sistema.reloj.adelantar(Duration.ofHours(1))
+
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos())
+        assertEquals(EstadoReporte.LISTO, reporteDe(lista).estado)
+        assertEquals("error_interno", reporteDe(conError).errorDetalle)
     }
 
     // ---------- Errores y reintentos ----------

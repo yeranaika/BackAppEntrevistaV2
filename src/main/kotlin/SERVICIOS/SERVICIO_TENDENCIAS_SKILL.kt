@@ -12,13 +12,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toKotlinDuration
 import java.time.LocalDateTime
 
@@ -114,6 +117,11 @@ class TareaSincronizacionMercado(
                 }
             }
         }
+    }
+
+    /** Para la tarea y espera (con tope) a que termine una sincronización en curso. Se llama en ApplicationStopping (D20). */
+    suspend fun detener() {
+        withTimeoutOrNull(5.seconds) { trabajo?.cancelAndJoin() }
     }
 
     override fun close() {

@@ -3,12 +3,14 @@ package SERVICIOS
 import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import CONFIGURACION.HISTORIAL_PRUEBAS_LIMITE
 import CONFIGURACION.INTENTOS_MAXIMOS_REPORTE
+import CONFIGURACION.LIMITE_RESCATE_SESIONES
 import CONFIGURACION.PESO_PUNTAJE_BLANDO
 import CONFIGURACION.PESO_PUNTAJE_CORPORAL
 import CONFIGURACION.PESO_PUNTAJE_TECNICO
 import CONFIGURACION.PUNTOS_PROGRESO_LIMITE
 import CONFIGURACION.UMBRAL_FORTALEZA
 import CONFIGURACION.UMBRAL_NIVEL_LOGRADO
+import CONFIGURACION.VENTANA_RESCATE_SESIONES
 import CONFIGURACION.VIGENCIA_RESERVA_IA
 import CONFIGURACION.ZONA_CORTE_CUOTA_IA
 import ERRORES.ErrorAplicacion
@@ -40,7 +42,11 @@ import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -102,7 +108,8 @@ class ServicioReporteEntrevista(
     /** Se llama al finalizar la entrevista (ya en segundo plano). */
     override suspend fun procesar(sesion: SesionEntrevista) {
         reportes.crearPendiente(sesion.id, reloj.instant())
-        if (reportes.tomarParaGenerar(sesion.id, INTENTOS_MAXIMOS_REPORTE)) generar(sesion.id)
+        val intento = UUID.randomUUID()
+        if (reportes.tomarParaGenerar(sesion.id, INTENTOS_MAXIMOS_REPORTE, reloj.instant(), intento)) generar(sesion.id, intento)
     }
 
     /** El reporte de una entrevista propia y finalizada. Si todavía no existe, se informa como "generando". */
@@ -121,10 +128,11 @@ class ServicioReporteEntrevista(
         if (actual.intentos >= INTENTOS_MAXIMOS_REPORTE) {
             throw ErrorConflicto("reintentos_agotados", "Se alcanzó el máximo de $INTENTOS_MAXIMOS_REPORTE intentos para este reporte")
         }
-        if (!reportes.tomarParaGenerar(sesionId, INTENTOS_MAXIMOS_REPORTE)) {
+        val intento = UUID.randomUUID()
+        if (!reportes.tomarParaGenerar(sesionId, INTENTOS_MAXIMOS_REPORTE, reloj.instant(), intento)) {
             throw ErrorConflicto("reporte_no_reintentable", "El reporte ya se está generando")
         }
-        tareasSegundoPlano.launch { generar(sesionId) }
+        tareasSegundoPlano.launch { generar(sesionId, intento) }
         return reportes.buscarPorSesion(sesionId)!!
     }
 
@@ -140,17 +148,34 @@ class ServicioReporteEntrevista(
 
     // ---------- Generación ----------
 
-    /** Nunca lanza: si algo falla, el reporte queda en error con un código (sin detalles internos). */
-    private suspend fun generar(sesionId: UUID) {
+    /**
+     * Si algo falla, el reporte queda en error con un código (sin detalles internos). Solo lanza la cancelación por
+     * apagado, y antes deja el reporte reintentable (D20). Todas sus escrituras van ligadas a [intento].
+     */
+    private suspend fun generar(sesionId: UUID, intento: UUID) {
         try {
             val sesion = sesiones.buscar(sesionId) ?: return
             val resultado = calcular(sesion)
-            reportes.guardarResultado(sesionId, resultado)
+            if (!reportes.guardarResultado(sesionId, resultado, intento)) {
+                log.warn("El reporte de la entrevista {} ya no estaba en generación (se dio por interrumpido): no se guarda", sesionId)
+                return
+            }
             acumularNiveles(sesion, resultado.detalles)
         } catch (e: Exception) {
+            // Apagado del servidor (no un timeout interno, que llega con la corrutina todavía activa): queda reintentable.
+            if (e is CancellationException && !currentCoroutineContext().isActive) {
+                log.warn("Reporte de la entrevista {} interrumpido por el apagado: queda reintentable", sesionId)
+                // NonCancellable para poder escribir aunque el trabajo esté cancelado; la BD sigue abierta porque esto
+                // corre durante ApplicationStopping. Si no se puede, lo deja reintentable el rescate.
+                withContext(NonCancellable) {
+                    runCatching { reportes.marcarInterrumpido(sesionId, reloj.instant(), intento) }
+                        .onFailure { log.warn("No se pudo marcar el reporte {} como interrumpido; lo hará el rescate", sesionId, it) }
+                }
+                throw e
+            }
             log.error("No se pudo generar el reporte de la entrevista {}", sesionId, e)
             val codigo = (e as? ErrorAplicacion)?.codigo ?: "error_interno"
-            runCatching { reportes.marcarError(sesionId, codigo, reloj.instant()) }
+            runCatching { reportes.marcarError(sesionId, codigo, reloj.instant(), intento) }
                 .onFailure { log.error("Tampoco se pudo marcar el reporte {} con error", sesionId, it) }
         }
     }
@@ -158,8 +183,28 @@ class ServicioReporteEntrevista(
     /** Si falla, el reporte igual queda listo: el puntaje por skill se puede volver a acumular en la próxima entrevista. */
     private suspend fun acumularNiveles(sesion: SesionEntrevista, detalles: List<DetalleSkillReporte>) {
         val evaluaciones = detalles.mapNotNull { d -> d.skillId?.let { EvaluacionNivelSkill(it, d.puntaje, nivel = null) } }
-        runCatching { niveles.acumular(sesion.usuarioId, evaluaciones, reloj.instant()) }
-            .onFailure { log.error("No se pudo acumular el nivel por skill de la entrevista {}", sesion.id, it) }
+        try {
+            niveles.acumular(sesion.usuarioId, evaluaciones, reloj.instant())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error("No se pudo acumular el nivel por skill de la entrevista {}", sesion.id, e)
+        }
+    }
+
+    /**
+     * Pasa a 'error' reintentable lo que un apagado sin aviso (SIGKILL, caída) dejó a medias (D20): reportes en
+     * 'generando' tomados hace más de [VIGENCIA_RESERVA_IA] y entrevistas finalizadas sin reporte. Lo llama
+     * TareaRescateReportes al arrancar y cada pocos minutos. No regenera nada (no gasta IA sin que el usuario lo pida).
+     */
+    suspend fun rescatarInterrumpidos(): Int {
+        val ahora = reloj.instant()
+        return reportes.rescatarInterrumpidos(
+            limite = ahora.minus(VIGENCIA_RESERVA_IA),
+            desdeSesiones = ahora.minus(VENTANA_RESCATE_SESIONES),
+            fecha = ahora,
+            maximoSesiones = LIMITE_RESCATE_SESIONES
+        ).also { if (it > 0) log.warn("Se rescataron {} reportes interrumpidos: quedan en error, reintentables", it) }
     }
 
     private suspend fun calcular(sesion: SesionEntrevista): ResultadoReporte {
