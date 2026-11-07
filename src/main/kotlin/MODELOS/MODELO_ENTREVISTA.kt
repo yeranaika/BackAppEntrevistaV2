@@ -17,8 +17,13 @@ enum class EstadoSesionEntrevista(val valorBd: String) {
     }
 }
 
-/** Expresiones que admite metrica_video.expresion_dominante. */
-val EXPRESIONES_VALIDAS = setOf("seguro", "nervioso", "distraido", "neutral", "confuso")
+/**
+ * Gestos que se guardan de una métrica de video: solo conductas OBSERVABLES (RNF10, D22). Es la misma lista que
+ * GESTOS_PERMITIDOS de la app Android; cualquier otra clave (una emoción, un blendshape crudo) se descarta.
+ */
+val GESTOS_OBSERVABLES = setOf(
+    "toca_cara", "manos_visibles", "gesticula_manos", "movimiento_cabeza", "cabeza_inclinada", "mirada_fuera", "rostro_visible"
+)
 
 /** Opción de una pregunta tal como estaba al armar la sesión (se guarda en opciones_snap). */
 @Serializable
@@ -89,8 +94,7 @@ data class MetricaVideo(
     val contactoVisual: BigDecimal?,
     val postura: BigDecimal?,
     val confianza: BigDecimal?,
-    val gestos: JsonObject?,
-    val expresionDominante: String?
+    val gestos: JsonObject?
 )
 
 /** Resumen para el historial (sin las preguntas). */

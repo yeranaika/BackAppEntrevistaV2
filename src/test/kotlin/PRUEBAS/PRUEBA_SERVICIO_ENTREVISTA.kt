@@ -28,6 +28,9 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Duration
 import java.util.UUID
 import kotlin.test.Test
@@ -344,8 +347,8 @@ class PruebaServicioEntrevista {
 
     // ---------- Métricas de video ----------
 
-    private fun metrica(ms: Long, contacto: String? = "80.5", expresion: String? = "seguro") =
-        MetricaVideo(ms, contacto?.let(::BigDecimal), BigDecimal("70"), BigDecimal("65.25"), null, expresion)
+    private fun metrica(ms: Long, contacto: String? = "80.5", gestos: JsonObject? = null) =
+        MetricaVideo(ms, contacto?.let(::BigDecimal), BigDecimal("70"), BigDecimal("65.25"), gestos)
 
     @Test
     fun `las metricas se guardan en lote y se validan`() = runBlocking<Unit> {
@@ -358,12 +361,29 @@ class PruebaServicioEntrevista {
         fallaCon<ErrorValidacion>("lote_invalido") { servicio.registrarMetricas(ana, sesion.id, emptyList()) }
         fallaCon<ErrorValidacion>("lote_invalido") { servicio.registrarMetricas(ana, sesion.id, (0..300).map { metrica(it.toLong()) }) }
         fallaCon<ErrorValidacion>("metrica_fuera_de_rango") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1, contacto = "100.01"))) }
-        fallaCon<ErrorValidacion>("expresion_invalida") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1, expresion = "feliz"))) }
         fallaCon<ErrorValidacion>("metrica_invalida") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(-1))) }
 
         servicio.cancelar(ana, sesion.id)
         fallaCon<ErrorConflicto>("entrevista_no_activa") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1))) }
         assertEquals(30, transaction { TablaMetricaVideo.selectAll().count() }, "los lotes rechazados no guardan nada")
+    }
+
+    @Test
+    fun `solo se guardan gestos observables (RNF10)`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral()
+        val sesion = iniciar()
+        val gestos = buildJsonObject {
+            put("toca_cara", 1.0)
+            put("mirada_fuera", 0.25)
+            put("nervioso", 0.8)
+            put("sonrisa", 1.0)
+        }
+        servicio.registrarMetricas(ana, sesion.id, listOf(metrica(0, gestos = gestos), metrica(500, gestos = buildJsonObject { put("feliz", 1) })))
+
+        val guardados = transaction { TablaMetricaVideo.selectAll().orderBy(TablaMetricaVideo.timestampMs).map { it[TablaMetricaVideo.gestos] } }
+        assertEquals(setOf("toca_cara", "mirada_fuera"), guardados[0]!!.keys)
+        assertNull(guardados[1], "sin gestos observables queda null")
+        assertTrue(transaction { TablaMetricaVideo.selectAll().all { it[TablaMetricaVideo.expresionDominante] == null } })
     }
 
     @Test

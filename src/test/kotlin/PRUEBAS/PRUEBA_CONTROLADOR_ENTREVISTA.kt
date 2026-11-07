@@ -99,7 +99,7 @@ class PruebaControladorEntrevista {
         assertEquals(HttpStatusCode.NoContent, enviar("GET", "$base/$id/siguiente", token = ana).status)
 
         val metricas = """{"metricas":[{"timestampMs":0,"contactoVisual":80.5,"postura":70,"confianza":65,"expresion":"Seguro"},
-                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral"}]}"""
+                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral"}]}""" // expresion se ignora (D22)
         val lote = enviar("POST", "$base/$id/metricas", metricas, ana)
         assertEquals(HttpStatusCode.Created, lote.status)
         assertEquals("2", lote.objeto().texto("insertadas"))

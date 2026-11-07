@@ -16,7 +16,7 @@ object TablaReporteEntrevista : Table("reporte_entrevista") {
     val puntajeGlobal = decimal("puntaje_global", 5, 2).default(java.math.BigDecimal.ZERO)
     val puntajeTecnico = decimal("puntaje_tecnico", 5, 2).default(java.math.BigDecimal.ZERO)
     val puntajeBlando = decimal("puntaje_blando", 5, 2).default(java.math.BigDecimal.ZERO)
-    val puntajeLenguajeCorporal = decimal("puntaje_lenguaje_corporal", 5, 2).default(java.math.BigDecimal.ZERO)
+    val puntajeLenguajeCorporal = decimal("puntaje_lenguaje_corporal", 5, 2).nullable() // null = sin medir (D22)
     val fortalezas = jsonb("fortalezas", Json, listaDeTextos).default(emptyList())
     val areasMejora = jsonb("areas_mejora", Json, listaDeTextos).default(emptyList())
     val recomendaciones = jsonb("recomendaciones_skills", Json, ListSerializer(RecomendacionSkill.serializer())).default(emptyList())

@@ -40,7 +40,7 @@ cd src/DB && docker compose up -d        # primera vez: crea el esquema y carga 
 ```
 Si la BD ya existía de antes, aplicar las migraciones pendientes (son idempotentes):
 ```bash
-for m in migrations/0{14,15,16,17,18,19,20}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
+for m in migrations/0{14,15,16,17,18,19,20,21}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
 ```
 
 ## 3. Ejecutar

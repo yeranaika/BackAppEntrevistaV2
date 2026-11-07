@@ -855,7 +855,7 @@ En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https e
 
 `POST /api/v1/entrevistas/{{sesionId}}/metricas` · Usuario · responde `201`
 
-Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0).
+Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible).
 
 ```json
 {
@@ -863,19 +863,19 @@ Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|
     {
       "timestampMs": 0,
       "contactoVisual": 80.5,
-      "postura": 70,
-      "confianza": 65,
-      "expresion": "seguro"
+      "postura": 70
     },
     {
       "timestampMs": 500,
       "contactoVisual": 78,
       "postura": 72,
-      "confianza": 66,
       "gestos": {
-        "toca_cara": false
-      },
-      "expresion": "neutral"
+        "toca_cara": 0,
+        "mirada_fuera": 0.25
+      }
+    },
+    {
+      "timestampMs": 1000
     }
   ]
 }
@@ -1384,7 +1384,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 139 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 138 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1414,7 +1414,6 @@ Los 139 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `estado_invalido` | Estado debe ser pendiente, aprobada o rechazada |
 | 400 | `etiqueta_invalida` | label no puede superar … caracteres |
 | 400 | `expiracion_invalida` | expires_at debe venir en ISO-8601 (ej: 2026-01-31T23:59:59Z) |
-| 400 | `expresion_invalida` | La expresión debe ser una de: … |
 | 400 | `genero_invalido` | Género no válido |
 | 400 | `hora_invalida` | La hora debe tener formato HH:mm (00:00 a 23:59) |
 | 400 | `id_invalido` | Formato de UUID inválido |

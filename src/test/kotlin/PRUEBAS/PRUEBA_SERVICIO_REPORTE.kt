@@ -138,7 +138,7 @@ class PruebaServicioReporte {
         assertNull(reporte.uso)
         assertTrue(reporte.puntajeTecnico.toDouble() > 90, "alternativas correctas y abiertas iguales a la ideal: ${reporte.puntajeTecnico}")
         assertTrue(reporte.puntajeBlando.toDouble() < 30, "\"no sé\" en las blandas: ${reporte.puntajeBlando}")
-        assertEquals(0, BigDecimal.ZERO.compareTo(reporte.puntajeLenguajeCorporal), "sin métricas de video")
+        assertNull(reporte.puntajeLenguajeCorporal, "sin métricas de video no se midió: null, no 0")
         val esperado = (reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3) / 0.8
         assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02, "sin video el peso se reparte entre técnico y blando")
 
@@ -187,18 +187,34 @@ class PruebaServicioReporte {
     @Test
     fun `las metricas de video dan el puntaje corporal y entran al global`() = runBlocking<Unit> {
         val sesion = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
-        val metrica = { ms: Long, expresion: String -> MetricaVideo(ms, BigDecimal("40"), BigDecimal("50"), BigDecimal("60"), null, expresion) }
-        sistema.entrevista.registrarMetricas(ana, sesion.id, listOf(metrica(0, "nervioso"), metrica(500, "nervioso"), metrica(1000, "seguro")))
+        val metrica = { ms: Long -> MetricaVideo(ms, BigDecimal("40"), BigDecimal("50"), BigDecimal("60"), null) }
+        sistema.entrevista.registrarMetricas(ana, sesion.id, listOf(metrica(0), metrica(500), metrica(1000)))
         val p = sesion.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
         val finalizada = sistema.entrevista.responderYFinalizar(ana, sesion.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id)))
 
         val reporte = generar(finalizada)
 
-        assertEquals(0, BigDecimal(50).compareTo(reporte.puntajeLenguajeCorporal))
+        assertEquals(0, BigDecimal(50).compareTo(reporte.puntajeLenguajeCorporal!!))
         val esperado = reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3 + 50 * 0.2
         assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02)
         assertTrue(reporte.areasMejora.any { it.contains("contacto visual") })
-        assertTrue(reporte.areasMejora.any { it.contains("nervioso") })
+        assertTrue(reporte.areasMejora.none { it.contains("Se te notó") }, "nunca se infieren emociones (RNF10)")
+    }
+
+    @Test
+    fun `ventanas sin evidencia no dan lenguaje corporal 0 sino sin medir`() = runBlocking<Unit> {
+        val sesion = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+        // La app manda ventanas vacías cuando el detector no está seguro de lo que vio.
+        sistema.entrevista.registrarMetricas(ana, sesion.id, (0 until 5).map { MetricaVideo(it * 500L, null, null, null, null) })
+        val p = sesion.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
+        val finalizada = sistema.entrevista.responderYFinalizar(ana, sesion.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id)))
+
+        val reporte = generar(finalizada)
+
+        assertNull(reporte.puntajeLenguajeCorporal)
+        val esperado = (reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3) / 0.8
+        assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02, "el peso corporal se reparte")
+        assertTrue(reporte.areasMejora.none { it.contains("contacto visual") })
     }
 
     // ---------- IA (premium) ----------

@@ -2678,10 +2678,10 @@
                 "metricas"
               ]
             },
-            "description": "Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0).",
+            "description": "Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"metricas\": [\n    {\n      \"timestampMs\": 0,\n      \"contactoVisual\": 80.5,\n      \"postura\": 70,\n      \"confianza\": 65,\n      \"expresion\": \"seguro\"\n    },\n    {\n      \"timestampMs\": 500,\n      \"contactoVisual\": 78,\n      \"postura\": 72,\n      \"confianza\": 66,\n      \"gestos\": {\n        \"toca_cara\": false\n      },\n      \"expresion\": \"neutral\"\n    }\n  ]\n}",
+              "raw": "{\n  \"metricas\": [\n    {\n      \"timestampMs\": 0,\n      \"contactoVisual\": 80.5,\n      \"postura\": 70\n    },\n    {\n      \"timestampMs\": 500,\n      \"contactoVisual\": 78,\n      \"postura\": 72,\n      \"gestos\": {\n        \"toca_cara\": 0,\n        \"mirada_fuera\": 0.25\n      }\n    },\n    {\n      \"timestampMs\": 1000\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

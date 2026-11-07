@@ -100,7 +100,7 @@ decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes 
 | `APAGADO_ESPERA_TAREAS_SEGUNDOS` | Al apagar, cuánto se espera a los reportes y correos en curso (por defecto 150; máx. 600). Debe caber en el drenado de Railway (`railway.json`: 200 s). |
 | `CABECERA_IP_CLIENTE` | Cabecera con la IP real del cliente puesta por el proxy (en Railway `X-Real-IP`, tras la prueba de humo). Vacía = IP de la conexión. |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `020` (idempotentes) sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `021` (idempotentes) sobre una BD existente:
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
 ```

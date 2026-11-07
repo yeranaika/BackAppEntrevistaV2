@@ -70,7 +70,6 @@ data class ProgresoSkill(
 private const val NOMBRE_TECNICAS_GENERALES = "Conocimientos técnicos generales"
 private const val NOMBRE_BLANDAS_GENERALES = "Habilidades blandas"
 private const val ITEMS_MAXIMOS_REPORTE = 6
-private val EXPRESIONES_A_TRABAJAR = setOf("nervioso", "distraido", "confuso")
 
 /**
  * Reporte de feedback de la entrevista (Fase 7). Se genera en segundo plano al finalizar:
@@ -235,9 +234,10 @@ class ServicioReporteEntrevista(
             puntajeGlobal = decimal(global(tecnico, blando, corporal)),
             puntajeTecnico = decimal(tecnico ?: 0.0),
             puntajeBlando = decimal(blando ?: 0.0),
-            puntajeLenguajeCorporal = decimal(corporal ?: 0.0),
+            // null si no hubo video o ninguna ventana tuvo evidencia: "sin medir", no un 0 de la persona (D22).
+            puntajeLenguajeCorporal = corporal?.let(::decimal),
             fortalezas = fortalezas(evaluacion, detalles, blando, corporal),
-            areasMejora = areasMejora(evaluacion, sesion, detalles, corporal, video, sinTranscripcion.size),
+            areasMejora = areasMejora(evaluacion, sesion, detalles, corporal, sinTranscripcion.size),
             recomendaciones = recomendaciones,
             resumen = evaluacion.resumen ?: resumen(sesion, global(tecnico, blando, corporal), detalles),
             modo = evaluacion.modo,
@@ -349,7 +349,6 @@ class ServicioReporteEntrevista(
         sesion: SesionEntrevista,
         detalles: List<DetalleSkillReporte>,
         corporal: Double?,
-        video: ResumenMetricasVideo?,
         sinTranscripcion: Int
     ): List<String> {
         val porReglas = detalles.filter { it.puntaje.toDouble() < UMBRAL_NIVEL_LOGRADO }.map { "Reforzar ${it.nombre}" }
@@ -357,8 +356,6 @@ class ServicioReporteEntrevista(
         val siempre = listOfNotNull(
             "Respondiste ${sesion.respondidas} de ${sesion.preguntas.size} preguntas: intenta responder todas".takeIf { sinResponder > 0 },
             "Trabaja el contacto visual y la postura frente a la cámara".takeIf { corporal != null && corporal < UMBRAL_NIVEL_LOGRADO },
-            "Se te notó ${video?.expresionMasFrecuente} durante buena parte de la entrevista: practica para responder con más calma"
-                .takeIf { video?.expresionMasFrecuente in EXPRESIONES_A_TRABAJAR },
             "$sinTranscripcion respuesta(s) en video no tenían transcripción y no se pudieron evaluar".takeIf { sinTranscripcion > 0 }
         )
         return (evaluacion.areasMejora.ifEmpty { porReglas } + siempre).distinct().take(ITEMS_MAXIMOS_REPORTE)

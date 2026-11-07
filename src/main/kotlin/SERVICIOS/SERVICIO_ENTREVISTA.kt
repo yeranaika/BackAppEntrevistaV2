@@ -14,7 +14,8 @@ import CONFIGURACION.TAMANO_PAGINA_ENTREVISTAS_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
-import MODELOS.EXPRESIONES_VALIDAS
+import MODELOS.GESTOS_OBSERVABLES
+import kotlinx.serialization.json.JsonObject
 import MODELOS.EstadoSesionEntrevista
 import MODELOS.MetricaVideo
 import MODELOS.NuevaSesionEntrevista
@@ -145,7 +146,7 @@ class ServicioEntrevista(
         }
         lote.forEach(::validarMetrica)
         activa(usuarioId, sesionId)
-        return metricas.insertarLote(sesionId, lote)
+        return metricas.insertarLote(sesionId, lote.map { it.copy(gestos = soloGestosObservables(it.gestos)) })
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */
@@ -242,10 +243,11 @@ class ServicioEntrevista(
         val fueraDeRango = listOfNotNull(metrica.contactoVisual, metrica.postura, metrica.confianza)
             .any { it < BigDecimal.ZERO || it > BigDecimal(PUNTAJE_MAXIMO_RESPUESTA) }
         if (fueraDeRango) throw ErrorValidacion("metrica_fuera_de_rango", "Los puntajes de video van de 0 a 100")
-        if (metrica.expresionDominante != null && metrica.expresionDominante !in EXPRESIONES_VALIDAS) {
-            throw ErrorValidacion("expresion_invalida", "La expresión debe ser una de: ${EXPRESIONES_VALIDAS.joinToString()}")
-        }
     }
+
+    /** Solo las claves de [GESTOS_OBSERVABLES] (RNF10); null si no queda ninguna. */
+    private fun soloGestosObservables(gestos: JsonObject?): JsonObject? =
+        gestos?.filterKeys { it in GESTOS_OBSERVABLES }?.takeIf { it.isNotEmpty() }?.let(::JsonObject)
 
     private fun entrevistaNoActiva() = ErrorConflicto("entrevista_no_activa", "La entrevista ya fue finalizada o cancelada")
     private fun sinRespuestas() = ErrorValidacion("sin_respuestas", "Responde al menos una pregunta")

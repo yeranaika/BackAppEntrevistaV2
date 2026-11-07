@@ -108,8 +108,8 @@ private fun MetricaVideoEntrada.aModelo() = MetricaVideo(
     contactoVisual = contactoVisual?.let(::aDecimal),
     postura = postura?.let(::aDecimal),
     confianza = confianza?.let(::aDecimal),
-    gestos = gestos,
-    expresionDominante = expresion?.trim()?.lowercase()
+    // `expresion` se acepta por compatibilidad pero se ignora: no se infieren ni se guardan emociones (RNF10, D22).
+    gestos = gestos
 )
 
 /** Las columnas son NUMERIC(5,2). */

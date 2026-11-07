@@ -291,8 +291,7 @@ data class ResumenMetricasVideo(
     val cantidad: Long,
     val contactoVisual: BigDecimal?,
     val postura: BigDecimal?,
-    val confianza: BigDecimal?,
-    val expresionMasFrecuente: String?
+    val confianza: BigDecimal?
 )
 
 class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
@@ -321,7 +320,6 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             this[TablaMetricaVideo.postura] = metrica.postura
             this[TablaMetricaVideo.confianza] = metrica.confianza
             this[TablaMetricaVideo.gestos] = metrica.gestos
-            this[TablaMetricaVideo.expresionDominante] = metrica.expresionDominante
         }
         nuevas.size
     }
@@ -335,13 +333,6 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             .where { TablaMetricaVideo.sesionId eq sesionId }
             .single()
         if (fila[cantidad] == 0L) return@transaccion null
-        val conteoExpresion = TablaMetricaVideo.expresionDominante.count()
-        val expresion = TablaMetricaVideo.select(TablaMetricaVideo.expresionDominante, conteoExpresion)
-            .where { (TablaMetricaVideo.sesionId eq sesionId) and TablaMetricaVideo.expresionDominante.isNotNull() }
-            .groupBy(TablaMetricaVideo.expresionDominante)
-            .orderBy(conteoExpresion to SortOrder.DESC)
-            .limit(1)
-            .firstOrNull()?.get(TablaMetricaVideo.expresionDominante)
-        ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza], expresion)
+        ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza])
     }
 }

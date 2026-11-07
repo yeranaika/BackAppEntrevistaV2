@@ -140,3 +140,19 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Consecuencias**: `POST /metricas` sigue respondiendo `201`; `insertadas` cuenta solo las nuevas (0 si el lote ya
   estaba). Un cliente que mande dos métricas distintas con el mismo `timestampMs` pierde la segunda. **Migración
   020**: aplicarla antes de desplegar.
+
+## D22 · Métricas de video sin emociones y lenguaje corporal «sin medir» (2026-11)
+- **Contexto**: la app Android ya no envía emociones (RNF10) y filtra los gestos, pero el backend seguía aceptando
+  `expresion` (seguro, nervioso…) y escribía «Se te notó nervioso…» en el reporte: cualquier otro cliente podía
+  reintroducir la inferencia de emociones. Además, una entrevista sin video o en la que ninguna ventana tuvo evidencia
+  (la app manda ventanas vacías cuando el detector no está seguro) guardaba `puntaje_lenguaje_corporal = 0` y el
+  reporte mostraba «Lenguaje corporal 0/100» por un problema de la cámara y no de la persona.
+- **Decisión**: (1) `expresion` se acepta por compatibilidad pero se ignora; se quita la frase del reporte y el
+  cálculo de la expresión más frecuente. (2) De `gestos` solo se guardan las claves de `GESTOS_OBSERVABLES` (la misma
+  lista que `GESTOS_PERMITIDOS` en la app); el resto se descarta sin error. (3) `puntajeLenguajeCorporal` es `null`
+  cuando no se midió; el peso del 20 % se reparte como ya se hacía.
+- **Por qué**: ignorar en vez de rechazar no rompe a clientes viejos y cierra la puerta a guardar emociones. `null`
+  ya era el contrato de la vista (`puntajeLenguajeCorporal: Double?`) y Android ya oculta la barra cuando es `null`.
+- **Consecuencias**: `confianza` sigue existiendo como puntaje de la persona, pero la app la manda en `null` (la
+  confianza del detector no es eso). **Migración 021**: columna nullable sin default, reportes sin métricas con datos
+  pasan de 0 a `null` y se borran las expresiones guardadas; aplicarla **antes** de desplegar este código.

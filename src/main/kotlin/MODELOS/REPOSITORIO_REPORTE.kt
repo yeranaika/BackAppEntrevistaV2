@@ -135,7 +135,7 @@ class RepositorioReporteExposed : RepositorioReporte {
                 it[puntajeGlobal] = escala(resultado.puntajeGlobal)
                 it[puntajeTecnico] = escala(resultado.puntajeTecnico)
                 it[puntajeBlando] = escala(resultado.puntajeBlando)
-                it[puntajeLenguajeCorporal] = escala(resultado.puntajeLenguajeCorporal)
+                it[puntajeLenguajeCorporal] = resultado.puntajeLenguajeCorporal?.let(::escala)
                 it[fortalezas] = resultado.fortalezas
                 it[areasMejora] = resultado.areasMejora
                 it[recomendaciones] = resultado.recomendaciones

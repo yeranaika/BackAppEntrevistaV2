@@ -34,7 +34,7 @@ data class MetricaVideoEntrada(
     val postura: Double? = null,
     val confianza: Double? = null,
     val gestos: JsonObject? = null,
-    /** seguro | nervioso | distraido | neutral | confuso */
+    /** Obsoleto: se acepta por compatibilidad y se ignora (RNF10: no se infieren emociones, D22). */
     val expresion: String? = null
 )
 
