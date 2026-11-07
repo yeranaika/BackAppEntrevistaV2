@@ -36,6 +36,10 @@ fun ApplicationCall.uuidDeConsulta(nombre: String): UUID? {
 /** Query param de fecha opcional en formato AAAA-MM-DD (ej: ?desde=2026-11-01); responde 400 con otro formato. */
 fun ApplicationCall.fechaDeConsulta(nombre: String): LocalDate? {
     val valor = request.queryParameters[nombre]?.takeIf { it.isNotBlank() } ?: return null
-    return runCatching { LocalDate.parse(valor.trim()) }
-        .getOrElse { throw ErrorValidacion("parametro_invalido", "El parámetro $nombre debe ser una fecha AAAA-MM-DD") }
+    val fecha = runCatching { LocalDate.parse(valor.trim()) }.getOrNull()
+    // ISO acepta años extremos (+999999999) que después desbordan los cálculos: solo años razonables.
+    if (fecha == null || fecha.year !in 2000..2100) {
+        throw ErrorValidacion("parametro_invalido", "El parámetro $nombre debe ser una fecha AAAA-MM-DD")
+    }
+    return fecha
 }

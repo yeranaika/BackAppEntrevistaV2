@@ -35,7 +35,8 @@ interface LectorCostosIa {
 class LectorCostosIaExposed : LectorCostosIa {
 
     override suspend fun usosEntre(desde: Instant, hasta: Instant): List<UsoIaRegistrado> = transaccion {
-        // Reportes evaluados con IA: solo guardarResultado escribe el modelo, y solo cuando la IA respondió.
+        // Reportes en los que el LLM respondió (y se pagó): modo 'ia' si la evaluación sirvió; modo freemium si respondió
+        // algo inválido y se usó el respaldo (fallida). Si el LLM no llegó a responder, no hay modelo ni costo.
         val reportes = TablaReporteEntrevista.selectAll()
             .where {
                 TablaReporteEntrevista.modeloLlm.isNotNull() and
@@ -50,7 +51,7 @@ class LectorCostosIaExposed : LectorCostosIa {
                     tokensEntrada = it[TablaReporteEntrevista.tokensEntrada],
                     tokensSalida = it[TablaReporteEntrevista.tokensSalida],
                     costoUsd = it[TablaReporteEntrevista.costoUsd]?.toDouble(),
-                    exitoso = true
+                    exitoso = it[TablaReporteEntrevista.modoEvaluacion] == ModoEvaluacion.IA.valorBd
                 )
             }
         val desdeConZona = OffsetDateTime.ofInstant(desde, ZoneOffset.UTC)

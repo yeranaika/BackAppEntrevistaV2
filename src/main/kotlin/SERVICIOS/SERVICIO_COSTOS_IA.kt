@@ -89,7 +89,7 @@ class ServicioCostosIa(
     private fun gastoDe(uso: UsoIaRegistrado): GastoIa {
         val tokens = GastoIa(tokensEntrada = (uso.tokensEntrada ?: 0).toLong(), tokensSalida = (uso.tokensSalida ?: 0).toLong())
         if (uso.exitoso) return tokens.copy(usos = 1, costoUsd = BigDecimal.valueOf(uso.costoUsd ?: 0.0))
-        // Falló: si guardó su costo se usa ese; si no, se estima con los tokens que sí se pagaron.
+        // Falló (respondió algo inválido): si guardó su costo se usa ese; si no, se estima con los tokens que sí se pagaron.
         val estimado = if (uso.costoUsd == null) BigDecimal.valueOf(costoLlmUsd(uso.modelo, uso.tokensEntrada, uso.tokensSalida)) else BigDecimal.ZERO
         return tokens.copy(fallidas = 1, costoUsd = BigDecimal.valueOf(uso.costoUsd ?: 0.0) + estimado, costoEstimadoUsd = estimado)
     }

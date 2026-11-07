@@ -234,6 +234,19 @@ class PruebaServicioReporte {
     }
 
     @Test
+    fun `una respuesta invalida del LLM queda registrada como gasto aunque el reporte sea freemium`() {
+        sistema.premium.esPremium = true
+        val respondioMal = generar(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso("json_roto"))))
+        assertEquals(ModoEvaluacion.FREEMIUM, respondioMal.modo, "el usuario recibe el reporte freemium")
+        val uso = assertNotNull(respondioMal.uso, "pero los tokens que se pagaron quedan registrados")
+        assertEquals(10, uso.tokensEntrada)
+        assertEquals(0, usadasEnEnero(), "no descuenta del tope: no recibió IA")
+
+        val noRespondio = generar(entrevistaFinalizada(usuario = nuevoUsuario("beto@ejemplo.com")), servicioCon(ia(ProveedorEvaluacionFalso("caido"))))
+        assertNull(noRespondio.uso, "si el LLM no respondió no hubo gasto")
+    }
+
+    @Test
     fun `sin premium nunca se llama al LLM`() {
         val proveedor = ProveedorEvaluacionFalso()
         val reporte = generar(entrevistaFinalizada(), servicioCon(EvaluadorEntrevistaIa(proveedor, "gpt-4o-mini", sistema.evaluadorEntrevistaGratis)))

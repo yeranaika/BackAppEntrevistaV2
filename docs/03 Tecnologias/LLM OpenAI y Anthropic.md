@@ -27,8 +27,9 @@ respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se
   IA por mes calendario UTC (por defecto 30; `0` = sin IA). El cupo se reserva en la BD **antes** de llamar al LLM, así
   que dos reportes simultáneos no lo superan. Al llegar al tope el reporte sale con el motor freemium, sin error.
 - **Cuánto se gasta**: `GET /api/v1/admin/costos-ia` (solo admin) suma por día y por modelo lo registrado en
-  `reporte_entrevista` y `pregunta_generacion_ia`. Las llamadas que respondieron mal no guardan costo: se estima con
-  `costoLlmUsd` (si se agrega un modelo, cargar su precio ahí).
+  `reporte_entrevista` y `pregunta_generacion_ia`. Una evaluación de reporte que respondió mal guarda sus tokens y
+  costo aunque el reporte salga freemium (cuenta como `fallida`); una generación de preguntas fallida no guarda costo y
+  se estima con `costoLlmUsd` (si se agrega un modelo, cargar su precio ahí).
 - **Seguridad**: las respuestas del candidato van en el mensaje de usuario como JSON de datos; las instrucciones dicen
   explícitamente que ignore instrucciones dentro de las respuestas.
 

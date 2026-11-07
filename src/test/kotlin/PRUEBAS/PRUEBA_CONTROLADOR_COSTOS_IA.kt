@@ -48,7 +48,7 @@ class PruebaControladorCostosIa {
     }
 
     /** Un reporte de entrevista evaluado con IA, guardado por el flujo real del repositorio. */
-    private fun reporteConIa(fecha: String, costo: Double) = runBlocking {
+    private fun reporteConIa(fecha: String, costo: Double, modo: ModoEvaluacion = ModoEvaluacion.IA) = runBlocking {
         val sesion = UUID.randomUUID()
         val instante = Instant.parse(fecha)
         sistema.reportesRepo.crearPendiente(sesion, instante)
@@ -57,7 +57,7 @@ class PruebaControladorCostosIa {
             sesion,
             ResultadoReporte(
                 BigDecimal(80), BigDecimal(80), BigDecimal(80), BigDecimal.ZERO, emptyList(), emptyList(), emptyList(), "ok",
-                ModoEvaluacion.IA, UsoLlm("gpt-4o-mini", 1_000, 300, costo), emptyList(), emptyList(), instante
+                modo, UsoLlm("gpt-4o-mini", 1_000, 300, costo), emptyList(), emptyList(), instante
             )
         )
     }
@@ -92,6 +92,16 @@ class PruebaControladorCostosIa {
         assertEquals(1, usos.count { it.origen == OrigenUsoIa.REPORTE_ENTREVISTA })
         assertEquals(2, usos.count { it.origen == OrigenUsoIa.GENERACION_PREGUNTAS })
         assertEquals(1, usos.count { !it.exitoso && it.costoUsd == null }, "la llamada fallida llega sin costo, con sus tokens")
+    }
+
+    @Test
+    fun `una evaluacion de reporte que respondio mal cuenta como llamada fallida con su costo`() = runBlocking<Unit> {
+        reporteConIa("2026-11-02T10:00:00Z", 0.0003, modo = ModoEvaluacion.FREEMIUM) // el LLM respondió algo inválido
+        val resumen = SERVICIOS.ServicioCostosIa(LectorCostosIaExposed(), sistema.reloj)
+            .resumen(java.time.LocalDate.parse("2026-11-01"), java.time.LocalDate.parse("2026-11-30"))
+        assertEquals(0, resumen.reportes.usos)
+        assertEquals(1, resumen.reportes.fallidas)
+        assertEquals(0, BigDecimal("0.0003").compareTo(resumen.reportes.costoUsd), "su costo real, ya calculado al guardarlo")
     }
 
     @Test
@@ -145,5 +155,9 @@ class PruebaControladorCostosIa {
         assertEquals("parametro_invalido", pedir(admin, "?desde=01-11-2026").json()["error"]!!.jsonPrimitive.content)
         assertEquals("rango_invalido", pedir(admin, "?desde=2026-11-10&hasta=2026-11-01").json()["error"]!!.jsonPrimitive.content)
         assertEquals(HttpStatusCode.BadRequest, pedir(admin, "?desde=2026-01-01&hasta=2026-12-31").status)
+        // %2B es "+": ISO acepta años de 9 dígitos y el último día del calendario desborda al calcular el fin del rango.
+        val extrema = pedir(admin, "?desde=%2B999999999-12-30&hasta=%2B999999999-12-31")
+        assertEquals(HttpStatusCode.BadRequest, extrema.status, "nunca un 500")
+        assertEquals("parametro_invalido", extrema.json()["error"]!!.jsonPrimitive.content)
     }
 }

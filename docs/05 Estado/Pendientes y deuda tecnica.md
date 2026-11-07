@@ -33,7 +33,10 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. Falta mostrarlo en el panel web.
 - [x] `.env.example`: agregar `LIMITE_REGISTROS_POR_IP` y `LIMITE_RECUPERACIONES_POR_IP` (2026-11-06, con `CABECERA_IP_CLIENTE`).
 - [ ] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (campo opcional nuevo, coordinado con Android).
-- [ ] **Descontar del tope las llamadas pagadas que responden mal** (hoy no descuentan cupo; requiere registrar sus tokens).
+- [ ] **Descontar del tope las llamadas pagadas que responden mal**: desde 2026-11-06 sus tokens y costo quedan en el
+  reporte (modo freemium) y aparecen en `GET /api/v1/admin/costos-ia` como `fallidas`; falta decidir si descuentan cupo.
+- [ ] **Llamadas pagadas que no llegan a guardarse**: si el LLM ya respondió pero el intento se corta (apagado, rescate,
+  error posterior), su costo no queda registrado. Requiere una tabla de uso de IA por llamada.
 - [x] **IP del consentimiento** (2026-11-06, rama `feature/ip-consentimiento-y-limites`): `ip_origen` usa la misma IP
   que el límite por IP (`ipDelCliente()`, resuelta una vez por solicitud): sin DNS inverso y, con `CABECERA_IP_CLIENTE`,
   la del cliente y no la del proxy.
