@@ -1,6 +1,8 @@
 ﻿# Utilidades compartidas por las pruebas de punta a punta (E2E).
 # Se cargan con:  . "$PSScriptRoot/UTILIDAD_E2E.ps1"
 # Requieren PowerShell 7+, el backend corriendo y el contenedor de Postgres de src/DB/docker-compose.yml.
+# Sin Docker: definir E2E_PSQL con la ruta a psql.exe (ej. $env:E2E_PSQL = 'C:\ruta\pgsql\bin\psql.exe'); la fase 4
+# además necesita el contenedor de Redis para sus pruebas del límite por IP.
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -23,7 +25,13 @@ function Inicializar-E2E([string]$UrlBase, [string]$ContenedorBd) {
     Get-Content $archivoEnv | Where-Object { $_ -match '^\s*([A-Z_]+)\s*=\s*(.*)$' } |
         ForEach-Object { $variables[$Matches[1]] = $Matches[2].Trim() }
     $script:UsuarioBd = $variables['DB_USER']
+    $script:ClaveBd = $variables['DB_PASS']
     $script:NombreBd = ($variables['DB_URL'] -replace '^.*/', '') -replace '\?.*$', ''
+    # Host y puerto del DB_URL (jdbc:postgresql://host:puerto/bd), para usar un psql local en vez de Docker.
+    if ($variables['DB_URL'] -match '//([^:/]+)(?::(\d+))?/') {
+        $script:HostBd = $Matches[1]
+        $script:PuertoBd = if ($Matches[2]) { $Matches[2] } else { '5432' }
+    }
 
     try {
         $salud = Llamar-Api GET '/health'
@@ -76,8 +84,15 @@ function Llamar-ApiEnParalelo([System.Net.Http.HttpRequestMessage[]]$Solicitudes
     $tareas | ForEach-Object { Convertir-Respuesta $_.Result }
 }
 
+<# SQL directo a la BD. Por defecto con `docker exec` al contenedor; si la variable de entorno E2E_PSQL apunta a un
+   psql.exe (PostgreSQL sin Docker), usa ese psql con el host, puerto y clave del .env. #>
 function Ejecutar-Sql([string]$Sql) {
-    $salida = docker exec $script:ContenedorBd psql -U $script:UsuarioBd -d $script:NombreBd -tAc $Sql 2>&1
+    $salida = if ($env:E2E_PSQL) {
+        $env:PGPASSWORD = $script:ClaveBd
+        & $env:E2E_PSQL -h $script:HostBd -p $script:PuertoBd -U $script:UsuarioBd -d $script:NombreBd -tAc $Sql 2>&1
+    } else {
+        docker exec $script:ContenedorBd psql -U $script:UsuarioBd -d $script:NombreBd -tAc $Sql 2>&1
+    }
     if ($LASTEXITCODE -ne 0) { throw "SQL falló: $salida" }
     return ($salida | Out-String).Trim()
 }

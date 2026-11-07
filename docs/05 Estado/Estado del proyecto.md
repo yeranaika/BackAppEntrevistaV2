@@ -27,7 +27,7 @@ actualizado: 2026-11-06
 | Apagado ordenado | Espera con tope al apagar, reporte cortado reintentable y rescate periódico (D20) | `feature/apagado-ordenado` | (ver git log) | 323 pruebas · 13 mutaciones detectadas · revisión adversarial |
 | Costos de IA (admin) | `GET /api/v1/admin/costos-ia`: gasto por día y por modelo, con el estimado de las llamadas fallidas | `feature/costos-ia-admin` | (ver git log) | 337 pruebas · 8 mutaciones detectadas · revisión adversarial final del conjunto |
 | Métricas de video idempotentes | Un lote reenviado por la app no se duplica: una métrica por `timestampMs` de la sesión (D21, migración 020) | `feature/metricas-idempotentes` | (ver git log) | 338 pruebas |
-| Métricas sin emociones | `expresion` se ignora, gestos solo observables, lenguaje corporal `null` si no se midió (D22, migración 021) | `feature/metricas-idempotentes` | (ver git log) | 340 pruebas |
+| Métricas sin emociones | `expresion` se ignora, gestos solo observables, lenguaje corporal `null` si no se midió (D22, migración 021) | `feature/metricas-idempotentes` | (ver git log) | 340 pruebas · humo en Postgres 16 real 20/20 (2026-11-07) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
 
@@ -43,6 +43,12 @@ Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLA
 
 ## Base de datos local
 Migraciones aplicadas hasta **018** (con respaldo previo de cada una).
+
+**2026-11-07:** las migraciones 014–021 se probaron en PostgreSQL 16.15 real (sin Docker): sobre el esquema del primer
+commit (`21b065f`) se aplicaron dos veces seguidas sin errores, y el esquema resultante es idéntico al de
+`src/DB/BasedeDatos.EntrevistaApp.sql` (comparado con `pg_dump --schema-only`). Prueba de humo por HTTP contra esa BD:
+lotes reenviados, solapados y 6 envíos simultáneos del mismo lote sin duplicar; reporte sin emociones; lenguaje corporal
+`null` sin video o sin evidencia (20/20).
 
 ## Qué funciona hoy (resumen)
 Registro/login (correo y Google), perfil y onboarding, consentimientos, recordatorios, premium (códigos y Google Play),
