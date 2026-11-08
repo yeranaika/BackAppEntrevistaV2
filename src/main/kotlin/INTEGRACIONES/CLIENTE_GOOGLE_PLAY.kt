@@ -59,31 +59,65 @@ private data class SuscripcionGoogle(
     val cancelReason: Int? = null
 )
 
-private class FallaTemporalGoogle(estado: HttpStatusCode) : IOException("Google Play respondió ${estado.value}")
+/**
+ * Falla reintentable al hablar con Google (sigue siendo IOException para que PoliticaResiliencia reintente).
+ * Su mensaje nunca lleva la URL, que incluye el token de compra, y no adjunta la causa original: la política la
+ * envuelve en el 503 y el manejador de errores la escribe en los logs, donde el token no debe quedar.
+ */
+private class FallaTemporalGoogle(motivo: String) : IOException("Google Play $motivo")
 
-class ClienteGooglePlay(
-    private val config: ConfiguracionGooglePlay,
-    private val cliente: HttpClient = HttpClient(CIO) { install(HttpTimeout) { requestTimeoutMillis = TIMEOUT_GOOGLE_MS } }
+// Se valida al arrancar: una cuenta de servicio mal configurada debe impedir levantar, no fallar en un pago.
+private fun crearProveedorTokenDeAcceso(config: ConfiguracionGooglePlay): suspend () -> String {
+    val credenciales = GoogleCredentials
+        .fromStream(ByteArrayInputStream(Base64.getDecoder().decode(config.cuentaServicioJsonBase64.trim())))
+        .createScoped(ALCANCE_ANDROID_PUBLISHER)
+    val mutexCredenciales = Mutex()
+    return {
+        mutexCredenciales.withLock {
+            withContext(Dispatchers.IO) { credenciales.refreshIfExpired() }
+            credenciales.accessToken?.tokenValue ?: throw IOException("Google no entregó token de acceso")
+        }
+    }
+}
+
+/** El constructor interno permite probar el contrato HTTP con MockEngine sin credenciales reales de Google. */
+class ClienteGooglePlay internal constructor(
+    private val paquete: String,
+    private val cliente: HttpClient,
+    private val tokenDeAcceso: suspend () -> String
 ) : VerificadorCompraGoogle, AutoCloseable {
+
+    constructor(
+        config: ConfiguracionGooglePlay,
+        cliente: HttpClient = HttpClient(CIO) { install(HttpTimeout) { requestTimeoutMillis = TIMEOUT_GOOGLE_MS } }
+    ) : this(config.paquete, cliente, crearProveedorTokenDeAcceso(config))
 
     private val json = Json { ignoreUnknownKeys = true }
     private val politica = PoliticaResiliencia(nombre = "google_play", tiempoMaximo = 20.seconds, intentos = 3)
-    private val mutexCredenciales = Mutex()
-
-    // Se valida al arrancar: una cuenta de servicio mal configurada debe impedir levantar, no fallar en un pago.
-    private val credenciales: GoogleCredentials = GoogleCredentials
-        .fromStream(ByteArrayInputStream(Base64.getDecoder().decode(config.cuentaServicioJsonBase64.trim())))
-        .createScoped(ALCANCE_ANDROID_PUBLISHER)
 
     override suspend fun verificar(productoId: String, tokenCompra: String): CompraGoogle = politica.ejecutar {
-        val url = "$URL_SUSCRIPCIONES/${config.paquete}/purchases/subscriptions/" +
+        val url = "$URL_SUSCRIPCIONES/$paquete/purchases/subscriptions/" +
             "${productoId.encodeURLPathPart()}/tokens/${tokenCompra.encodeURLPathPart()}"
-        val respuesta = cliente.get(url) { header(HttpHeaders.Authorization, "Bearer ${tokenDeAcceso()}") }
-        when {
-            respuesta.status.isSuccess() -> aCompra(json.decodeFromString<SuscripcionGoogle>(respuesta.bodyAsText()))
-            respuesta.status == HttpStatusCode.TooManyRequests || respuesta.status.value >= 500 -> throw FallaTemporalGoogle(respuesta.status)
-            else -> CompraGoogle(esValida = false, estaActiva = false, expiracion = null)
+        val autorizacion = "Bearer ${tokenDeAcceso()}"
+        sinExponerUrl {
+            val respuesta = cliente.get(url) { header(HttpHeaders.Authorization, autorizacion) }
+            when {
+                respuesta.status.isSuccess() -> aCompra(json.decodeFromString<SuscripcionGoogle>(respuesta.bodyAsText()))
+                respuesta.status == HttpStatusCode.TooManyRequests || respuesta.status.value >= 500 ->
+                    throw FallaTemporalGoogle("respondió ${respuesta.status.value}")
+                else -> CompraGoogle(esValida = false, estaActiva = false, expiracion = null)
+            }
         }
+    }
+
+    /**
+     * Ktor pone la URL completa en el mensaje de sus IOException (timeout, conexión), y esa URL lleva el token de
+     * compra: se cambian por una [FallaTemporalGoogle] que solo dice el tipo de falla.
+     */
+    private suspend fun <T> sinExponerUrl(bloque: suspend () -> T): T = try {
+        bloque()
+    } catch (e: IOException) {
+        throw if (e is FallaTemporalGoogle) e else FallaTemporalGoogle("no respondió (${e.javaClass.simpleName})")
     }
 
     private fun aCompra(datos: SuscripcionGoogle): CompraGoogle {
@@ -94,11 +128,6 @@ class ClienteGooglePlay(
             (datos.cancelReason == null || datos.cancelReason == SIN_CANCELAR) &&
             expiracion?.isAfter(Instant.now()) == true
         return CompraGoogle(esValida = true, estaActiva = estaActiva, expiracion = expiracion)
-    }
-
-    private suspend fun tokenDeAcceso(): String = mutexCredenciales.withLock {
-        withContext(Dispatchers.IO) { credenciales.refreshIfExpired() }
-        credenciales.accessToken?.tokenValue ?: throw IOException("Google no entregó token de acceso")
     }
 
     override fun close() = cliente.close()
