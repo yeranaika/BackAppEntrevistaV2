@@ -14,8 +14,12 @@ $esquema = Join-Path $aqui "BasedeDatos.EntrevistaApp.sql"
 $semilla = Join-Path $aqui "BasedeDatos.EntrevistaApp.Seeds.sql"
 $env:PGPORT = "$Puerto"
 $env:PGCLIENTENCODING = "UTF8"
+# Sin avisos NOTICE: en PowerShell 5.1 cualquier línea de psql en stderr con 2>&1 se vuelve un error y corta el script.
+$env:PGOPTIONS = "-c client_min_messages=warning"
 
 function Sql([string]$archivo) {
+    # El resultado lo dice el código de salida de psql (ON_ERROR_STOP), no el texto que escriba en stderr.
+    $ErrorActionPreference = "Continue"
     $salida = & "$Bin\psql.exe" -q -X -v ON_ERROR_STOP=1 -d $Bd -f $archivo 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { throw "Falló $archivo`n$($salida -join "`n")" }
 }
@@ -29,7 +33,7 @@ function Conteo { Valor "select (select count(*) from pregunta) || '/' || (selec
 $fallas = 0
 function Esperar([string]$que, $obtenido, $esperado) {
     if ("$obtenido" -eq "$esperado") { "  OK   $que ($obtenido)" }
-    else { "  FALLA $que: se esperaba $esperado y salió $obtenido"; $script:fallas++ }
+    else { "  FALLA ${que}: se esperaba '$esperado' y salió '$obtenido'"; $script:fallas++ }
 }
 
 & "$Bin\dropdb.exe" --if-exists --force $Bd
