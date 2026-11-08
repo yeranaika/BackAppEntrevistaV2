@@ -23,11 +23,10 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Ktlint y Detekt en CI**: requieren configurar reglas compatibles con las convenciones (archivos en MAYÚSCULAS,
   nombres en español) antes de activarlos; con la configuración por defecto fallarían desde el primer día.
 - [ ] **Revisión de código** de las ramas antes de fusionar a `main`.
-- [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en la BD local y en Railway, con
+- [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en Railway (en la BD local ya está), con
   respaldo, **antes** de desplegar esa rama (sin la columna fallan los endpoints de entrevista y el reporte), y volver
   a correrla una vez desplegada.
-- [ ] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): la semilla re-ejecutable está escrita pero el script aún no se
-  ha corrido contra un PostgreSQL real.
+- [x] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): 7/7 en verde contra PostgreSQL 16 (2026-11-07).
 
 ## Media
 - [ ] **Logs estructurados con id de solicitud** (correlacionar error del cliente con el log).
