@@ -7,6 +7,7 @@ import UTILIDADES.PoliticaResiliencia
 import kotlin.time.Duration.Companion.milliseconds
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.header
@@ -79,7 +80,8 @@ interface ProveedorPreguntasIa {
 
 /**
  * Agrega reintentos y cortocircuito a un proveedor. Solo se reintenta cuando el proveedor no respondió o
- * respondió con error HTTP; una respuesta con formato inválido no mejora reintentando y cuesta tokens.
+ * respondió con error HTTP; una respuesta con formato inválido no mejora reintentando y cuesta tokens, y un tiempo
+ * agotado (provider_timeout) tampoco se reintenta: el proveedor pudo cobrar esa llamada.
  */
 class ProveedorConResiliencia(
     private val interno: ProveedorPreguntasIa,
@@ -116,20 +118,17 @@ class ProveedorOpenAi(
             }
         }
         val sobre = leerSobre(respuesta)
-        val contenido = extraer {
-            val eleccion = sobre["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: throw respuestaInvalida()
-            if (eleccion["finish_reason"]?.jsonPrimitive?.content == "length") throw respuestaTruncada()
-            val mensaje = eleccion["message"]?.jsonObject ?: throw respuestaInvalida()
-            if (!mensaje["refusal"]?.jsonPrimitive?.content.isNullOrBlank()) throw rechazoDelModelo()
+        // Los tokens se leen antes: un rechazo o un corte también se cobran y se auditan con su costo.
+        val tokens = leerTokens(sobre, "prompt_tokens", "completion_tokens")
+        val contenido = extraer(tokens) {
+            val eleccion = sobre["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
+            if (eleccion["finish_reason"]?.jsonPrimitive?.content == "length") throw respuestaTruncada(tokens)
+            val mensaje = eleccion["message"]?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
+            if (!mensaje["refusal"]?.jsonPrimitive?.content.isNullOrBlank()) throw rechazoDelModelo(tokens)
             mensaje["content"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                ?: throw respuestaInvalida("provider_missing_content")
+                ?: throw respuestaInvalida("provider_missing_content", tokens)
         }
-        val uso = runCatching { sobre["usage"]?.jsonObject }.getOrNull()
-        return RespuestaProveedorIa(
-            contenido = contenido,
-            tokensEntrada = uso?.get("prompt_tokens")?.jsonPrimitive?.intOrNull,
-            tokensSalida = uso?.get("completion_tokens")?.jsonPrimitive?.intOrNull
-        )
+        return RespuestaProveedorIa(contenido = contenido, tokensEntrada = tokens.entrada, tokensSalida = tokens.salida)
     }
 
     private fun cuerpo(solicitud: SolicitudProveedorIa) = buildJsonObject {
@@ -168,23 +167,20 @@ class ProveedorAnthropic(
             }
         }
         val sobre = leerSobre(respuesta)
-        val texto = extraer {
+        // Los tokens se leen antes: un rechazo o un corte también se cobran y se auditan con su costo.
+        val tokens = leerTokens(sobre, "input_tokens", "output_tokens")
+        val texto = extraer(tokens) {
             when (sobre["stop_reason"]?.jsonPrimitive?.content) {
-                "refusal" -> throw rechazoDelModelo()
-                "max_tokens", "model_context_window_exceeded" -> throw respuestaTruncada()
+                "refusal" -> throw rechazoDelModelo(tokens)
+                "max_tokens", "model_context_window_exceeded" -> throw respuestaTruncada(tokens)
             }
             sobre["content"]?.jsonArray
                 ?.firstOrNull { it.jsonObject["type"]?.jsonPrimitive?.content == "text" }
                 ?.jsonObject?.get("text")?.jsonPrimitive?.content
                 ?.takeIf { it.isNotBlank() }
-                ?: throw respuestaInvalida("provider_missing_content")
+                ?: throw respuestaInvalida("provider_missing_content", tokens)
         }
-        val uso = runCatching { sobre["usage"]?.jsonObject }.getOrNull()
-        return RespuestaProveedorIa(
-            contenido = texto,
-            tokensEntrada = uso?.get("input_tokens")?.jsonPrimitive?.intOrNull,
-            tokensSalida = uso?.get("output_tokens")?.jsonPrimitive?.intOrNull
-        )
+        return RespuestaProveedorIa(contenido = texto, tokensEntrada = tokens.entrada, tokensSalida = tokens.salida)
     }
 
     private fun cuerpo(solicitud: SolicitudProveedorIa) = buildJsonObject {
@@ -211,13 +207,24 @@ private suspend fun enviar(llamada: suspend () -> HttpResponse): HttpResponse = 
     llamada()
 } catch (e: ErrorAplicacion) {
     throw e
+} catch (e: HttpRequestTimeoutException) {
+    throw tiempoAgotado()
 } catch (_: Exception) {
     throw ErrorRespuestaExterna("provider_http_error", "El proveedor de IA no respondió")
 }
 
+/**
+ * El pedido ya se envió y el proveedor puede estar generando (y cobrando) la respuesta: no se reintenta, para no
+ * pagar dos veces (ProveedorConResiliencia solo reintenta provider_http_error).
+ */
+private fun tiempoAgotado() =
+    ErrorRespuestaExterna("provider_timeout", "El proveedor de IA tardó demasiado en responder")
+
 private suspend fun leerSobre(respuesta: HttpResponse): JsonObject {
     val cuerpo = try {
         respuesta.bodyAsText()
+    } catch (e: HttpRequestTimeoutException) {
+        throw tiempoAgotado()
     } catch (_: Exception) {
         throw ErrorRespuestaExterna("provider_http_error", "El proveedor de IA no respondió")
     }
@@ -231,22 +238,33 @@ private suspend fun leerSobre(respuesta: HttpResponse): JsonObject {
     }
 }
 
-private inline fun extraer(bloque: () -> String): String = try {
+private inline fun extraer(tokens: TokensLeidos, bloque: () -> String): String = try {
     bloque()
 } catch (e: ErrorAplicacion) {
     throw e
 } catch (_: Exception) {
-    throw respuestaInvalida()
+    throw respuestaInvalida(tokens = tokens)
+}
+
+/** Tokens que el proveedor informó en el sobre (null si no vinieron). */
+private data class TokensLeidos(val entrada: Int?, val salida: Int?)
+
+private fun leerTokens(sobre: JsonObject, claveEntrada: String, claveSalida: String): TokensLeidos {
+    val uso = runCatching { sobre["usage"]?.jsonObject }.getOrNull()
+    return TokensLeidos(
+        runCatching { uso?.get(claveEntrada)?.jsonPrimitive?.intOrNull }.getOrNull(),
+        runCatching { uso?.get(claveSalida)?.jsonPrimitive?.intOrNull }.getOrNull()
+    )
 }
 
 private fun proveedorNoConfigurado() =
     ErrorServicioExterno("provider_not_configured", "No hay API key configurada para ese proveedor de IA")
 
-private fun respuestaInvalida(codigo: String = "provider_invalid_response") =
-    ErrorRespuestaExterna(codigo, "El proveedor de IA devolvió una respuesta con formato inesperado")
+private fun respuestaInvalida(codigo: String = "provider_invalid_response", tokens: TokensLeidos? = null) =
+    ErrorRespuestaExterna(codigo, "El proveedor de IA devolvió una respuesta con formato inesperado", tokens?.entrada, tokens?.salida)
 
-private fun respuestaTruncada() =
-    ErrorRespuestaExterna("provider_truncated", "La respuesta del proveedor de IA quedó incompleta")
+private fun respuestaTruncada(tokens: TokensLeidos) =
+    ErrorRespuestaExterna("provider_truncated", "La respuesta del proveedor de IA quedó incompleta", tokens.entrada, tokens.salida)
 
-private fun rechazoDelModelo() =
-    ErrorRespuestaExterna("provider_refusal", "El modelo se negó a generar las preguntas")
+private fun rechazoDelModelo(tokens: TokensLeidos) =
+    ErrorRespuestaExterna("provider_refusal", "El modelo se negó a generar las preguntas", tokens.entrada, tokens.salida)

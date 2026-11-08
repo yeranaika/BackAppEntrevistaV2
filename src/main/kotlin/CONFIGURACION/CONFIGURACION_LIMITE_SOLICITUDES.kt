@@ -20,11 +20,15 @@ val LIMITE_REGISTRO = RateLimitName("registro")
 /** Solicitar código de recuperación: cada solicitud envía un correo. */
 val LIMITE_RECUPERACION = RateLimitName("recuperacion")
 
+/** Generar preguntas con IA (admin): cada solicitud puede costar una llamada al LLM (anti-ráfaga; el gasto, D23). */
+val LIMITE_GENERACION_IA = RateLimitName("generacion_ia")
+
 /** Prefijo de los contadores en Redis: limite:<nombre>:<ip>. Nunca debe coincidir con otro (ver Redis.md). */
 const val PREFIJO_LIMITE_IP = "limite:"
 
 private val VENTANA_REGISTRO = 10.minutes
 private val VENTANA_RECUPERACION = 15.minutes
+private val VENTANA_GENERACION_IA = 60.minutes
 private val log = LoggerFactory.getLogger("LimiteSolicitudes")
 
 /** Como mucho un aviso por minuto cuando el límite cae a memoria por falta de Redis. */
@@ -57,10 +61,13 @@ fun Application.configurarLimiteSolicitudes(limites: ConfiguracionLimites, cache
     install(RateLimit) {
         limitePorIp(LIMITE_REGISTRO, "registro", limites.registrosPorIp, VENTANA_REGISTRO, cache, aviso)
         limitePorIp(LIMITE_RECUPERACION, "recuperacion", limites.recuperacionesPorIp, VENTANA_RECUPERACION, cache, aviso)
+        limitePorIp(LIMITE_GENERACION_IA, "generacion_ia", limites.generacionesIaPorIp, VENTANA_GENERACION_IA, cache, aviso)
     }
     log.info(
-        "Límite por IP: registro {} cada {}, recuperación {} cada {}; IP desde {}; contador compartido en la caché ({}*)",
+        "Límite por IP: registro {} cada {}, recuperación {} cada {}, generación con IA {} cada {}; IP desde {}; " +
+            "contador compartido en la caché ({}*)",
         limites.registrosPorIp, VENTANA_REGISTRO, limites.recuperacionesPorIp, VENTANA_RECUPERACION,
+        limites.generacionesIaPorIp, VENTANA_GENERACION_IA,
         limites.cabeceraIpCliente?.let { "la cabecera $it" } ?: "la conexión", PREFIJO_LIMITE_IP
     )
 }

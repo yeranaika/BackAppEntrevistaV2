@@ -201,6 +201,20 @@ class PruebaControladorEntrevista {
     }
 
     @Test
+    fun `si la app pide una entrevista sin banco la que tenia en curso sigue viva`() = testApplication {
+        val sistema = sistemaConBanco()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+
+        val primera = enviar("POST", "/api/prueba-practica/front", """{"sector":"backend","nivel":"junior","metaCargo":"QA","tipoPrueba":"ENT"}""", ana)
+            .objeto().texto("pruebaId")
+        val sinBanco = enviar("POST", "/api/prueba-practica/front", """{"sector":"backend","nivel":"senior","metaCargo":"QA","tipoPrueba":"ENT"}""", ana)
+        assertEquals(HttpStatusCode.Conflict, sinBanco.status)
+        assertEquals("preguntas_insuficientes", sinBanco.objeto().texto("error"))
+        assertEquals("en_progreso", enviar("GET", "$base/$primera", token = ana).objeto().texto("estado"))
+    }
+
+    @Test
     fun `la app recibe errores claros para tipos y cargos no disponibles`() = testApplication {
         val sistema = SistemaPrueba().apply { repeat(2) { sembrarBancoGeneral(tecnicas = 1, blandas = 0) } }
         application { sistema.montar(this) }

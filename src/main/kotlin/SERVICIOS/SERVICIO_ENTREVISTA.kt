@@ -70,8 +70,9 @@ class ServicioEntrevista(
     private val log = LoggerFactory.getLogger(ServicioEntrevista::class.java)
 
     /**
-     * @param reemplazarEnProgreso true cancela la sesión en curso en vez de responder 409
-     *   (la app Android rinde la entrevista de una vez y no puede retomarla).
+     * @param reemplazarEnProgreso true reemplaza la sesión en curso en vez de responder 409
+     *   (la app Android rinde la entrevista de una vez y no puede retomarla). La anterior se cancela solo si la
+     *   nueva se crea: un 409 preguntas_insuficientes la deja como estaba.
      */
     suspend fun iniciar(usuarioId: UUID, pedido: PedidoEntrevista, reemplazarEnProgreso: Boolean = false): SesionEntrevista {
         val cantidad = pedido.cantidadPreguntas ?: PREGUNTAS_ENTREVISTA_POR_DEFECTO
@@ -84,7 +85,7 @@ class ServicioEntrevista(
         val (cargo, nombreCargo) = contexto.cargo(usuarioId, pedido.cargoId, pedido.nombreCargo)
         val nivel = contexto.nivel(usuarioId, pedido.nivel, cargo)
 
-        liberarSesionAnterior(usuarioId, reemplazarEnProgreso)
+        val anterior = sesionAReemplazar(usuarioId, reemplazarEnProgreso)
 
         val recientes = sesiones.preguntasRecientes(usuarioId, SESIONES_SIN_REPETIR_PREGUNTAS)
         val preguntas = selector.seleccionarMixta(ContextoSeleccion(cargo, nivel, recientes), cantidad)
@@ -94,7 +95,15 @@ class ServicioEntrevista(
                 "Aún no hay suficientes preguntas aprobadas para $nombreCargo (${nivel.valorBd}); prueba con otro nivel o cargo"
             )
         }
-        return sesiones.crear(NuevaSesionEntrevista(usuarioId, cargo?.id, nombreCargo, nivel, reloj.instant()), preguntas)
+        val nueva = NuevaSesionEntrevista(usuarioId, cargo?.id, nombreCargo, nivel, reloj.instant(), reemplazaA = anterior?.id)
+        val creada = sesiones.crear(nueva, preguntas)
+        // Otra solicitud pudo finalizarla o cancelarla mientras se elegían las preguntas: se registra solo lo que pasó.
+        anterior?.let {
+            if (sesiones.buscar(it.id)?.estado == EstadoSesionEntrevista.CANCELADA) {
+                log.info("Sesión de entrevista {} cancelada al iniciar {}", it.id, creada.id)
+            }
+        }
+        return creada
     }
 
     /** La sesión en curso, o null. Una sesión abandonada hace más de 2 h se cancela y no cuenta. */
@@ -191,16 +200,20 @@ class ServicioEntrevista(
 
     // ---------- Reglas ----------
 
-    private suspend fun liberarSesionAnterior(usuarioId: UUID, reemplazar: Boolean) {
-        val anterior = sesiones.buscarEnProgreso(usuarioId) ?: return
-        if (!reemplazar && !estaVencida(anterior)) {
+    /**
+     * La sesión en curso que la nueva reemplazará, o null. No la cancela: eso ocurre al crear la nueva, en la misma
+     * transacción, para que un error al elegir preguntas no la pierda. Una abandonada hace más de 2 h ya no cuenta
+     * (enProgreso la cancela).
+     */
+    private suspend fun sesionAReemplazar(usuarioId: UUID, reemplazar: Boolean): SesionEntrevista? {
+        val anterior = enProgreso(usuarioId) ?: return null
+        if (!reemplazar) {
             throw ErrorConflicto(
                 "entrevista_en_progreso",
                 "Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra"
             )
         }
-        sesiones.cerrar(anterior.id, EstadoSesionEntrevista.CANCELADA, reloj.instant())
-        log.info("Sesión de entrevista {} cancelada al iniciar una nueva", anterior.id)
+        return anterior
     }
 
     private fun estaVencida(sesion: SesionEntrevista): Boolean =

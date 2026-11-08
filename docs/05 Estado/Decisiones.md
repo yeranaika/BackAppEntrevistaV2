@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [decisiones, adr]
-actualizado: 2026-11-06
+actualizado: 2026-11-07
 ---
 
 # Decisiones
@@ -156,3 +156,66 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Consecuencias**: `confianza` sigue existiendo como puntaje de la persona, pero la app la manda en `null` (la
   confianza del detector no es eso). **Migración 021**: columna nullable sin default, reportes sin métricas con datos
   pasan de 0 a `null` y se borran las expresiones guardadas; aplicarla **antes** de desplegar este código.
+
+## D23 · Tope mensual de gasto en la generación de preguntas con IA (2026-11)
+- **Contexto**: `POST /api/v1/admin/preguntas/generar-ia` (y su alias `/api/v1/admin/questions/generate-ai`) llama al
+  LLM en cada solicitud y no tenía ningún freno: un admin con un script, un panel en bucle o una sesión robada podían
+  gastar sin límite. Además, un rechazo, un corte o una respuesta sin contenido del proveedor se auditaban sin tokens,
+  aunque el proveedor los cobra.
+- **Decisión**: (1) tope de gasto **global** por mes calendario UTC, `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD
+  por defecto; `0` = generación con IA desactivada; negativo o no numérico se toma como `0`). El gasto se suma desde
+  `pregunta_generacion_ia` con `costoTotalUsd` (la misma cuenta que `GET /api/v1/admin/costos-ia`), incluidas las
+  fallidas con su costo estimado. Se revisa **después** de validar el pedido y **antes** de llamar al proveedor; al
+  llegar al tope responde `429 tope_generacion_ia_alcanzado` con un mensaje que dice cuándo se repone (el día 1 del
+  mes siguiente, UTC; con tope `0` el mensaje dice que está desactivada). La variable acepta coma decimal (`0,5`); un
+  valor ilegible desactiva la generación con un aviso en el log en vez de caer al valor por defecto. Para sumar se leen
+  solo las columnas de costo, con un índice por `fecha_generacion` (migración 022). Si el gasto no se puede leer, el
+  error sube y tampoco se llama. (2) `ErrorRespuestaExterna`
+  lleva `tokensEntrada`/`tokensSalida`: `provider_refusal`, `provider_truncated`, `provider_missing_content` y
+  `provider_invalid_response` se auditan con los tokens que informó el proveedor (nunca viajan al cliente);
+  `provider_http_error` sigue sin tokens. Un tiempo agotado es `provider_timeout` y **no se reintenta** (el pedido ya
+  salió y el proveedor pudo cobrarlo; antes se reintentaba y podía pagarse dos veces). (3) Límite anti-ráfaga por IP `LIMITE_GENERACIONES_IA_POR_IP` (30 cada
+  60 min, clave Redis `limite:generacion_ia:<ip>`), común a la ruta y su alias → `429 demasiadas_solicitudes`. Corre
+  después de `soloAdmin`: un 403 no consume cupo.
+- **Por qué**: el gasto es lo que importa frenar y ya estaba registrado por llamada; contar solicitudes no lo acota
+  (una de 10 preguntas cuesta más que una de 1). Es global porque `pregunta_generacion_ia` no guarda qué admin pidió
+  la generación. Sumar las fallidas evita que un proveedor que rechaza en bucle gaste sin tope. El límite por IP corta
+  ráfagas antes de que el tope mensual se agote en minutos.
+- **Consecuencias**: sin reserva previa (a diferencia de D17): dos llamadas simultáneas pueden pasar el tope en lo
+  que cueste una de ellas. Un admin agota el cupo de todos. Un `provider_timeout` cuenta 0 en el tope (no hay
+  tokens), aunque el proveedor pudo cobrarlo. El índice va en la migración 022. El panel (rama
+  `fix/textos-costos-ia` de Front-web-APPENTREVISTA) explica el 429 del tope, el `provider_timeout` y que las fallidas
+  con tokens aparecen en Costos IA.
+
+## D24 · Copia de la rúbrica por pregunta de entrevista y traza de IA coherente al editar (2026-11)
+- **Contexto**: el snapshot de cada pregunta de entrevista copiaba enunciado, tipo, opciones y respuesta ideal, pero
+  no la rúbrica: el reporte leía las palabras clave del banco al generarse. Editar la rúbrica entre el final de la
+  entrevista y el reporte (o un reintento) cambiaba la nota. Además, editar una pregunta generada con IA la devolvía
+  a `pendiente`, pero su traza en `pregunta_generacion_ia` seguía `aprobada`/`rechazada` con el revisor anterior.
+- **Decisión**: (1) columna `sesion_pregunta_respuesta.rubrica_snap` (JSONB): la rúbrica al servir la pregunta
+  (`'{}'` si no tenía). El reporte usa la copia; solo las filas sin copia (anteriores a la migración 022) recurren al
+  banco y, si la pregunta se borró, se evalúan sin palabras clave como hasta ahora. (2) Editar una pregunta deja su
+  traza de IA en `pendiente_revision` con `revisado_por` NULL, en la misma transacción. (3) **Migración 022**: crea la
+  columna, completa las filas existentes con la rúbrica actual del banco (la misma que el reporte leía hasta hoy) y
+  devuelve a `pendiente_revision` sin revisor las trazas de preguntas `pendiente` que estaban aprobadas o rechazadas.
+- **Por qué**: es el mismo principio de los snapshots (editar el banco nunca cambia una prueba ya rendida) y la
+  rúbrica es la que decide la nota del motor freemium. La traza de IA tiene que decir lo mismo que la pregunta.
+- **Consecuencias**: la migración 022 es aditiva e idempotente, pero el código nuevo lee `rubrica_snap`: **aplicarla
+  antes de desplegar** (si no, fallan los endpoints de entrevista y el reporte) y **volver a correrla una vez
+  desplegado**, para completar las filas y trazas que el código anterior dejó mientras convivían. Sin cambios en el
+  contrato HTTP.
+
+## D25 · Semilla re-ejecutable sin índice único en el banco (2026-11)
+- **Contexto**: `BasedeDatos.EntrevistaApp.Seeds.sql` usaba `ON CONFLICT DO NOTHING` en preguntas y opciones, pero
+  esas tablas no tienen clave natural, así que no había conflicto que evitar: cada corrida volvía a insertar las 14
+  preguntas y sus opciones, y el banco quedaba con copias.
+- **Decisión**: cada pregunta se inserta solo si **no existe** otra con el mismo enunciado + skill + cargo + nivel
+  (`NOT EXISTS`, con `IS NOT DISTINCT FROM` para el cargo), y las opciones (un `INSERT` por pregunta) solo si la
+  pregunta aún no tiene ninguna. Los catálogos siguen con `ON CONFLICT` sobre su clave única. Verificación:
+  `src/DB/PROBAR_SEMILLA.ps1` (crea y borra la BD desechable `semilla_prueba`).
+- **Por qué**: se descartó un índice único en `pregunta`: el admin y los lotes de IA no capturan esa violación (darían
+  500), un btree sobre `TEXT` largo tiene límite de tamaño y limpiar los duplicados existentes dejaría el historial con
+  `pregunta_id` NULL (los snapshots apuntan a las copias).
+- **Consecuencias**: si el admin editó el enunciado, la skill o el nivel de una pregunta de la semilla, volver a
+  correrla crea otra vez la versión original; una pregunta rechazada o con opciones editadas no se toca. Las BD ya
+  contaminadas por la semilla vieja **no se limpian** solas. Sin migración.

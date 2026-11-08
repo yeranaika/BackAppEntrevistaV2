@@ -1,5 +1,6 @@
 package CONTROLADORES
 
+import CONFIGURACION.LIMITE_GENERACION_IA
 import ESQUEMAS.ConsultaPreguntas
 import ESQUEMAS.RespuestaGenerarPreguntas
 import ESQUEMAS.RespuestaOk
@@ -20,6 +21,7 @@ import VISTAS.aRespuestaPublica
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -33,8 +35,9 @@ import io.ktor.server.routing.*
  * PATCH  /api/v1/admin/preguntas/{id}/aprobar
  * PATCH  /api/v1/admin/preguntas/{id}/rechazar    { "motivo": "..." }
  * DELETE /api/v1/admin/preguntas/{id}             solo si nunca se usó
- * POST   /api/v1/admin/preguntas/generar-ia       genera con LLM (nacen pendientes)
- * POST   /api/v1/admin/questions/generate-ai      ruta antigua del panel, mismo comportamiento
+ * POST   /api/v1/admin/preguntas/generar-ia       genera con LLM (nacen pendientes); 429 tope_generacion_ia_alcanzado
+ *                                                  si se llegó al gasto del mes (D23) o demasiadas_solicitudes por IP
+ * POST   /api/v1/admin/questions/generate-ai      ruta antigua del panel, mismo comportamiento (comparte el límite)
  *
  * Usuario autenticado:
  * GET    /api/v1/preguntas                        solo aprobadas, sin solución; filtros + cantidad
@@ -51,7 +54,7 @@ fun Route.controladorPregunta(servicio: ServicioPregunta, generacion: ServicioGe
                 call.respond(servicio.listar(call.consultaPreguntas()).aRespuesta())
             }
 
-            post("/generar-ia") { generarConIa(generacion) }
+            rateLimit(LIMITE_GENERACION_IA) { post("/generar-ia") { generarConIa(generacion) } }
 
             route("/{id}") {
                 get {
@@ -83,7 +86,7 @@ fun Route.controladorPregunta(servicio: ServicioPregunta, generacion: ServicioGe
 
     route("/api/v1/admin/questions") {
         soloAdmin {
-            post("/generate-ai") { generarConIa(generacion) }
+            rateLimit(LIMITE_GENERACION_IA) { post("/generate-ai") { generarConIa(generacion) } }
         }
     }
 

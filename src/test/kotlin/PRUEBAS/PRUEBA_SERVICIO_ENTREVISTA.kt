@@ -1,5 +1,6 @@
 package PRUEBAS
 
+import kotlinx.serialization.json.jsonObject
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
@@ -184,6 +185,33 @@ class PruebaServicioEntrevista {
     }
 
     @Test
+    fun `si no hay preguntas para la nueva la entrevista en curso no se cancela`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
+        val primera = iniciar()
+
+        // El banco sembrado es junior: para senior no hay preguntas y la app pide reemplazar la que está en curso.
+        fallaCon<ErrorConflicto>("preguntas_insuficientes") {
+            servicio.iniciar(ana, PedidoEntrevista(nombreCargo = "QA", nivel = "sr"), reemplazarEnProgreso = true)
+        }
+        val sigue = servicio.obtener(ana, primera.id)
+        assertEquals(EstadoSesionEntrevista.EN_PROGRESO, sigue.estado)
+        assertNull(sigue.fechaFin)
+        assertEquals(primera.id, servicio.enProgreso(ana)!!.id)
+    }
+
+    @Test
+    fun `al reemplazar evita las preguntas de la entrevista que reemplaza`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
+        val primera = iniciar()
+        val segunda = servicio.iniciar(ana, PedidoEntrevista(nombreCargo = "Backend Developer"), reemplazarEnProgreso = true)
+
+        assertTrue(primera.preguntas.map { it.preguntaId }.intersect(segunda.preguntas.map { it.preguntaId }.toSet()).isEmpty())
+        val cancelada = servicio.obtener(ana, primera.id)
+        assertEquals(EstadoSesionEntrevista.CANCELADA, cancelada.estado)
+        assertEquals(segunda.fechaInicio, cancelada.fechaFin)
+    }
+
+    @Test
     fun `una entrevista abandonada mas de 2 horas se cancela sola`() = runBlocking<Unit> {
         sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
         val abandonada = iniciar()
@@ -298,13 +326,20 @@ class PruebaServicioEntrevista {
         val original = sesion.preguntas.first()
         sistema.preguntas.reemplazarContenido(
             original.preguntaId!!,
-            ContenidoPregunta(null, null, TipoPregunta.ABIERTA_TEXTO, CategoriaHabilidad.TECNICA, NivelExperiencia.JUNIOR, "Otro enunciado", null, null, emptyList())
+            ContenidoPregunta(
+                null, null, TipoPregunta.ABIERTA_TEXTO, CategoriaHabilidad.TECNICA, NivelExperiencia.JUNIOR, "Otro enunciado", null,
+                kotlinx.serialization.json.Json.parseToJsonElement("""{"palabras_clave":["nueva"]}""").jsonObject, emptyList()
+            )
         )
         sistema.preguntas.eliminar(sesion.preguntas[1].preguntaId!!)
 
         val despues = servicio.obtener(ana, sesion.id)
         assertEquals(original.enunciado, despues.preguntas.first().enunciado)
         assertEquals(original.opciones, despues.preguntas.first().opciones)
+        // La rúbrica también es copia: sin rúbrica en el banco se guarda {} (no null) y no sigue a la edición.
+        assertEquals(kotlinx.serialization.json.JsonObject(emptyMap()), original.rubrica)
+        assertEquals(original.rubrica, despues.preguntas.first().rubrica)
+        assertTrue(despues.preguntas.all { it.rubrica != null }, "la copia sigue aunque la pregunta se borre")
         assertEquals(8, despues.preguntas.size)
     }
 

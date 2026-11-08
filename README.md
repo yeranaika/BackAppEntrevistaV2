@@ -99,8 +99,20 @@ decisiones. Empieza por [`docs/00 Inicio.md`](docs/00%20Inicio.md). Los agentes 
 | `LIMITE_EVALUACIONES_IA_MENSUAL` | Reportes con IA por usuario premium y mes calendario UTC (por defecto 30; 0 = sin IA). Al llegar al tope el reporte sale con el motor freemium. |
 | `APAGADO_ESPERA_TAREAS_SEGUNDOS` | Al apagar, cuánto se espera a los reportes y correos en curso (por defecto 150; máx. 600). Debe caber en el drenado de Railway (`railway.json`: 200 s). |
 | `CABECERA_IP_CLIENTE` | Cabecera con la IP real del cliente puesta por el proxy (en Railway `X-Real-IP`, tras la prueba de humo). Vacía = IP de la conexión. |
+| `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` | Gasto estimado máximo (USD) en generar preguntas con IA por mes calendario UTC, sumando todos los admins y las llamadas fallidas (por defecto 5; 0 = generación con IA desactivada; negativo o no numérico = 0). Al llegar: `429 tope_generacion_ia_alcanzado` (D23). |
+| `LIMITE_GENERACIONES_IA_POR_IP` | Generaciones de preguntas con IA por IP cada 60 min (por defecto 30), común a `generar-ia` y su alias. Al exceder: `429 demasiadas_solicitudes`. |
 
-**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `021` (idempotentes) sobre una BD existente:
+**Migraciones:** el servidor ya no crea ni altera tablas al arrancar. Aplicar `migrations/014` a `022` (idempotentes) sobre una BD existente.
+La **022** (`rubrica_snap`, D24) debe estar aplicada **antes** de desplegar este código (si no, fallan la entrevista y el reporte), y conviene volver a correrla una vez desplegado (es idempotente):
 ```powershell
 Get-Content migrations/015_alinear_esquema.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista
+Get-Content migrations/022_rubrica_snap_y_traza_editada.sql | docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1
 ```
+
+**Semilla re-ejecutable (D25):** `src/DB/BasedeDatos.EntrevistaApp.Seeds.sql` se puede volver a correr sin duplicar
+preguntas ni opciones. Para comprobarlo en una BD desechable (`semilla_prueba`, no toca `DBentrevista`), con los
+binarios de PostgreSQL y `PGUSER`/`PGPASSWORD` definidos:
+```powershell
+pwsh src/DB/PROBAR_SEMILLA.ps1 -Bin C:\ruta\pgsql\bin -Puerto 5432
+```
+Aún no se ha ejecutado. Una BD que ya tenga duplicados de la semilla vieja no se limpia sola.

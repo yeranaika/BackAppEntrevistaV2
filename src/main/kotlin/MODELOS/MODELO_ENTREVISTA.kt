@@ -42,6 +42,8 @@ data class PreguntaSesion(
     val orden: Int,
     val enunciado: String,
     val respuestaIdeal: String?,
+    /** Copia de la rúbrica del banco al servir la pregunta; null solo en filas anteriores a la migración 022 (D24). */
+    val rubrica: JsonObject?,
     val tipo: TipoPregunta,
     val categoria: CategoriaHabilidad,
     val skillId: UUID?,
@@ -77,7 +79,9 @@ data class NuevaSesionEntrevista(
     val cargoId: UUID?,
     val cargoObjetivo: String,
     val nivel: NivelExperiencia,
-    val inicio: Instant
+    val inicio: Instant,
+    /** Sesión en curso que esta reemplaza: se cancela al crear la nueva, en la misma transacción. */
+    val reemplazaA: UUID? = null
 )
 
 /** Respuesta ya validada por el servicio, lista para guardar. */

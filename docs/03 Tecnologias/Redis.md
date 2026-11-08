@@ -2,7 +2,7 @@
 tipo: tecnologia
 tags: [tecnologia, redis, cache]
 version: Redis 7 · Jedis 5.2.0
-actualizado: 2026-11-06
+actualizado: 2026-11-07
 ---
 
 # Redis
@@ -26,6 +26,7 @@ por IP (D18). No es fuente de verdad: si Redis cae, la app sigue funcionando (la
 | `login:fallos:<correo>` | Contraseñas incorrectas seguidas | 15 min |
 | `limite:registro:<ip>` | Registros desde esa IP (`POST /auth/register`) | 10 min desde el primero |
 | `limite:recuperacion:<ip>` | Códigos de recuperación pedidos desde esa IP | 15 min desde el primero |
+| `limite:generacion_ia:<ip>` | Generaciones de preguntas con IA desde esa IP (`generar-ia` y su alias `generate-ai`, mismo contador; `LIMITE_GENERACIONES_IA_POR_IP`, 30). Solo cuenta solicitudes de un admin: corre después de `soloAdmin` | 60 min desde el primero |
 
 Crear un cargo o sincronizar tendencias **invalida** `mercado:*`.
 

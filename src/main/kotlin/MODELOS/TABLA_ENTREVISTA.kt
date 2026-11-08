@@ -35,6 +35,8 @@ object TablaSesionPreguntaRespuesta : Table("sesion_pregunta_respuesta") {
     val categoriaHabilidad = varchar("categoria_habilidad", 10).nullable()
     val skillId = uuid("skill_id").nullable()
     val opciones = jsonb("opciones_snap", Json, ListSerializer(OpcionSnapshot.serializer())).nullable()
+    /** Rúbrica al servir la pregunta ('{}' si no tenía). NULL solo en filas anteriores a la migración 022 (D24). */
+    val rubrica = jsonb("rubrica_snap", Json, JsonObject.serializer()).nullable()
     /** Respuesta abierta: texto escrito o transcripción del audio (STT). */
     val transcripcion = text("transcripcion_audio").nullable()
     val videoClipUrl = varchar("video_clip_url", 500).nullable()

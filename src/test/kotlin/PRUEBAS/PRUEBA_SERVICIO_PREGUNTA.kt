@@ -109,6 +109,26 @@ class PruebaServicioPregunta {
     }
 
     @Test
+    fun `editar una pregunta de IA ya revisada devuelve su traza a pendiente y sin revisor`() = runBlocking<Unit> {
+        val ids = sistema.generacion.generar(
+            SolicitudGenerarPreguntas(cargoId = cargoId, nivel = "junior", cantidad = 3, tipo = "opcion_multiple")
+        ).map { it.ids.preguntaId }.take(2)
+        fun traza(id: UUID) = transaction {
+            TablaGeneracionPreguntaIa.selectAll().where { TablaGeneracionPreguntaIa.preguntaId eq id }.single()
+                .let { it[TablaGeneracionPreguntaIa.estadoRevision] to it[TablaGeneracionPreguntaIa.revisadoPor] }
+        }
+
+        servicio.aprobar(ids[0], adminId)
+        servicio.rechazar(ids[1], "Ambigua", adminId)
+        ids.forEach { servicio.editar(it, opcionMultiple(enunciado = "Enunciado editado $it")) }
+        ids.forEach { assertEquals("pendiente_revision" to null, traza(it)) }
+
+        // Al volver a revisarla, la traza queda con el nuevo revisor.
+        servicio.aprobar(ids[0], adminId)
+        assertEquals("aprobada" to adminId, traza(ids[0]))
+    }
+
+    @Test
     fun `rechazar exige motivo y lo guarda, aprobar despues lo limpia`() = runBlocking<Unit> {
         val id = servicio.crear(abierta()).id
         fallaCon<ErrorValidacion>("motivo_requerido") { servicio.rechazar(id, "  ", adminId) }

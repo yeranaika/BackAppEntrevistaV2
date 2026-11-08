@@ -286,8 +286,10 @@ class ServicioReporteEntrevista(
     }
 
     private suspend fun aEvaluar(pregunta: PreguntaSesion): RespuestaAbiertaAEvaluar {
-        // Las palabras clave están en la rúbrica del banco; si la pregunta se borró, se evalúa sin ellas.
-        val rubrica = pregunta.preguntaId?.let { preguntas.buscarPorId(it)?.rubrica }
+        // La rúbrica es la copia tomada al servir la pregunta: editar el banco no cambia la evaluación (D24). Solo las
+        // filas anteriores a la migración 022 no la tienen: para ellas se usa la del banco y, si la pregunta se borró,
+        // se evalúa sin palabras clave.
+        val rubrica = pregunta.rubrica ?: pregunta.preguntaId?.let { preguntas.buscarPorId(it)?.rubrica }
         return RespuestaAbiertaAEvaluar(
             pregunta.id, pregunta.categoria, pregunta.enunciado, pregunta.respuestaIdeal, palabrasClaveDe(rubrica), pregunta.transcripcion!!
         )

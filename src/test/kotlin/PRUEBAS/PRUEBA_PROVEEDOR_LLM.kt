@@ -120,6 +120,72 @@ class PruebaProveedorLlm {
     }
 
     @Test
+    fun `rechazo, corte y falta de contenido conservan los tokens que se cobraron`() {
+        val corte = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking {
+                ProveedorOpenAi(
+                    "clave",
+                    cliente("""{"choices":[{"finish_reason":"length","message":{"content":"{}"}}],"usage":{"prompt_tokens":12,"completion_tokens":34}}""")
+                ).generar(solicitud())
+            }
+        }
+        assertEquals("provider_truncated", corte.codigo)
+        assertEquals(12, corte.tokensEntrada)
+        assertEquals(34, corte.tokensSalida)
+
+        val rechazo = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking {
+                ProveedorAnthropic(
+                    "clave",
+                    cliente("""{"content":[{"type":"text","text":"no"}],"stop_reason":"refusal","usage":{"input_tokens":7,"output_tokens":9}}""")
+                ).generar(solicitud(modelo = "claude-haiku-4-5"))
+            }
+        }
+        assertEquals("provider_refusal", rechazo.codigo)
+        assertEquals(7, rechazo.tokensEntrada)
+        assertEquals(9, rechazo.tokensSalida)
+
+        val sinContenido = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking {
+                ProveedorAnthropic("clave", cliente("""{"content":[],"usage":{"input_tokens":3,"output_tokens":0}}"""))
+                    .generar(solicitud(modelo = "claude-haiku-4-5"))
+            }
+        }
+        assertEquals("provider_missing_content", sinContenido.codigo)
+        assertEquals(3, sinContenido.tokensEntrada)
+
+        // Un error HTTP no trae sobre: sin tokens.
+        val http = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking { ProveedorOpenAi("clave", cliente("""{"error":"x"}""", HttpStatusCode.TooManyRequests)).generar(solicitud()) }
+        }
+        assertEquals(null, http.tokensEntrada)
+    }
+
+    @Test
+    fun `un tiempo agotado no se reintenta porque el proveedor pudo cobrar la llamada`() {
+        var llamadas = 0
+        val lento = HttpClient(MockEngine) {
+            install(ContentNegotiation) { json(json) }
+            engine { addHandler { llamadas++; throw io.ktor.client.plugins.HttpRequestTimeoutException("https://api", 60_000) } }
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_timeout") {
+            INTEGRACIONES.ProveedorConResiliencia(ProveedorOpenAi("clave", lento), "openai-prueba-timeout").generar(solicitud())
+        }
+        assertEquals(1, llamadas)
+
+        // Un error de red sí se reintenta (no hubo respuesta que cobrar).
+        var deRed = 0
+        val caido = HttpClient(MockEngine) {
+            install(ContentNegotiation) { json(json) }
+            engine { addHandler { deRed++; throw IOException("sin red") } }
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_http_error") {
+            INTEGRACIONES.ProveedorConResiliencia(ProveedorOpenAi("clave", caido), "openai-prueba-red").generar(solicitud())
+        }
+        assertEquals(2, deRed)
+    }
+
+    @Test
     fun `fallas de red y respuestas HTTP de error no filtran mensajes internos`() {
         val deRed = assertFailsWith<ErrorRespuestaExterna> {
             runBlocking { ProveedorOpenAi("clave", clienteQueFalla("socket secreto")).generar(solicitud()) }

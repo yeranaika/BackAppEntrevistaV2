@@ -122,6 +122,15 @@ class PruebaServicioPractica {
     }
 
     @Test
+    fun `si la nueva practica no tiene preguntas la anterior sigue en curso`() = runBlocking<Unit> {
+        repeat(4) { sembrarAlternativa() }
+        val primera = iniciar()
+        // El banco sembrado es junior: para senior no hay preguntas.
+        fallaCon<ErrorConflicto>("preguntas_insuficientes") { servicio.iniciar(ana, PedidoPractica(skillId = skillKotlin.toString(), nivel = "sr")) }
+        assertEquals(EstadoPractica.EN_PROGRESO, servicio.obtener(ana, primera.id).estado)
+    }
+
+    @Test
     fun `evita repetir preguntas de practicas recientes mientras el banco alcance`() = runBlocking<Unit> {
         repeat(4) { sembrarAlternativa() }
         val primera = iniciar(PedidoPractica(skillId = skillKotlin.toString(), nivel = "jr", cantidadPreguntas = 2))

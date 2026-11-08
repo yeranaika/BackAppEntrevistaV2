@@ -203,21 +203,27 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             body={"cargoId": "{{cargoId}}", "tipo": "opcion_multiple", "categoria": "tecnica", "nivel": "junior",
                   "enunciado": "¿Para qué sirve suspend en Kotlin?",
                   "opciones": [{"texto": "Suspender sin bloquear el hilo", "esCorrecta": True}, {"texto": "Crear un hilo"}]},
-            omitir_en_prueba=True, desc="Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión."),
+            omitir_en_prueba=True, desc="Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión (y su traza de IA, si la tiene, a `pendiente_revision` sin revisor)."),
         req("Borrar pregunta (admin)", "DELETE", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN, omitir_en_prueba=True,
             desc="Solo si nunca se usó en una prueba; si no, conviene rechazarla."),
         req("Rechazar pregunta (admin)", "PATCH", "/api/v1/admin/preguntas/{{preguntaId}}/rechazar", ADMIN, body={"motivo": "Muy fácil"}, omitir_en_prueba=True,
             desc="Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita (vuelve a pendiente) y `DELETE` borra si nunca se usó."),
         req("Generar preguntas con IA (admin)", "POST", "/api/v1/admin/preguntas/generar-ia", ADMIN,
             body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2, "tipo": "abierta_texto", "categoria": "tecnica", "modelo": "gpt-4o-mini"},
-            omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10."),
+            omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. "
+            "`429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a "
+            "`LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y "
+            "el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP "
+            "(`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias)."),
         req("Preguntas para usuarios", "GET", "/api/v1/preguntas", consulta=[("cargoId", "{{cargoId}}"), ("cantidad", "5")],
             desc="Solo aprobadas y sin la solución."),
     ]),
-    ("10 · Entrevista", "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.", [
+    ("10 · Entrevista", "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones, respuesta ideal y rúbrica): editar o borrar el banco no cambia una entrevista rendida ni su reporte.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.", [
         req("Iniciar entrevista", "POST", "/api/v1/entrevistas", body={"cargoId": "{{cargoId}}", "nivel": "junior", "cantidadPreguntas": 3},
             espera=[201], guarda={"sesionId": ("j.sesionId", lambda j: j.get("sesionId"))},
-            desc="Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`."),
+            desc="Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`. "
+            "La app Android (`POST /api/prueba-practica/front` con `ENT`) reemplaza la entrevista en curso en vez de responder 409, "
+            "pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso."),
         req("Entrevista en curso", "GET", "/api/v1/entrevistas/actual", espera=[200, 204]),
         req("Siguiente pregunta", "GET", "/api/v1/entrevistas/{{sesionId}}/siguiente", espera=[200, 204],
             guarda={"preguntaSesionId": ("j.preguntaSesionId", lambda j: j.get("preguntaSesionId")),
@@ -303,7 +309,9 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                 "preguntaAppId": ("j.preguntas[0].preguntaId", lambda j: (j.get("preguntas") or [{}])[0].get("preguntaId", "")),
                 "opcionAppId": ("(j.preguntas[0].configRespuesta.opciones || [{id: ''}])[0].id",
                                 lambda j: ((j.get("preguntas") or [{}])[0].get("configRespuesta", {}).get("opciones") or [{"id": ""}])[0]["id"])},
-            desc="`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`."),
+            desc="`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`. "
+            "Con `ENT` la entrevista en curso se reemplaza (se cancela en la misma transacción que crea la nueva) y con `PR`/`BL` "
+            "la práctica en curso queda abandonada, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso."),
         req("Enviar respuestas", "POST", "/api/prueba-practica/{{pruebaId}}/respuestas",
             body={"pruebaId": "{{pruebaId}}", "respuestas": [{"preguntaId": "{{preguntaAppId}}", "opcionesSeleccionadas": ["{{opcionAppId}}"], "respuestaTexto": "Mi respuesta"}]},
             espera=[200, 400, 404],
@@ -343,7 +351,8 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos."),
         req("Generar preguntas con IA (alias)", "POST", "/api/v1/admin/questions/generate-ai", ADMIN,
             body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2}, omitir_en_prueba=True,
-            desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM)."),
+            desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: "
+            "`tope_generacion_ia_alcanzado` (gasto del mes en el tope) y `demasiadas_solicitudes` (comparte el contador por IP con la ruta nueva)."),
         req("Callback de Google (web)", "GET", "/auth/google/callback", PUBLICA, omitir_en_prueba=True,
             desc="Lo llama Google al terminar el login web; no se usa desde Postman."),
     ]),
@@ -452,7 +461,7 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 403 | Sesión válida sin permiso (rutas de admin) |
 | 404 | No existe, o es de otro usuario (no se revela que existe) |
 | 409 | Choca con el estado actual (`entrevista_en_progreso`, `pregunta_ya_respondida`, `compra_ya_registrada`…) |
-| 429 | Límite superado: `demasiadas_solicitudes` (por IP) o `demasiados_intentos` (login) |
+| 429 | Límite superado: `demasiadas_solicitudes` (por IP), `demasiados_intentos` (login) o `tope_generacion_ia_alcanzado` (gasto mensual en generar preguntas con IA) |
 | 500 | Error inesperado (`error_interno`); el detalle queda en el log, nunca en la respuesta |
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
@@ -472,8 +481,8 @@ Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay en
 - **Ids**: UUID. Un id mal formado en la ruta responde `400 id_invalido`.
 - **Niveles**: `junior | semisenior | senior` (también se aceptan `jr | mid | sr`).
 - **Paginación**: `?pagina=1&tamano=20` donde aplica (tamaño máximo 100).
-- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min. **Login**: 5 contraseñas
-  incorrectas bloquean el correo 15 min.
+- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min; generación de preguntas con
+  IA (admin) 30 cada 60 min. **Login**: 5 contraseñas incorrectas bloquean el correo 15 min.
 - ⚠️ en una descripción = cuesta dinero (LLM), consume cuota de APIs externas, manda correos o borra datos.
 """
 

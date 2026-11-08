@@ -153,6 +153,46 @@ class PruebaControladorPregunta {
     }
 
     @Test
+    fun `al agotar el tope mensual responde 429 con un codigo que el panel puede mostrar`() = testApplication {
+        val proveedor = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+        // gpt-4o-mini con 100 + 200 tokens cuesta ~USD 0.000135: la primera llamada agota un tope de 0.0001.
+        val sistema = SistemaPrueba(proveedorIa = proveedor, topeGastoGeneracionIaUsd = 0.0001)
+        application { sistema.montar(this) }
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val (cargoId, _) = sistema.crearCatalogo()
+        val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":1,"tipo":"abierta_texto","categoria":"blanda"}"""
+
+        assertEquals(HttpStatusCode.Created, enviar("POST", "$base/generar-ia", pedido, admin).status)
+        val agotado = enviar("POST", "$base/generar-ia", pedido, admin)
+        assertEquals(HttpStatusCode.TooManyRequests, agotado.status)
+        assertEquals("tope_generacion_ia_alcanzado", agotado.objeto().texto("error"))
+        assertTrue(!agotado.objeto().texto("mensaje").isNullOrBlank())
+        assertEquals(1, proveedor.solicitudes.size)
+    }
+
+    @Test
+    fun `el limite por IP de generar-ia es comun a la ruta nueva y al alias y no lo gasta un no admin`() = testApplication {
+        val proveedor = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+        val sistema = SistemaPrueba(
+            proveedorIa = proveedor,
+            limites = CONFIGURACION.ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000, generacionesIaPorIp = 1)
+        )
+        application { sistema.montar(this) }
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val usuario = tokenDe(sistema, "ana@ejemplo.com")
+        val (cargoId, _) = sistema.crearCatalogo()
+        val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":1,"tipo":"abierta_texto","categoria":"blanda"}"""
+
+        // Un no admin recibe 403 antes del límite: no consume el cupo de la IP.
+        repeat(2) { assertEquals(HttpStatusCode.Forbidden, enviar("POST", "$base/generar-ia", pedido, usuario).status) }
+        assertEquals(HttpStatusCode.Created, enviar("POST", "$base/generar-ia", pedido, admin).status)
+        val alias = enviar("POST", "/api/v1/admin/questions/generate-ai", pedido, admin)
+        assertEquals(HttpStatusCode.TooManyRequests, alias.status)
+        assertEquals("demasiadas_solicitudes", alias.objeto().texto("error"))
+        assertEquals(1, proveedor.solicitudes.size)
+    }
+
+    @Test
     fun `generar con un cargo inexistente responde 404 sin llamar al LLM`() = testApplication {
         val proveedor = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
         val sistema = sistemaCon(proveedor)

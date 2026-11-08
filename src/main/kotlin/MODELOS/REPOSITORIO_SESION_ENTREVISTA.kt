@@ -1,5 +1,6 @@
 package MODELOS
 
+import kotlinx.serialization.json.JsonObject
 import ERRORES.ErrorConflicto
 import UTILIDADES.SQLSTATE_VALOR_DUPLICADO
 import UTILIDADES.transaccion
@@ -25,7 +26,9 @@ enum class ResultadoRegistroRespuestas { REGISTRADAS, SESION_NO_ACTIVA, YA_RESPO
 interface RepositorioSesionEntrevista {
     /**
      * Crea la sesión con un slot por pregunta (en ese orden) y suma un uso a cada pregunta.
-     * ErrorConflicto("entrevista_en_progreso") si el usuario ya tiene una sesión en progreso.
+     * Si [NuevaSesionEntrevista.reemplazaA] viene, cancela esa sesión (si sigue en progreso) en la misma transacción:
+     * si la nueva no se crea, la anterior sigue en curso.
+     * ErrorConflicto("entrevista_en_progreso") si después de eso el usuario aún tiene una sesión en progreso.
      */
     suspend fun crear(nueva: NuevaSesionEntrevista, preguntas: List<Pregunta>): SesionEntrevista
 
@@ -54,6 +57,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             transaccion {
                 // Bloquear al usuario serializa dos "iniciar" simultáneos (en Postgres además lo impide el índice único).
                 TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq nueva.usuarioId }.forUpdate().toList()
+                nueva.reemplazaA?.let { cerrarSiSigueEnProgreso(it, EstadoSesionEntrevista.CANCELADA, nueva.inicio) }
                 if (existeEnProgreso(nueva.usuarioId)) throw entrevistaEnProgreso()
                 insertarSesion(id, nueva)
                 insertarPreguntas(id, preguntas)
@@ -133,14 +137,8 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         ResultadoRegistroRespuestas.REGISTRADAS
     }
 
-    override suspend fun cerrar(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean = transaccion {
-        TablaSesionEntrevista.update({
-            (TablaSesionEntrevista.sesionId eq sesionId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd)
-        }) {
-            it[TablaSesionEntrevista.estado] = estado.valorBd
-            it[fechaFin] = fecha
-        } > 0
-    }
+    override suspend fun cerrar(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean =
+        transaccion { cerrarSiSigueEnProgreso(sesionId, estado, fecha) }
 
     override suspend fun preguntasRecientes(usuarioId: UUID, sesiones: Int): Set<UUID> = transaccion {
         val recientes = TablaSesionEntrevista.select(TablaSesionEntrevista.sesionId)
@@ -189,6 +187,14 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 
     // ---------- Apoyo (dentro de una transacción) ----------
 
+    private fun cerrarSiSigueEnProgreso(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean =
+        TablaSesionEntrevista.update({
+            (TablaSesionEntrevista.sesionId eq sesionId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd)
+        }) {
+            it[TablaSesionEntrevista.estado] = estado.valorBd
+            it[fechaFin] = fecha
+        } > 0
+
     private fun existeEnProgreso(usuarioId: UUID): Boolean =
         TablaSesionEntrevista.selectAll()
             .where { (TablaSesionEntrevista.usuarioId eq usuarioId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd) }
@@ -213,6 +219,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             this[TablaSesionPreguntaRespuesta.preguntaId] = pregunta.id
             this[TablaSesionPreguntaRespuesta.enunciado] = pregunta.enunciado
             this[TablaSesionPreguntaRespuesta.respuestaIdeal] = pregunta.respuestaIdeal
+            this[TablaSesionPreguntaRespuesta.rubrica] = pregunta.rubrica ?: RUBRICA_VACIA
             this[TablaSesionPreguntaRespuesta.tipoPregunta] = pregunta.tipo.valorBd
             this[TablaSesionPreguntaRespuesta.categoriaHabilidad] = pregunta.categoria.valorBd
             this[TablaSesionPreguntaRespuesta.skillId] = pregunta.skillId
@@ -258,6 +265,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         orden = this[TablaSesionPreguntaRespuesta.orden].toInt(),
         enunciado = this[TablaSesionPreguntaRespuesta.enunciado],
         respuestaIdeal = this[TablaSesionPreguntaRespuesta.respuestaIdeal],
+        rubrica = this[TablaSesionPreguntaRespuesta.rubrica],
         // Filas anteriores a la migración 016 no tienen snapshot de tipo: eran preguntas abiertas.
         tipo = this[TablaSesionPreguntaRespuesta.tipoPregunta]?.let(TipoPregunta::desdeBd) ?: TipoPregunta.ABIERTA_TEXTO,
         categoria = this[TablaSesionPreguntaRespuesta.categoriaHabilidad]?.let(CategoriaHabilidad::desdeBd) ?: CategoriaHabilidad.TECNICA,
@@ -336,3 +344,6 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
         ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza])
     }
 }
+
+/** Una pregunta sin rúbrica se guarda como objeto vacío: NULL queda solo para las filas anteriores a la migración 022. */
+private val RUBRICA_VACIA = JsonObject(emptyMap())

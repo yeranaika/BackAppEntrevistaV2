@@ -412,6 +412,9 @@ CREATE TABLE IF NOT EXISTS pregunta_generacion_ia (
     revisado_por     UUID        REFERENCES usuario(usuario_id) ON DELETE SET NULL,
     fecha_generacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- El tope mensual de gasto en IA (D23) suma por fecha en cada pedido (migración 022).
+CREATE INDEX IF NOT EXISTS idx_gen_ia_fecha
+    ON pregunta_generacion_ia(fecha_generacion);
 CREATE INDEX IF NOT EXISTS idx_gen_ia_estado
     ON pregunta_generacion_ia(estado_revision, fecha_generacion DESC)
     INCLUDE (cargo_id, skill_id, modelo_llm);
@@ -674,6 +677,8 @@ CREATE TABLE IF NOT EXISTS sesion_pregunta_respuesta (
     skill_id             UUID      REFERENCES skill(skill_id) ON DELETE SET NULL,
     -- [{ "id": "...", "texto": "...", "es_correcta": true }]
     opciones_snap        JSONB,
+    -- Rúbrica de evaluación al servir la pregunta ('{}' si no tenía): editar el banco no cambia el reporte (migración 022)
+    rubrica_snap         JSONB,
     -- Sin FK: apunta al snapshot
     opcion_elegida_id    UUID,
     -- NULL = todavía sin responder

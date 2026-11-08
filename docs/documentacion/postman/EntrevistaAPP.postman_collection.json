@@ -2270,7 +2270,7 @@
                 "{{preguntaId}}"
               ]
             },
-            "description": "Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión.",
+            "description": "Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión (y su traza de IA, si la tiene, a `pendiente_revision` sin revisor).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2431,7 +2431,7 @@
                 "generar-ia"
               ]
             },
-            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10.",
+            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2499,7 +2499,7 @@
     },
     {
       "name": "10 · Entrevista",
-      "description": "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.",
+      "description": "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones, respuesta ideal y rúbrica): editar o borrar el banco no cambia una entrevista rendida ni su reporte.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.",
       "item": [
         {
           "name": "Iniciar entrevista",
@@ -2522,7 +2522,7 @@
                 "entrevistas"
               ]
             },
-            "description": "Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`.",
+            "description": "Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`. La app Android (`POST /api/prueba-practica/front` con `ENT`) reemplaza la entrevista en curso en vez de responder 409, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidadPreguntas\": 3\n}",
@@ -3643,7 +3643,7 @@
                 "front"
               ]
             },
-            "description": "`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`.",
+            "description": "`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`. Con `ENT` la entrevista en curso se reemplaza (se cancela en la misma transacción que crea la nueva) y con `PR`/`BL` la práctica en curso queda abandonada, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"sector\": \"backend\",\n  \"nivel\": \"jr\",\n  \"metaCargo\": \"{{nombreCargo}}\",\n  \"tipoPrueba\": \"PR\"\n}",
@@ -4306,7 +4306,7 @@
                 "generate-ai"
               ]
             },
-            "description": "⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM).",
+            "description": "⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: `tope_generacion_ia_alcanzado` (gasto del mes en el tope) y `demasiadas_solicitudes` (comparte el contador por IP con la ruta nueva).",
             "auth": {
               "type": "bearer",
               "bearer": [

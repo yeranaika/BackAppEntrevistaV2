@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [pendientes, deuda-tecnica, backlog]
-actualizado: 2026-10-03
+actualizado: 2026-11-07
 ---
 
 # Pendientes y deuda técnica (backend)
@@ -23,6 +23,11 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Ktlint y Detekt en CI**: requieren configurar reglas compatibles con las convenciones (archivos en MAYÚSCULAS,
   nombres en español) antes de activarlos; con la configuración por defecto fallarían desde el primer día.
 - [ ] **Revisión de código** de las ramas antes de fusionar a `main`.
+- [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en la BD local y en Railway, con
+  respaldo, **antes** de desplegar esa rama (sin la columna fallan los endpoints de entrevista y el reporte), y volver
+  a correrla una vez desplegada.
+- [ ] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): la semilla re-ejecutable está escrita pero el script aún no se
+  ha corrido contra un PostgreSQL real.
 
 ## Media
 - [ ] **Logs estructurados con id de solicitud** (correlacionar error del cliente con el log).
@@ -47,6 +52,23 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Correo de recuperación sin reintento**: si el envío se corta por un apagado, no se reenvía solo (el usuario pide otro).
 - [ ] **Entrevistas finalizadas hace más de 24 h sin reporte** (datos anteriores a la Fase 7 o caídas largas): no las
   rescata la tarea periódica; decidir un relleno único por SQL.
+- [x] **Tope de gasto en la generación de preguntas con IA** (2026-11-07, rama `fix/banco-preguntas`, D23):
+  `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD/mes UTC, global) → `429 tope_generacion_ia_alcanzado`, y límite por IP
+  `LIMITE_GENERACIONES_IA_POR_IP`. Quedan abiertos los cinco puntos siguientes.
+- [ ] **Tope de generación por admin**: hoy es global porque `pregunta_generacion_ia` no guarda quién pidió la
+  generación; requiere una columna `solicitado_por` (migración) y decidir el reparto.
+- [ ] **Reserva previa del tope de generación**: sin reserva, dos generaciones simultáneas pueden pasar el tope en lo
+  que cueste una de ellas (el tope de reportes, D17, sí reserva).
+- [ ] **Cortocircuito abierto auditado como fallida**: cuando la política del LLM tiene el cortocircuito abierto
+  (`*_no_disponible`), la generación se registra en `pregunta_generacion_ia` como fallida aunque no hubo llamada al
+  proveedor (sin tokens, así que no suma gasto, pero ensucia la auditoría y el conteo de `fallidas`).
+- [ ] **Panel admin: gasto del mes frente al tope** de generación (hoy solo se ve el 429 al llegar).
+- [x] **Panel admin: texto de `GenerarPreguntas.jsx`** alineado con D23 (rama `fix/textos-costos-ia` del panel, sin
+  push): fallidas con tokens, `provider_timeout` y el 429 del tope.
+- [ ] **Estimar el costo de un `provider_timeout`** para el tope (hoy cuenta 0: no hay tokens, aunque el proveedor
+  pudo cobrar la llamada).
+- [ ] **Limpiar las BD ya contaminadas por la semilla vieja** (preguntas y opciones duplicadas, D25): decidir un SQL
+  único, **con respaldo**, que conserve la copia a la que apuntan los snapshots e historial.
 
 ## Baja
 - [ ] Revisar dependencias sin uso (`poi-ooxml`, `bcrypt`, `google-api-client:2.+` con versión dinámica).

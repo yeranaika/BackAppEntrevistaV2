@@ -37,6 +37,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
@@ -86,9 +88,12 @@ class PruebaServicioReporte {
         usuario: UUID = ana,
         aciertaAlternativas: Boolean = true,
         textoBlandas: String? = "no sé",
-        textoTecnicas: String = ideal
+        textoTecnicas: String = ideal,
+        /** Se ejecuta con la sesión ya servida y antes de responder (p. ej. para editar el banco). */
+        antesDeResponder: (SesionEntrevista) -> Unit = {}
     ): SesionEntrevista = runBlocking {
         val sesion = sistema.entrevista.iniciar(usuario, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+        antesDeResponder(sesion)
         val respuestas = sesion.preguntas.mapNotNull { p ->
             when {
                 p.tipo == TipoPregunta.OPCION_MULTIPLE ->
@@ -124,6 +129,59 @@ class PruebaServicioReporte {
                 delay(20)
             }
             @Suppress("UNREACHABLE_CODE") error("inalcanzable")
+        }
+    }
+
+    /** Cambia la rúbrica de las preguntas abiertas técnicas en el banco (como si un admin la editara). */
+    private fun cambiarRubricaEnBanco(sesion: SesionEntrevista, json: String) {
+        val ids = sesion.preguntas.filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+            .mapNotNull { it.preguntaId }
+        org.jetbrains.exposed.sql.transactions.transaction {
+            ids.forEach { id ->
+                MODELOS.TablaPregunta.update({ MODELOS.TablaPregunta.preguntaId eq id }) {
+                    it[MODELOS.TablaPregunta.rubricaEvaluacion] = Json.parseToJsonElement(json).jsonObject
+                }
+            }
+        }
+    }
+
+    private fun abiertasTecnicas(sesion: SesionEntrevista) = runBlocking {
+        sistema.sesionesEntrevista.buscar(sesion.id)!!.preguntas
+            .filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+    }
+
+    // ---------- Rúbrica copiada al servir la pregunta (D24) ----------
+
+    @Test
+    fun `editar la rubrica del banco despues de servir la pregunta no cambia la evaluacion`() {
+        val sesion = entrevistaFinalizada(antesDeResponder = { servida ->
+            val copias = servida.preguntas.filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+            assertEquals(2, copias.size)
+            assertTrue(copias.all { SERVICIOS.palabrasClaveDe(it.rubrica) == listOf("corrutina", "hilo") })
+            cambiarRubricaEnBanco(servida, """{"palabras_clave":["inmutabilidad","sellada"]}""")
+        })
+        assertEquals(EstadoReporte.LISTO, generar(sesion).estado)
+        // La respuesta es la ideal: con la rúbrica copiada (corrutina, hilo) cubre todo; con la del banco quedaría en 60.
+        abiertasTecnicas(sesion).forEach { pregunta ->
+            assertTrue(pregunta.puntaje!!.toDouble() > 90.0, "puntaje ${pregunta.puntaje}")
+            assertTrue(!pregunta.feedback.toString().contains("inmutabilidad"))
+        }
+    }
+
+    @Test
+    fun `una fila sin copia de la rubrica anterior a la migracion 022 usa la del banco`() {
+        val sesion = entrevistaFinalizada(antesDeResponder = { servida ->
+            org.jetbrains.exposed.sql.transactions.transaction {
+                MODELOS.TablaSesionPreguntaRespuesta.update({ MODELOS.TablaSesionPreguntaRespuesta.sesionId eq servida.id }) {
+                    it[MODELOS.TablaSesionPreguntaRespuesta.rubrica] = null
+                }
+            }
+            cambiarRubricaEnBanco(servida, """{"palabras_clave":["inmutabilidad","sellada"]}""")
+        })
+        assertEquals(EstadoReporte.LISTO, generar(sesion).estado)
+        abiertasTecnicas(sesion).forEach { pregunta ->
+            assertTrue(pregunta.puntaje!!.toDouble() < 90.0, "puntaje ${pregunta.puntaje}")
+            assertTrue(pregunta.feedback.toString().contains("inmutabilidad"))
         }
     }
 

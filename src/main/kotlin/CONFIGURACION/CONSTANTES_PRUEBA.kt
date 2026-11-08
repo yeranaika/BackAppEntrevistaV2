@@ -51,6 +51,13 @@ const val EVALUACIONES_IA_MENSUALES_POR_DEFECTO = 30
 val ZONA_CORTE_CUOTA_IA: ZoneId = ZoneOffset.UTC
 
 /**
+ * Generación de preguntas con IA (admin): gasto máximo estimado en USD por mes calendario UTC, sumando las llamadas de
+ * todos los admins (también las fallidas, con su costo estimado). 0 = generación con IA desactivada. Se cambia con
+ * LIMITE_GASTO_GENERACION_IA_MENSUAL_USD (D23).
+ */
+const val GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO = 5.0
+
+/**
  * Una reserva de IA en un reporte que sigue "generando" deja de contar pasado este tiempo (el servidor se reinició
  * a mitad de la generación). La llamada al LLM tiene un tope de ~70 s, así que una generación real nunca dura tanto.
  * También es el umbral desde el cual un reporte en "generando" se considera abandonado y se rescata (D20): debe ser

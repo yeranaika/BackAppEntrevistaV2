@@ -160,13 +160,18 @@ class SistemaPrueba(
     /** LLM falso: por defecto responde un lote válido de 1 pregunta abierta. */
     val proveedorIa: ProveedorIaGrabador = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto")),
     /** Por defecto holgados para que las pruebas no choquen con el límite; se bajan para probarlo. */
-    private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000),
+    private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000, generacionesIaPorIp = 1_000),
     val clienteMercado: ClienteMercadoLaboralFalso = ClienteMercadoLaboralFalso(emptyMap()),
     val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso(),
     val procesadorEntrevista: ProcesadorEntrevistaGrabador = ProcesadorEntrevistaGrabador(),
     val reloj: RelojAjustable = RelojAjustable(),
     /** Caché compartida (hace de Redis): los contadores del límite por IP usan el [reloj] de la prueba. */
-    val cache: CacheEnMemoria = CacheEnMemoria { reloj.millis() }
+    val cache: CacheEnMemoria = CacheEnMemoria { reloj.millis() },
+    /**
+     * Tope mensual de la generación con IA (D23). Usa el reloj del sistema, no [reloj]: la auditoría en H2 se fecha con
+     * la hora real.
+     */
+    topeGastoGeneracionIaUsd: Double = CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -193,7 +198,8 @@ class SistemaPrueba(
     val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), reloj)
     val pregunta = ServicioPregunta(preguntas, catalogo)
     val generacion = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
+        SERVICIOS.TopeGastoGeneracionIa(usdMensual = topeGastoGeneracionIaUsd)
     )
 
     val mercadoRepo = RepositorioMercadoExposed()

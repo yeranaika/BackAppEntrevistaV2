@@ -1,7 +1,7 @@
 ---
 tipo: arquitectura
 tags: [base-de-datos, modelo, migraciones]
-actualizado: 2026-10-03
+actualizado: 2026-11-07
 ---
 
 # Modelo de datos
@@ -9,6 +9,12 @@ actualizado: 2026-10-03
 Base **PostgreSQL 16**, esquema **`app`**. Esquema completo en `src/DB/BasedeDatos.EntrevistaApp.sql` (fuente de verdad
 para una BD nueva) y datos de ejemplo en `BasedeDatos.EntrevistaApp.Seeds.sql`. Los cambios sobre una BD existente
 van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
+
+La **semilla es re-ejecutable** (D25): los catálogos usan `ON CONFLICT` sobre su clave única y, como `pregunta` y
+`opcion_pregunta` no tienen clave natural, cada pregunta se inserta solo si no existe otra con el mismo enunciado +
+skill + cargo + nivel, y sus opciones solo si aún no tiene ninguna. Si el admin editó el enunciado, la skill o el nivel
+de una pregunta de la semilla, volver a correrla crea otra vez la original. Una BD que ya tenga duplicados de la
+semilla vieja no se limpia sola. Se verifica con `src/DB/PROBAR_SEMILLA.ps1` → [[Puesta en marcha]].
 
 ## Tablas por dominio
 | Dominio | Tablas | Notas |
@@ -20,7 +26,7 @@ van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
 | Suscripción | `suscripcion`, `codigo_suscripcion` | `token_compra_hash` único: un pago, una cuenta |
 | Mercado | `cargo`, `skill`, `cargo_skill`, `skill_tendencia` | `cargo_skill.nivel_requerido`, `peso`, `obligatoria` |
 | Banco de preguntas | `pregunta`, `opcion_pregunta`, `pregunta_generacion_ia` | Solo `estado = 'aprobada'` se sirve a usuarios; trazabilidad y costo de la IA |
-| Entrevista | `sesion_entrevista`, `sesion_pregunta_respuesta`, `metrica_video` | Snapshot de cada pregunta; índice único de una sesión en curso por usuario |
+| Entrevista | `sesion_entrevista`, `sesion_pregunta_respuesta`, `metrica_video` | Snapshot de cada pregunta (también la rúbrica, `rubrica_snap`, D24); índice único de una sesión en curso por usuario |
 | Feedback | `reporte_entrevista`, `reporte_skill_detalle` | `estado_generacion`, `modo_evaluacion`, modelo/tokens/costo, `intentos_generacion`. `modo_evaluacion='ia'` con estado `generando` es un cupo del tope mensual reservado (D17; caduca a los 10 min) |
 | Nivelación | `test_nivelacion`, `intento_test`, `resultado_nivelacion` | `respuestas_detalle` (JSONB) guarda preguntas servidas y corrección |
 | Práctica | `sesion_practica`, `respuesta_practica` | `preguntas_snap` (JSONB); `id_local` único para sincronización offline |
@@ -28,8 +34,9 @@ van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
 | Visión (futuro) | `modelo_vision_ia`, `frame_entrenamiento`, `prediccion_vision`, `onboarding_usuario` | Existen en el esquema; el backend actual no las usa |
 
 ## Principios
-- **Snapshots**: entrevista, práctica y nivelación copian la pregunta servida (enunciado, opciones, respuesta ideal).
-  Editar o borrar el banco nunca cambia una prueba ya rendida.
+- **Snapshots**: entrevista, práctica y nivelación copian la pregunta servida (enunciado, opciones, respuesta ideal;
+  la entrevista también la rúbrica, de la que el reporte saca las palabras clave). Editar o borrar el banco nunca
+  cambia una prueba ya rendida. Solo las filas de entrevista anteriores a la migración 022 sin copia recurren al banco.
 - **Concurrencia por la BD**: índices únicos parciales + actualizaciones condicionales (`UPDATE … WHERE estado = …`)
   y `SELECT … FOR UPDATE` sobre el usuario o la sesión. Ejemplos: una sola entrevista en curso, un canje no supera
   `max_uses`, una nivelación se rinde una vez, un reporte se genera una vez.
@@ -49,6 +56,7 @@ van en `migrations/` (ver más abajo). Tecnología: [[PostgreSQL y Exposed]].
 | `019_rescate_reportes.sql` | `intento_id` del reporte (cada intento de generación escribe solo lo suyo) e índices parciales para el rescate de reportes interrumpidos (D20) |
 | `020_metricas_video_idempotentes.sql` | Borra métricas de video duplicadas y crea el índice único `(sesion_id, timestamp_ms)`: un lote reenviado no se guarda dos veces (D21) |
 | `021_metricas_sin_emociones.sql` | `puntaje_lenguaje_corporal` admite NULL («sin medir») y los reportes sin métricas con datos pasan de 0 a NULL; borra las expresiones (emociones) guardadas (D22) |
+| `022_rubrica_snap_y_traza_editada.sql` | `sesion_pregunta_respuesta.rubrica_snap` (copia de la rúbrica; completa las filas existentes con la del banco) y devuelve a `pendiente_revision` sin revisor las trazas de IA de preguntas `pendiente` que estaban aprobadas o rechazadas (D24). **Aplicarla antes de desplegar** |
 
 Todas son **idempotentes** (se pueden correr dos veces). Al crear una nueva: actualizar también el esquema base y
 verificar sobre una BD vacía (`createdb`, esquema, migraciones, `dropdb`). Ver [[Puesta en marcha]].

@@ -12,6 +12,7 @@ private const val PUERTO_SMTP_POR_DEFECTO = 465
 private const val TAMANO_POOL_BD_POR_DEFECTO = 10
 private const val REGISTROS_POR_IP_POR_DEFECTO = 30
 private const val RECUPERACIONES_POR_IP_POR_DEFECTO = 5
+private const val GENERACIONES_IA_POR_IP_POR_DEFECTO = 30
 private const val HOST_JSEARCH_POR_DEFECTO = "jsearch.p.rapidapi.com"
 
 data class ConfiguracionBaseDatos(
@@ -64,7 +65,9 @@ data class ConfiguracionLlm(
     val openAiApiKey: String,
     val anthropicApiKey: String,
     /** Tope mensual de evaluaciones con IA por usuario premium; 0 = sin IA (D17). */
-    val evaluacionesIaMensuales: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO
+    val evaluacionesIaMensuales: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO,
+    /** Tope mensual (USD estimados, UTC) de la generación de preguntas con IA; 0 = desactivada (D23). */
+    val gastoGeneracionIaMensualUsd: Double = GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
 ) {
     val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank()
 }
@@ -77,7 +80,9 @@ data class ConfiguracionLimites(
      * Cabecera en la que el proxy de confianza escribe la IP del cliente (en Railway: X-Real-IP). null = la conexión
      * TCP directa. Solo se activa tras comprobar que el proxy la sobrescribe (si no, el cliente podría falsificarla).
      */
-    val cabeceraIpCliente: String? = null
+    val cabeceraIpCliente: String? = null,
+    /** Generaciones de preguntas con IA por IP en cada ventana (anti-ráfaga; el gasto lo frena el tope mensual, D23). */
+    val generacionesIaPorIp: Int = GENERACIONES_IA_POR_IP_POR_DEFECTO
 ) {
     init {
         cabeceraIpCliente?.let {
@@ -127,8 +132,24 @@ private class LectorConfiguracion(entorno: ApplicationEnvironment) {
 
     fun entero(clave: String, porDefecto: Int): Int = opcional(clave)?.toIntOrNull() ?: porDefecto
 
+
     fun booleano(clave: String, rutaYaml: String? = null): Boolean =
         opcional(clave, rutaYaml)?.lowercase() in setOf("true", "1", "yes")
+}
+
+/**
+ * Tope mensual de la generación con IA (D23). Sin definir: el valor por defecto. Acepta coma decimal ("0,5"). Un valor
+ * definido pero ilegible, negativo o no finito se toma como 0 (generación desactivada) con un aviso: ante la duda no
+ * se gasta en IA, y no se cae en silencio a un tope más alto que el que se quiso poner.
+ */
+internal fun leerTopeGastoUsd(valor: String?): Double {
+    val texto = valor?.trim()?.takeIf { it.isNotEmpty() } ?: return GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
+    val numero = texto.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+    if (numero == null) {
+        org.slf4j.LoggerFactory.getLogger("Configuracion")
+            .warn("LIMITE_GASTO_GENERACION_IA_MENSUAL_USD='{}' no es un monto válido: la generación con IA queda desactivada", texto)
+    }
+    return numero ?: 0.0
 }
 
 private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionGeneral {
@@ -174,12 +195,14 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             openAiApiKey = lector.opcional("OPENAI_API_KEY").orEmpty(),
             anthropicApiKey = lector.opcional("ANTHROPIC_API_KEY").orEmpty(),
             // Un valor negativo se toma como 0: ante la duda no se gasta en IA.
-            evaluacionesIaMensuales = lector.entero("LIMITE_EVALUACIONES_IA_MENSUAL", EVALUACIONES_IA_MENSUALES_POR_DEFECTO).coerceAtLeast(0)
+            evaluacionesIaMensuales = lector.entero("LIMITE_EVALUACIONES_IA_MENSUAL", EVALUACIONES_IA_MENSUALES_POR_DEFECTO).coerceAtLeast(0),
+            gastoGeneracionIaMensualUsd = leerTopeGastoUsd(lector.opcional("LIMITE_GASTO_GENERACION_IA_MENSUAL_USD"))
         ),
         limites = ConfiguracionLimites(
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),
             recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO),
-            cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() }
+            cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() },
+            generacionesIaPorIp = lector.entero("LIMITE_GENERACIONES_IA_POR_IP", GENERACIONES_IA_POR_IP_POR_DEFECTO).coerceAtLeast(1)
         ),
         apagado = ConfiguracionApagado(
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).

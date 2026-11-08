@@ -92,6 +92,8 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
         if (actualizadas == 0) return@transaccion false
         TablaOpcionPregunta.deleteWhere { preguntaId eq id }
         insertarOpciones(id, contenido.opciones)
+        // Nadie revisó el contenido nuevo: la traza de IA vuelve a pendiente y sin revisor, igual que la pregunta (D24).
+        marcarTraza(id, EstadoPregunta.PENDIENTE, revisadoPor = null)
         true
     }
 
@@ -101,10 +103,7 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
                 it[TablaPregunta.estado] = estado.valorBd
                 it[TablaPregunta.motivoRechazo] = motivoRechazo
             }
-            TablaGeneracionPreguntaIa.update({ TablaGeneracionPreguntaIa.preguntaId eq id }) {
-                it[estadoRevision] = estado.valorTrazabilidad
-                it[TablaGeneracionPreguntaIa.revisadoPor] = revisadoPor
-            }
+            marcarTraza(id, estado, revisadoPor)
             actualizadas > 0
         }
 
@@ -115,6 +114,14 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
     }
 
     // ---------- Apoyo ----------
+
+    /** Refleja el estado de revisión en la trazabilidad de IA (no hace nada si la pregunta la escribió un admin). */
+    private fun marcarTraza(id: UUID, estado: EstadoPregunta, revisadoPor: UUID?) {
+        TablaGeneracionPreguntaIa.update({ TablaGeneracionPreguntaIa.preguntaId eq id }) {
+            it[TablaGeneracionPreguntaIa.estadoRevision] = estado.valorTrazabilidad
+            it[TablaGeneracionPreguntaIa.revisadoPor] = revisadoPor
+        }
+    }
 
     private fun consulta(filtro: FiltroPreguntas): Query {
         val condiciones = listOfNotNull(

@@ -38,6 +38,7 @@ import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
 import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioMercado
 import SERVICIOS.ServicioOnboarding
@@ -154,7 +155,10 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
 
-    val servicioGeneracionPregunta = ServicioGeneracionPregunta(proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo)
+    val servicioGeneracionPregunta = ServicioGeneracionPregunta(
+        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo,
+        TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+    )
     /** Gasto en IA para el admin (reportes con IA y generación de preguntas). */
     val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed())
 

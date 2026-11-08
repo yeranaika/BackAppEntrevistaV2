@@ -1,7 +1,7 @@
 ---
 tipo: arquitectura
 tags: [errores, resiliencia, cache]
-actualizado: 2026-10-03
+actualizado: 2026-11-07
 ---
 
 # Manejo de errores y resiliencia
@@ -19,13 +19,15 @@ Los servicios lanzan errores de `ERRORES/ERRORES_APLICACION.kt`; **nunca** códi
 | `ErrorProhibido` | 403 | Sin permiso |
 | `ErrorNoEncontrado` | 404 | No existe **o es de otro usuario** |
 | `ErrorConflicto` | 409 | Choca con el estado actual |
-| `ErrorDemasiadosIntentos` | 429 | Bloqueo de login |
-| `ErrorRespuestaExterna` | 502 | Proveedor respondió algo inutilizable |
+| `ErrorDemasiadosIntentos` | 429 | Bloqueo de login, intentos del código de recuperación y tope mensual de gasto en la generación de preguntas con IA (`tope_generacion_ia_alcanzado`, D23) |
+| `ErrorRespuestaExterna` | 502 | Proveedor respondió algo inutilizable. Lleva los tokens que el proveedor informó (para auditar su costo; nunca viajan al cliente) |
 | `ErrorServicioExterno` | 503 | Proveedor o BD no disponible |
 | cualquier otra excepción | 500 `error_interno` | Se registra con traza; al cliente sin detalles |
 
 Cuerpo: `{"error": "<codigo_snake_case>", "mensaje": "<texto en español>", "message": "<igual>"}`.
 El código es **estable** (lo usa la app); el mensaje es para mostrar. Catálogo completo de códigos en [[API]].
+El límite por IP (plugin `RateLimit`, D18) no pasa por `ErrorDemasiadosIntentos`: responde `429 demasiadas_solicitudes`
+desde `CONFIGURACION_ERRORES.kt` (registro, recuperación y generación de preguntas con IA).
 
 ## Resiliencia de integraciones
 `UTILIDADES/UTILIDAD_RESILIENCIA.kt` → `PoliticaResiliencia`: **timeout por intento**, **reintentos con espera

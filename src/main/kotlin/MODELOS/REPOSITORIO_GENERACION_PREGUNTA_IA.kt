@@ -4,6 +4,7 @@ import UTILIDADES.transaccion
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -37,6 +38,9 @@ interface RepositorioGeneracionPreguntaIa {
 
     /** Registra una llamada cuyo resultado no se pudo usar (para auditar costo y fallas). */
     suspend fun registrarFallo(traza: TrazaGeneracion)
+
+    /** Usos registrados (lotes y fallos) con fecha en [desde, hasta): base del tope mensual de gasto (D23). */
+    suspend fun usosEntre(desde: Instant, hasta: Instant): List<UsoIaRegistrado>
 }
 
 class RepositorioGeneracionPreguntaIaExposed : RepositorioGeneracionPreguntaIa {
@@ -77,6 +81,9 @@ class RepositorioGeneracionPreguntaIaExposed : RepositorioGeneracionPreguntaIa {
             }
         }
     }
+
+    override suspend fun usosEntre(desde: Instant, hasta: Instant): List<UsoIaRegistrado> =
+        transaccion { leerUsosGeneracionPreguntas(desde, hasta) }
 
     private fun escribirTraza(fila: UpdateBuilder<*>, traza: TrazaGeneracion, ahora: OffsetDateTime) {
         fila[TablaGeneracionPreguntaIa.cargoId] = traza.cargoId

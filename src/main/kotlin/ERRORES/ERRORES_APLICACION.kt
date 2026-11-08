@@ -27,11 +27,20 @@ class ErrorNoEncontrado(codigo: String, mensaje: String = codigo) : ErrorAplicac
 /** El recurso ya existe o choca con el estado actual → 409. */
 class ErrorConflicto(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
 
-/** Se superó el límite de intentos (ej: código de recuperación) → 429. */
+/** Se superó un límite de intentos o un tope de uso (código de recuperación, login, gasto mensual en IA) → 429. */
 class ErrorDemasiadosIntentos(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
 
-/** Un proveedor externo respondió, pero con algo inutilizable (rechazo, respuesta truncada, JSON inválido) → 502. */
-class ErrorRespuestaExterna(codigo: String, mensaje: String = codigo) : ErrorAplicacion(codigo, mensaje)
+/**
+ * Un proveedor externo respondió, pero con algo inutilizable (rechazo, respuesta truncada, JSON inválido) → 502.
+ * Si el proveedor informó los tokens de esa respuesta (que igual cobra), viajan aquí para auditar su costo; nunca
+ * se envían al cliente.
+ */
+class ErrorRespuestaExterna(
+    codigo: String,
+    mensaje: String = codigo,
+    val tokensEntrada: Int? = null,
+    val tokensSalida: Int? = null
+) : ErrorAplicacion(codigo, mensaje)
 
 /** Un proveedor externo (LLM, correo, Google, JSearch…) falló o no está configurado → 503. */
 class ErrorServicioExterno(

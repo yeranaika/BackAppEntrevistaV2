@@ -54,24 +54,33 @@ class LectorCostosIaExposed : LectorCostosIa {
                     exitoso = it[TablaReporteEntrevista.modoEvaluacion] == ModoEvaluacion.IA.valorBd
                 )
             }
-        val desdeConZona = OffsetDateTime.ofInstant(desde, ZoneOffset.UTC)
-        val hastaConZona = OffsetDateTime.ofInstant(hasta, ZoneOffset.UTC)
-        val generaciones = TablaGeneracionPreguntaIa.selectAll()
-            .where {
-                (TablaGeneracionPreguntaIa.fechaGeneracion greaterEq desdeConZona) and
-                    (TablaGeneracionPreguntaIa.fechaGeneracion less hastaConZona)
-            }
-            .map {
-                UsoIaRegistrado(
-                    origen = OrigenUsoIa.GENERACION_PREGUNTAS,
-                    fecha = it[TablaGeneracionPreguntaIa.fechaGeneracion].toInstant(),
-                    modelo = it[TablaGeneracionPreguntaIa.modeloLlm],
-                    tokensEntrada = it[TablaGeneracionPreguntaIa.tokensInput],
-                    tokensSalida = it[TablaGeneracionPreguntaIa.tokensOutput],
-                    costoUsd = it[TablaGeneracionPreguntaIa.costoUsd]?.toDouble(),
-                    exitoso = it[TablaGeneracionPreguntaIa.parseExitoso]
-                )
-            }
-        reportes + generaciones
+        reportes + leerUsosGeneracionPreguntas(desde, hasta)
     }
+}
+
+/** Filas de pregunta_generacion_ia con fecha en [desde, hasta). Llamar dentro de una transacción. */
+internal fun leerUsosGeneracionPreguntas(desde: Instant, hasta: Instant): List<UsoIaRegistrado> {
+    val desdeConZona = OffsetDateTime.ofInstant(desde, ZoneOffset.UTC)
+    val hastaConZona = OffsetDateTime.ofInstant(hasta, ZoneOffset.UTC)
+    // Solo las columnas del costo: prompt_enviado y respuesta_raw pesan KB por fila y el tope se revisa en cada pedido.
+    return TablaGeneracionPreguntaIa
+        .select(
+            TablaGeneracionPreguntaIa.fechaGeneracion, TablaGeneracionPreguntaIa.modeloLlm, TablaGeneracionPreguntaIa.tokensInput,
+            TablaGeneracionPreguntaIa.tokensOutput, TablaGeneracionPreguntaIa.costoUsd, TablaGeneracionPreguntaIa.parseExitoso
+        )
+        .where {
+            (TablaGeneracionPreguntaIa.fechaGeneracion greaterEq desdeConZona) and
+                (TablaGeneracionPreguntaIa.fechaGeneracion less hastaConZona)
+        }
+        .map {
+            UsoIaRegistrado(
+                origen = OrigenUsoIa.GENERACION_PREGUNTAS,
+                fecha = it[TablaGeneracionPreguntaIa.fechaGeneracion].toInstant(),
+                modelo = it[TablaGeneracionPreguntaIa.modeloLlm],
+                tokensEntrada = it[TablaGeneracionPreguntaIa.tokensInput],
+                tokensSalida = it[TablaGeneracionPreguntaIa.tokensOutput],
+                costoUsd = it[TablaGeneracionPreguntaIa.costoUsd]?.toDouble(),
+                exitoso = it[TablaGeneracionPreguntaIa.parseExitoso]
+            )
+        }
 }

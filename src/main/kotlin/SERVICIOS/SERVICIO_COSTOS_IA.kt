@@ -88,9 +88,18 @@ class ServicioCostosIa(
 
     private fun gastoDe(uso: UsoIaRegistrado): GastoIa {
         val tokens = GastoIa(tokensEntrada = (uso.tokensEntrada ?: 0).toLong(), tokensSalida = (uso.tokensSalida ?: 0).toLong())
-        if (uso.exitoso) return tokens.copy(usos = 1, costoUsd = BigDecimal.valueOf(uso.costoUsd ?: 0.0))
-        // Falló (respondió algo inválido): si guardó su costo se usa ese; si no, se estima con los tokens que sí se pagaron.
-        val estimado = if (uso.costoUsd == null) BigDecimal.valueOf(costoLlmUsd(uso.modelo, uso.tokensEntrada, uso.tokensSalida)) else BigDecimal.ZERO
-        return tokens.copy(fallidas = 1, costoUsd = BigDecimal.valueOf(uso.costoUsd ?: 0.0) + estimado, costoEstimadoUsd = estimado)
+        if (uso.exitoso) return tokens.copy(usos = 1, costoUsd = costoTotalUsd(uso))
+        val estimado = if (uso.costoUsd == null) costoTotalUsd(uso) else BigDecimal.ZERO
+        return tokens.copy(fallidas = 1, costoUsd = costoTotalUsd(uso), costoEstimadoUsd = estimado)
     }
+}
+
+/**
+ * Costo total de un uso: el guardado; si una llamada fallida (respondió algo inútil) no lo guardó, el estimado con los
+ * tokens que sí se pagaron. Lo usan el resumen para el admin y el tope de generación (D23), para que sumen igual.
+ */
+fun costoTotalUsd(uso: UsoIaRegistrado): BigDecimal = when {
+    uso.costoUsd != null -> BigDecimal.valueOf(uso.costoUsd)
+    uso.exitoso -> BigDecimal.ZERO
+    else -> BigDecimal.valueOf(costoLlmUsd(uso.modelo, uso.tokensEntrada, uso.tokensSalida))
 }

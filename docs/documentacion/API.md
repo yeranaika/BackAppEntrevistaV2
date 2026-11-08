@@ -34,7 +34,7 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 403 | Sesión válida sin permiso (rutas de admin) |
 | 404 | No existe, o es de otro usuario (no se revela que existe) |
 | 409 | Choca con el estado actual (`entrevista_en_progreso`, `pregunta_ya_respondida`, `compra_ya_registrada`…) |
-| 429 | Límite superado: `demasiadas_solicitudes` (por IP) o `demasiados_intentos` (login) |
+| 429 | Límite superado: `demasiadas_solicitudes` (por IP), `demasiados_intentos` (login) o `tope_generacion_ia_alcanzado` (gasto mensual en generar preguntas con IA) |
 | 500 | Error inesperado (`error_interno`); el detalle queda en el log, nunca en la respuesta |
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
@@ -54,8 +54,8 @@ Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay en
 - **Ids**: UUID. Un id mal formado en la ruta responde `400 id_invalido`.
 - **Niveles**: `junior | semisenior | senior` (también se aceptan `jr | mid | sr`).
 - **Paginación**: `?pagina=1&tamano=20` donde aplica (tamaño máximo 100).
-- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min. **Login**: 5 contraseñas
-  incorrectas bloquean el correo 15 min.
+- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min; generación de preguntas con
+  IA (admin) 30 cada 60 min. **Login**: 5 contraseñas incorrectas bloquean el correo 15 min.
 - ⚠️ en una descripción = cuesta dinero (LLM), consume cuota de APIs externas, manda correos o borra datos.
 
 ## Índice
@@ -732,7 +732,7 @@ Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina
 
 `PUT /api/v1/admin/preguntas/{{preguntaId}}` · Admin · responde `200`
 
-Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión.
+Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión (y su traza de IA, si la tiene, a `pendiente_revision` sin revisor).
 
 ```json
 {
@@ -775,7 +775,7 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
 
 `POST /api/v1/admin/preguntas/generar-ia` · Admin · responde `200`
 
-⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10.
+⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias).
 
 ```json
 {
@@ -800,7 +800,7 @@ Simulación pregunta a pregunta.
 
 - Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.
 - Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.
-- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.
+- Cada pregunta guarda una copia fija (enunciado, tipo, opciones, respuesta ideal y rúbrica): editar o borrar el banco no cambia una entrevista rendida ni su reporte.
 - La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.
 
 | Método | Ruta | Auth | Qué hace |
@@ -819,7 +819,7 @@ Simulación pregunta a pregunta.
 
 `POST /api/v1/entrevistas` · Usuario · responde `201`
 
-Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`.
+Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`. La app Android (`POST /api/prueba-practica/front` con `ENT`) reemplaza la entrevista en curso en vez de responder 409, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.
 
 ```json
 {
@@ -1184,7 +1184,7 @@ Contrato que ya usa la app: crea y rinde cada prueba de una vez.
 
 `POST /api/prueba-practica/front` · Usuario · responde `201`, `409`
 
-`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`.
+`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`. Con `ENT` la entrevista en curso se reemplaza (se cancela en la misma transacción que crea la nueva) y con `PR`/`BL` la práctica en curso queda abandonada, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.
 
 ```json
 {
@@ -1366,7 +1366,7 @@ Igual que `POST /admin/usuarios`.
 
 `POST /api/v1/admin/questions/generate-ai` · Admin · responde `200`
 
-⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM).
+⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: `tope_generacion_ia_alcanzado` (gasto del mes en el tope) y `demasiadas_solicitudes` (comparte el contador por IP con la ruta nueva).
 
 ```json
 {
@@ -1384,7 +1384,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 138 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 140 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1518,9 +1518,11 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
 | 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
+| 429 | `tope_generacion_ia_alcanzado` | La generación de preguntas con IA está desactivada en el servidor (LIMITE_GASTO_GENERACION_IA_MENSUAL_USD = 0) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |
 | 502 | `provider_invalid_output` | La IA devolvió preguntas que no cumplen las reglas de calidad |
 | 502 | `provider_refusal` | El modelo se negó a generar las preguntas |
+| 502 | `provider_timeout` | El proveedor de IA tardó demasiado en responder |
 | 502 | `provider_truncated` | La respuesta del proveedor de IA quedó incompleta |
 | 503 | `documento_no_disponible` | El documento legal no está disponible |
 | 503 | `eula_no_disponible` | No hay texto legal publicado ni archivo EULA disponible |

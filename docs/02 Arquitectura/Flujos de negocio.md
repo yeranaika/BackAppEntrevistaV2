@@ -1,7 +1,7 @@
 ---
 tipo: arquitectura
 tags: [flujos, negocio, entrevista, practica, nivelacion, feedback]
-actualizado: 2026-10-03
+actualizado: 2026-11-07
 ---
 
 # Flujos de negocio
@@ -35,7 +35,8 @@ sequenceDiagram
 `POST /api/v1/practicas` (por skill o por cargo; modo alternativas/abiertas/mixto) → por cada respuesta
 `POST /{id}/respuestas` devuelve **feedback inmediato** → `POST /{id}/finalizar`.
 - Alternativas: correcta/incorrecta + explicación de la opción. Abiertas: **motor freemium** (correcta desde 60).
-- Una práctica en curso a la vez (empezar otra abandona la anterior). Suma puntaje a la skill, **no cambia su nivel**.
+- Una práctica en curso a la vez (empezar otra abandona la anterior). Si la nueva no tiene preguntas
+  (`409 preguntas_insuficientes`), la anterior **sigue en curso**. Suma puntaje a la skill, **no cambia su nivel**.
 - **Offline**: la app sincroniza intentos con `POST /api/v1/sync/attempts`, idempotente por `localAttemptId`; si la pregunta
   existe en el banco se vuelve a corregir en el servidor.
 
@@ -49,8 +50,15 @@ stateDiagram-v2
     finalizada --> [*]: reporte en segundo plano
 ```
 - 60 % técnicas / 40 % blandas; **una sola entrevista en curso** por usuario (bloqueo + índice único).
+  `POST /api/v1/entrevistas` responde `409 entrevista_en_progreso` si hay una en curso; una abandonada hace más de 2 h
+  se cancela al iniciar y no cuenta.
+- **Reemplazo (app Android, `ENT`)**: la entrevista en curso se reemplaza, pero se cancela **dentro de la misma
+  transacción que crea la nueva**, después de elegir las preguntas. Si la nueva no se crea (`409
+  preguntas_insuficientes`), la anterior sigue en curso.
+- Cada pregunta servida guarda su snapshot, rúbrica incluida (D24): el reporte evalúa con esa copia aunque el banco
+  cambie después.
 - Cada pregunta se responde **una vez**; la corrección se oculta hasta finalizar; entrevistas ajenas = 404.
-- Métricas de video en lotes de hasta 300 (contacto visual, postura, confianza, expresión).
+- Métricas de video en lotes de hasta 300 (contacto visual, postura, confianza; `expresion` se acepta pero se ignora, D22).
 
 ## 6. Reporte de feedback (Fase 7)
 `ServicioReporteEntrevista` se dispara al finalizar. Estado `generando → listo | error`.
@@ -63,6 +71,7 @@ stateDiagram-v2
 ## 7. App Android (`/api/prueba-practica`)
 La app rinde cada prueba **de una vez**: `POST /front` con `tipoPrueba` `ENT` (entrevista) · `PR`/`BL` (práctica técnica/blanda) · `NV`
 (nivelación), y `POST /{pruebaId}/respuestas` con todas las respuestas. `ServicioPruebasApp` deriva al servicio que corresponde.
+Con `ENT` y `PR`/`BL` la prueba en curso se reemplaza solo si la nueva se crea (ver flujos 4 y 5).
 `GET /intentos` junta el historial de todo.
 
 ## 8. Mercado laboral
