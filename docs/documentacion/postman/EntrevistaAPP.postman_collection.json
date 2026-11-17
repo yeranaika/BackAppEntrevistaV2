@@ -2158,7 +2158,7 @@
                 }
               ]
             },
-            "description": "Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano.",
+            "description": "Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2431,7 +2431,7 @@
                 "generar-ia"
               ]
             },
-            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias).",
+            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2444,7 +2444,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"cargo_id\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidad\": 2,\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"modelo\": \"gpt-4o-mini\"\n}",
+              "raw": "{\n  \"cargo_id\": \"{{cargoId}}\",\n  \"nivel\": \"junior\",\n  \"cantidad\": 2,\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"modelo\": \"gpt-4o-mini\",\n  \"usar_mercado\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2465,6 +2465,47 @@
               }
             }
           ]
+        },
+        {
+          "name": "Cobertura del banco frente al mercado (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/cobertura?cargoId={{cargoId}}&minimo=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "cobertura"
+              ],
+              "query": [
+                {
+                  "key": "cargoId",
+                  "value": "{{cargoId}}"
+                },
+                {
+                  "key": "minimo",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y pendientes que le sirven, por nivel, y cuántas faltan para llegar a `minimo` aprobadas (1 a 50, por defecto 5). Sirve para generar con IA justo lo que falta (D26). No llama al LLM ni a las APIs de empleo.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
         },
         {
           "name": "Preguntas para usuarios",

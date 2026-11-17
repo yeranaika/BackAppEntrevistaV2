@@ -78,4 +78,10 @@ Con `ENT` y `PR`/`BL` la prueba en curso se reemplaza solo si la nueva se crea (
 Cada 7 días se consultan ofertas (JSearch → Remotive → Arbeitnow → dataset de contingencia), se normalizan skills
 (`NormalizadorSkill`), se actualiza la demanda y los requisitos por cargo. Caché Redis en las lecturas. → [[APIs de empleo]]
 
+Las ofertas de cada búsqueda quedan guardadas (`OfertasEnCache`, 8 días). Al generar preguntas con IA para un cargo o
+una skill, el prompt lleva las skills más pedidas y frases cortas de esas ofertas (`ServicioContextoMercado`); si no
+hay guardadas, se buscan con un tope de 6 s. `GET /api/v1/admin/preguntas/cobertura` muestra, por cargo, las skills que
+pide el mercado y cuántas preguntas aprobadas tienen por nivel, para generar justo lo que falta. → D26 en
+[[Decisiones]]
+
 Relacionado: [[Modelo de datos]] · [[Arquitectura general]] · [[LLM OpenAI y Anthropic]]

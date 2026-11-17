@@ -619,6 +619,7 @@ Administración (solo admin) y lectura para usuarios.
 | `DELETE` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Borrar pregunta (admin) |
 | `PATCH` | `/api/v1/admin/preguntas/{{preguntaId}}/rechazar` | Admin | Rechazar pregunta (admin) |
 | `POST` | `/api/v1/admin/preguntas/generar-ia` | Admin | Generar preguntas con IA (admin) |
+| `GET` | `/api/v1/admin/preguntas/cobertura` | Admin | Cobertura del banco frente al mercado (admin) |
 | `GET` | `/api/v1/preguntas` | Usuario | Preguntas para usuarios |
 
 ### Crear pregunta de alternativas (admin)
@@ -718,7 +719,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
 
 `GET /api/v1/admin/preguntas?estado=aprobada&cargoId={{cargoId}}&pagina=1&tamano=20` · Admin · responde `200`
 
-Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano.
+Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano.
 
 ### Ver pregunta (admin)
 
@@ -775,7 +776,7 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
 
 `POST /api/v1/admin/preguntas/generar-ia` · Admin · responde `200`
 
-⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias).
+⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).
 
 ```json
 {
@@ -784,9 +785,16 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
   "cantidad": 2,
   "tipo": "abierta_texto",
   "categoria": "tecnica",
-  "modelo": "gpt-4o-mini"
+  "modelo": "gpt-4o-mini",
+  "usar_mercado": true
 }
 ```
+
+### Cobertura del banco frente al mercado (admin)
+
+`GET /api/v1/admin/preguntas/cobertura?cargoId={{cargoId}}&minimo=5` · Admin · responde `200`
+
+Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y pendientes que le sirven, por nivel, y cuántas faltan para llegar a `minimo` aprobadas (1 a 50, por defecto 5). Sirve para generar con IA justo lo que falta (D26). No llama al LLM ni a las APIs de empleo.
 
 ### Preguntas para usuarios
 
@@ -1384,7 +1392,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 140 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 141 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1428,6 +1436,7 @@ Los 140 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `max_usos_invalido` | max_uses debe ser al menos 1 |
 | 400 | `metrica_fuera_de_rango` | Los puntajes de video van de 0 a 100 |
 | 400 | `metrica_invalida` | timestampMs no puede ser negativo |
+| 400 | `minimo_invalido` | El mínimo de preguntas por nivel debe estar entre 1 y … |
 | 400 | `missing_fields` | El título y el cuerpo son obligatorios |
 | 400 | `missing_refresh` | Falta el refresh token |
 | 400 | `modelo_invalido` | Modelo no soportado: usa … |

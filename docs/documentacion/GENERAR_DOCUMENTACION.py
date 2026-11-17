@@ -196,7 +196,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                   "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."}, espera=[201]),
         req("Listar preguntas (admin)", "GET", "/api/v1/admin/preguntas", ADMIN,
             consulta=[("estado", "aprobada"), ("cargoId", "{{cargoId}}"), ("pagina", "1"), ("tamano", "20")],
-            desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano."),
+            desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano."),
         req("Ver pregunta (admin)", "GET", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN),
         req("Aprobar pregunta (admin)", "PATCH", "/api/v1/admin/preguntas/{{preguntaId}}/aprobar", ADMIN),
         req("Editar pregunta (admin)", "PUT", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN,
@@ -209,12 +209,22 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Rechazar pregunta (admin)", "PATCH", "/api/v1/admin/preguntas/{{preguntaId}}/rechazar", ADMIN, body={"motivo": "Muy fácil"}, omitir_en_prueba=True,
             desc="Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita (vuelve a pendiente) y `DELETE` borra si nunca se usó."),
         req("Generar preguntas con IA (admin)", "POST", "/api/v1/admin/preguntas/generar-ia", ADMIN,
-            body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2, "tipo": "abierta_texto", "categoria": "tecnica", "modelo": "gpt-4o-mini"},
+            body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2, "tipo": "abierta_texto", "categoria": "tecnica",
+                  "modelo": "gpt-4o-mini", "usar_mercado": True},
             omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. "
             "`429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a "
             "`LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y "
             "el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP "
-            "(`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias)."),
+            "(`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). "
+            "Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales "
+            "de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta "
+            "trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` "
+            "y `mensaje` si no se usaron)."),
+        req("Cobertura del banco frente al mercado (admin)", "GET", "/api/v1/admin/preguntas/cobertura", ADMIN,
+            consulta=[("cargoId", "{{cargoId}}"), ("minimo", "5")],
+            desc="Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y "
+            "pendientes que le sirven, por nivel, y cuántas faltan para llegar a `minimo` aprobadas (1 a 50, por defecto 5). "
+            "Sirve para generar con IA justo lo que falta (D26). No llama al LLM ni a las APIs de empleo."),
         req("Preguntas para usuarios", "GET", "/api/v1/preguntas", consulta=[("cargoId", "{{cargoId}}"), ("cantidad", "5")],
             desc="Solo aprobadas y sin la solución."),
     ]),

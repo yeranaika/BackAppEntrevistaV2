@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -131,6 +132,7 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
             filtro.nivel?.let { TablaPregunta.nivelDificultad eq it.valorBd },
             filtro.skillId?.let { TablaPregunta.skillId eq it },
             filtro.cargoId?.let { TablaPregunta.cargoId eq it },
+            filtro.paraCargoId?.let { (TablaPregunta.cargoId eq it) or TablaPregunta.cargoId.isNull() },
             filtro.generadaPorIa?.let { TablaPregunta.generadaPorIa eq it }
         )
         val consulta = TablaPregunta.selectAll()

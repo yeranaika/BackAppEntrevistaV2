@@ -197,15 +197,20 @@ class SistemaPrueba(
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
     val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), reloj)
     val pregunta = ServicioPregunta(preguntas, catalogo)
+    val mercadoRepo = RepositorioMercadoExposed()
+    /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */
+    val ofertas = INTEGRACIONES.OfertasEnCache(clienteMercado, cache)
+    val contextoMercado = SERVICIOS.ServicioContextoMercado(ofertas, mercadoRepo)
     val generacion = ServicioGeneracionPregunta(
         mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
-        SERVICIOS.TopeGastoGeneracionIa(usdMensual = topeGastoGeneracionIaUsd)
+        SERVICIOS.TopeGastoGeneracionIa(usdMensual = topeGastoGeneracionIaUsd),
+        mercado = contextoMercado
     )
+    val cobertura = SERVICIOS.ServicioCoberturaPreguntas(mercadoRepo, MODELOS.LectorCoberturaPreguntasExposed())
 
-    val mercadoRepo = RepositorioMercadoExposed()
-    val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, clienteMercado)
+    val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, ofertas)
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
-    val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, clienteMercado, requisitos) { mercado.invalidarCache() }
+    val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, ofertas, requisitos) { mercado.invalidarCache() }
     val documentos = FuenteDocumentosLegalesArchivo()
     val consentimiento = ServicioConsentimiento(RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos)
     val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
@@ -293,7 +298,7 @@ class SistemaPrueba(
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
-            controladorPregunta(pregunta, generacion)
+            controladorPregunta(pregunta, generacion, cobertura)
             controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)

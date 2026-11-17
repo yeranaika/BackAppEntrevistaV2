@@ -219,3 +219,32 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Consecuencias**: si el admin editó el enunciado, la skill o el nivel de una pregunta de la semilla, volver a
   correrla crea otra vez la versión original; una pregunta rechazada o con opciones editadas no se toca. Las BD ya
   contaminadas por la semilla vieja **no se limpian** solas. Sin migración.
+
+## D26 · Preguntas generadas con lo que pide el mercado y cobertura del banco (2026-11)
+- **Contexto**: el backend anterior tenía `POST /jobs/generate-and-save`: buscaba una oferta real en JSearch y la IA
+  escribía preguntas a partir de esa oferta (así salieron 647 preguntas). En V2 la sincronización semanal solo calcula
+  qué skills pide cada cargo, y `generar-ia` recibía solo el nombre del cargo y de la skill. Si el mercado agregaba
+  una skill a un cargo, nada avisaba que el banco no tenía preguntas para ella.
+- **Decisión**: (1) `OfertasEnCache` envuelve al cliente de empleo: cada búsqueda que hace la sincronización queda
+  guardada por consulta (`ofertas:consulta:<cargo>`, 8 días; el dataset de respaldo, 1 hora). (2) `generar-ia`, con
+  cargo o skill y `usar_mercado` (por defecto `true`), arma con `ServicioContextoMercado` lo que piden las ofertas:
+  las skills más pedidas y hasta 6 frases cortas de ofertas distintas. Usa primero las guardadas; si no hay, busca con
+  un tope de 6 s (el proxy del panel corta a los 55 s y además hay que esperar al LLM). Si no alcanza, genera sin
+  ofertas y la búsqueda sigue en segundo plano para la próxima vez (una sola búsqueda por consulta a la vez). Solo
+  sirven las ofertas que mencionan la skill o, sin skill, las que comparten con el cargo una palabra del título que no
+  sea de rol (developer, engineer, manager… no bastan; siglas como ML o QA sí; español-inglés) o piden al menos dos
+  skills del cargo. Lo que se entrega es de la categoría pedida: unas preguntas blandas reciben solo habilidades blandas
+  (si las ofertas no nombran ninguna, se genera sin ofertas). Se busca después de revisar el tope de gasto (D23). La
+  respuesta trae `contexto_mercado` y el prompt auditado guarda las ofertas usadas. (3) `GET /api/v1/admin/preguntas/cobertura`
+  cruza las skills de cada cargo con el banco: aprobadas y pendientes por nivel que sirven al cargo (de la skill y del
+  cargo, o de la skill sin cargo, como `SelectorPreguntas`) y cuántas faltan para un mínimo (5 por defecto).
+- **Por qué**: así las preguntas nuevas se parecen a lo que se evalúa hoy, sin volver a gastar cuota de las APIs de
+  empleo en cada generación. No se genera solo: cada generación cuesta y queda pendiente de revisión, así que la
+  decide un admin desde la cobertura (el panel la abre con el cargo, la skill y el nivel ya puestos).
+- **Consecuencias**: los fragmentos son texto de terceros: se limpian de caracteres que abren bloques, van entre
+  comillas y el prompt dice que son datos y no instrucciones; igual las preguntas pasan por revisión. El prompt pide
+  escribir en español (las ofertas suelen venir en inglés). Unos 400 a 700 tokens más de entrada por generación. Sin
+  migración y sin cambios en el contrato de Android. Las 647 preguntas del backend anterior no están en V2. El HTML de las
+  ofertas se limpia con las etiquetas de bloque como saltos de línea (así `<strong>Kotlin</strong>` no parte la frase) y
+  de una descripción larga se guarda el comienzo y el final (ahí van los requisitos y los tags). `GET /api/v1/admin/preguntas`
+  acepta `paraCargoId` (del cargo o sin cargo) para listar las mismas pendientes que cuenta la cobertura.

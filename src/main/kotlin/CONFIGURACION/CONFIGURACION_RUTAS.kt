@@ -36,7 +36,7 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
         controladorSuscripcion(d.servicioSuscripcion)
 
         // Banco de preguntas e IA
-        controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta)
+        controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta, d.servicioCoberturaPreguntas)
         controladorCostosIa(d.servicioCostosIa)
 
         // Mercado laboral: cargos, skills y tendencias

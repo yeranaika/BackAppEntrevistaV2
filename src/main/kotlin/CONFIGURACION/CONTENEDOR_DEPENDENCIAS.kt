@@ -5,6 +5,7 @@ import INTEGRACIONES.ClienteCorreoSmtp
 import INTEGRACIONES.ClienteGooglePlay
 import INTEGRACIONES.ClienteGoogleIdentidad
 import INTEGRACIONES.ClienteMercadoLaboralHttp
+import INTEGRACIONES.OfertasEnCache
 import INTEGRACIONES.ContadorIntentosCache
 import INTEGRACIONES.EnviadorCorreo
 import INTEGRACIONES.FuenteDocumentosLegalesArchivo
@@ -21,6 +22,7 @@ import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioCuentaOAuthExposed
 import MODELOS.RepositorioGeneracionPreguntaIaExposed
 import MODELOS.RepositorioMercadoExposed
+import MODELOS.LectorCoberturaPreguntasExposed
 import MODELOS.RepositorioObjetivoCarrera
 import MODELOS.RepositorioObjetivoCarreraExposed
 import MODELOS.RepositorioPerfil
@@ -41,6 +43,8 @@ import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioMercado
+import SERVICIOS.ServicioContextoMercado
+import SERVICIOS.ServicioCoberturaPreguntas
 import SERVICIOS.ServicioOnboarding
 import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioRecordatorio
@@ -109,6 +113,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val cache = CacheRedis(configuracion.redis)
     val enviadorCorreo: EnviadorCorreo = ClienteCorreoSmtp(configuracion.correo)
     val clienteMercadoLaboral = ClienteMercadoLaboralHttp(configuracion.mercadoLaboral)
+    /** Cada búsqueda de la sincronización queda guardada por consulta: la generación de preguntas la reutiliza (D26). */
+    val ofertasEnCache = OfertasEnCache(clienteMercadoLaboral, cache)
     val verificadorGoogle = ClienteGoogleIdentidad(configuracion.google.clientId)
     private val clienteGooglePlay = if (configuracion.googlePlay.esSimulado) null else ClienteGooglePlay(configuracion.googlePlay)
     val verificadorCompras: VerificadorCompraGoogle = clienteGooglePlay ?: VerificadorCompraSimulado()
@@ -155,21 +161,28 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
 
+    /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
+    val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
+
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
         proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo,
-        TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+        TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd),
+        mercado = servicioContextoMercado
     )
+
+    /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
+    val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())
     /** Gasto en IA para el admin (reportes con IA y generación de preguntas). */
     val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed())
 
-    val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, clienteMercadoLaboral)
+    val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, ofertasEnCache)
 
     val servicioMercado = ServicioMercado(repositorioMercado, repositorioMercado, servicioRequisitosCargo, cache)
 
     val servicioTendencias = ServicioTendenciasSkill(
         lector = repositorioMercado,
         escritor = repositorioMercado,
-        clienteMercado = clienteMercadoLaboral,
+        clienteMercado = ofertasEnCache,
         requisitos = servicioRequisitosCargo,
         alActualizar = { servicioMercado.invalidarCache() }
     )
@@ -281,6 +294,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         tareasSegundoPlano.cancelar()
         tareaMercado.close()
         tareaRescate.close()
+        servicioContextoMercado.close()
         clienteMercadoLaboral.close()
         clienteGooglePlay?.close()
         clienteHttpLlm.close()
