@@ -35,7 +35,14 @@ private const val COMPRA_CONFIRMADA = 1
 private const val SIN_CANCELAR = 0
 private val DURACION_COMPRA_SIMULADA = 30.days
 
-data class CompraGoogle(val esValida: Boolean, val estaActiva: Boolean, val expiracion: Instant?)
+/**
+ * Lo que Google Play dice de una compra.
+ *
+ * @property cuentaOfuscada el `obfuscatedExternalAccountId` con que la app abrió la compra (hash de su cuenta, D27).
+ * null si la compra no lo trae: hecha desde la tienda de Play (volver a suscribirse, código promocional), con una
+ * versión de la app que no lo enviaba, o simulada.
+ */
+data class CompraGoogle(val esValida: Boolean, val estaActiva: Boolean, val expiracion: Instant?, val cuentaOfuscada: String? = null)
 
 interface VerificadorCompraGoogle {
     /**
@@ -51,12 +58,14 @@ class VerificadorCompraSimulado : VerificadorCompraGoogle {
         CompraGoogle(esValida = true, estaActiva = true, expiracion = Instant.now().plusSeconds(DURACION_COMPRA_SIMULADA.inWholeSeconds))
 }
 
+// Solo se leen estos campos: los datos personales que trae la respuesta de Google (correo, nombre) se ignoran.
 @Serializable
 private data class SuscripcionGoogle(
     val expiryTimeMillis: String? = null,
     val paymentState: Int? = null,
     val acknowledgementState: Int? = null,
-    val cancelReason: Int? = null
+    val cancelReason: Int? = null,
+    val obfuscatedExternalAccountId: String? = null
 )
 
 /**
@@ -127,7 +136,12 @@ class ClienteGooglePlay internal constructor(
             datos.acknowledgementState == COMPRA_CONFIRMADA &&
             (datos.cancelReason == null || datos.cancelReason == SIN_CANCELAR) &&
             expiracion?.isAfter(Instant.now()) == true
-        return CompraGoogle(esValida = true, estaActiva = estaActiva, expiracion = expiracion)
+        return CompraGoogle(
+            esValida = true,
+            estaActiva = estaActiva,
+            expiracion = expiracion,
+            cuentaOfuscada = datos.obfuscatedExternalAccountId?.trim()?.takeIf { it.isNotEmpty() }
+        )
     }
 
     override fun close() = cliente.close()

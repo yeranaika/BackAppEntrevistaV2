@@ -144,15 +144,23 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Ver preferencias", "GET", "/recordatorios/preferencias", desc="`404 recordatorio_no_configurado` si nunca se guardaron."),
     ]),
     ("07 · Suscripción (billing)", "JSON en snake_case (contrato de Android).", [
-        req("Estado de la suscripción", "GET", "/billing/status"),
+        req("Estado de la suscripción", "GET", "/billing/status",
+            desc="`is_premium`, `plan`, `source` (`google` | `interna`), `status`, `start_at` y `expires_at` (ms epoch). "
+                 "A un premium con IA activa le suma `reportes_ia_limite`, `reportes_ia_restantes` (0 a límite) y "
+                 "`reportes_ia_renovacion` (ms epoch del inicio del mes siguiente, UTC): los reportes con IA que le quedan "
+                 "en el mes, contados como la reserva (D29). A un usuario gratis no le llegan."),
         req("Crear código premium (admin)", "POST", "/billing/admin/codes", ADMIN,
             body={"days": 30, "label": "postman", "max_uses": 1, "license_type": "PROM"}, espera=[201],
             guarda={"codigoPremium": ("j.code", lambda j: j.get("code"))}, desc="`license_type`: PROM, INST o GOOG."),
         req("Canjear código", "POST", "/billing/code/redeem", body={"code": "{{codigoPremium}}"}, espera=[200, 400],
-            desc="Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`."),
+            desc="Atómico: nunca supera `max_uses`. Responde el mismo estado que `GET /billing/status` (con el cupo de "
+                 "reportes con IA, D29) más `mensaje`. `400 codigo_invalido_o_expirado`."),
         req("Verificar compra de Google Play", "POST", "/billing/google/verify",
             body={"product_id": "premium_mensual", "purchase_token": "<token de Google Play>", "purchase_time": 1735689600000}, omitir_en_prueba=True,
-            desc="Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula."),
+            desc="Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Si Google dice que la pagó otra cuenta "
+                 "de la app (`obfuscatedExternalAccountId` distinto del SHA-256 del id de la cuenta), también "
+                 "`409 compra_ya_registrada` (D27); sin ese dato decide el dueño del token. Google caído → `503`. "
+                 "Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula."),
     ]),
     ("08 · Mercado laboral", "Catálogo público de cargos y skills (caché Redis: cargos 6 h, matriz 12 h; crear un cargo invalida la caché). Las tendencias se sincronizan solas cada 7 días desde JSearch → Remotive → Arbeitnow → dataset de contingencia. La administración es solo para admin.", [
         req("Crear cargo (admin)", "POST", "/admin/market/cargos", ADMIN,
@@ -343,7 +351,10 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             desc="Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. "
                  "Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. "
                  "`fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). "
-                 "Costos en USD con 6 decimales."),
+                 "Costos en USD con 6 decimales. `topeGeneracionPreguntas` es el gasto del mes UTC en curso (no depende del rango) frente al "
+                 "tope de generación con IA: `mes`, `gastadoUsd`, `topeUsd`, `restanteUsd`, `fechaReposicion` (`null` si está desactivado), "
+                 "`estaDesactivado` y `estaAgotado`; la próxima generación responde `429 tope_generacion_ia_alcanzado` si uno de los dos "
+                 "es `true` (D28)."),
     ]),
     ("17 · Cierre de sesión", "", [
         req("Cerrar sesión", "POST", "/auth/logout", PUBLICA, body={"refreshToken": "{{refreshToken}}"}, desc="Revoca el refresh token."),

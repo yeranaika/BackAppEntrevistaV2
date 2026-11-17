@@ -1,9 +1,6 @@
 package SERVICIOS
 
-import CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
-import CONFIGURACION.ZONA_CORTE_CUOTA_IA
 import ERRORES.ErrorAplicacion
-import ERRORES.ErrorDemasiadosIntentos
 import ERRORES.ErrorRespuestaExterna
 import ERRORES.ErrorServicioExterno
 import ERRORES.ErrorValidacion
@@ -29,9 +26,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
-import java.math.BigDecimal
-import java.time.Clock
-import java.time.YearMonth
 import java.util.UUID
 
 private const val CANTIDAD_MAXIMA_POR_LOTE = 10
@@ -57,12 +51,6 @@ data class ResultadoGeneracionIa(
     val mercado: ResultadoContextoMercado
 )
 
-/** Tope mensual de gasto de la generación con IA (D23) y reloj con el que se corta el mes en UTC. */
-data class TopeGastoGeneracionIa(
-    val usdMensual: Double = GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO,
-    val reloj: Clock = Clock.systemUTC()
-)
-
 /**
  * Genera preguntas con un LLM y las deja en el banco como pendientes de revisión.
  * Toda llamada queda auditada en pregunta_generacion_ia, incluso las que fallan, y el gasto del mes (también el de
@@ -73,7 +61,8 @@ class ServicioGeneracionPregunta(
     private val proveedores: Map<TipoProveedorIa, ProveedorPreguntasIa>,
     private val repositorio: RepositorioGeneracionPreguntaIa,
     private val catalogo: LectorCatalogo,
-    private val tope: TopeGastoGeneracionIa = TopeGastoGeneracionIa(),
+    /** Tope mensual de gasto (D23): la misma instancia que muestra Costos IA (D28). */
+    private val topeMensual: ServicioTopeGeneracionIa = ServicioTopeGeneracionIa(repositorio),
     /** null: nunca se usan ofertas (pruebas, o sin cliente de empleo). */
     private val mercado: FuenteContextoMercado? = null
 ) {
@@ -99,7 +88,7 @@ class ServicioGeneracionPregunta(
         val nombreSkill = pedido.skillId?.let { catalogo.nombreSkill(it) }
         val proveedor = proveedores[tipoProveedor(pedido.modelo)]
             ?: throw ErrorServicioExterno("provider_not_configured", "No hay proveedor para el modelo ${pedido.modelo}")
-        verificarTopeMensual()
+        topeMensual.verificar()
 
         // Después del tope: si no se va a generar, tampoco se gasta cuota de las APIs de empleo.
         val contextoMercado = when {
@@ -168,34 +157,6 @@ class ServicioGeneracionPregunta(
 
     private fun TrazaGeneracion.conTokensDe(e: ErrorAplicacion) =
         if (e is ErrorRespuestaExterna) copy(tokensEntrada = e.tokensEntrada, tokensSalida = e.tokensSalida) else this
-
-    /**
-     * Con el gasto del mes (UTC) en el tope no se llama al LLM. Suma las llamadas de todos los admins, también las
-     * fallidas con su costo estimado. Si el gasto no se puede leer, el error sube y tampoco se llama (no se gasta a
-     * ciegas). Sin reserva previa: dos llamadas simultáneas pueden pasar el tope en lo que cueste una de ellas.
-     */
-    private suspend fun verificarTopeMensual() {
-        val ahora = tope.reloj.instant()
-        val mes = YearMonth.from(ahora.atZone(ZONA_CORTE_CUOTA_IA))
-        val desde = mes.atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
-        val hasta = mes.plusMonths(1).atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
-        val gastado = repositorio.usosEntre(desde, hasta).fold(BigDecimal.ZERO) { suma, uso -> suma + costoTotalUsd(uso) }
-        val limite = BigDecimal.valueOf(tope.usdMensual)
-        if (limite.signum() <= 0) {
-            throw ErrorDemasiadosIntentos(
-                "tope_generacion_ia_alcanzado",
-                "La generación de preguntas con IA está desactivada en el servidor (LIMITE_GASTO_GENERACION_IA_MENSUAL_USD = 0)"
-            )
-        }
-        if (gastado < limite) return
-        val usd = limite.stripTrailingZeros().toPlainString()
-        val repone = mes.plusMonths(1).atDay(1)
-        log.info("Tope mensual de generación con IA alcanzado: USD {} de {} en {}", gastado.toPlainString(), usd, mes)
-        throw ErrorDemasiadosIntentos(
-            "tope_generacion_ia_alcanzado",
-            "Se alcanzó el tope mensual de gasto en IA para generar preguntas (USD $usd); se repone el $repone (UTC)"
-        )
-    }
 
     /** Si la auditoría falla se registra en el log, pero se informa el error original al cliente. */
     private suspend fun registrarFalloSinOcultar(traza: TrazaGeneracion) {

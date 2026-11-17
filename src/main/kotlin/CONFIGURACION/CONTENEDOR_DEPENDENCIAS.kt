@@ -40,6 +40,7 @@ import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
 import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.ServicioTopeGeneracionIa
 import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioMercado
@@ -67,6 +68,7 @@ import SERVICIOS.EvaluadorEntrevistaFreemium
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.ResolutorContextoPrueba
 import SERVICIOS.ServicioReporteEntrevista
+import SERVICIOS.ServicioCupoIa
 import SERVICIOS.VerificadorPremium
 import MODELOS.RepositorioReporteExposed
 import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
@@ -164,16 +166,19 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
     val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
 
+    /** Tope de gasto de la generación con IA (D23): una sola instancia para el 429 y para Costos IA (D28). */
+    private val topeGeneracionIa = ServicioTopeGeneracionIa(
+        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+    )
+
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
-        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo,
-        TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd),
-        mercado = servicioContextoMercado
+        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado
     )
 
     /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
     val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())
-    /** Gasto en IA para el admin (reportes con IA y generación de preguntas). */
-    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed())
+    /** Gasto en IA para el admin (reportes con IA y generación de preguntas) y gasto del mes frente al tope (D28). */
+    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa)
 
     val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, ofertasEnCache)
 
@@ -193,7 +198,14 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioRecordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
 
-    val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras)
+    // Se crea antes que la suscripción: el cupo de reportes con IA que ve la app (D29) lo lee del mismo repositorio.
+    private val repositorioReporte = RepositorioReporteExposed()
+    /** Reportes con IA que le quedan al premium en el mes, con el mismo tope y la misma condición que la reserva (D17). */
+    private val servicioCupoIa = ServicioCupoIa(
+        repositorioReporte, configuracion.llm.evaluacionesIaMensuales, iaDisponible = configuracion.llm.tieneProveedor
+    )
+
+    val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras, cupoIa = servicioCupoIa)
 
     private val selectorPreguntas = SelectorPreguntas(repositorioPregunta, repositorioMercado)
     private val repositorioSesionEntrevista = RepositorioSesionEntrevistaExposed()
@@ -214,7 +226,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     private val repositorioNivelSkill = RepositorioNivelSkillExposed()
 
     val servicioReporte = ServicioReporteEntrevista(
-        reportes = RepositorioReporteExposed(),
+        reportes = repositorioReporte,
         sesiones = repositorioSesionEntrevista,
         metricas = repositorioMetricaVideo,
         preguntas = repositorioPregunta,

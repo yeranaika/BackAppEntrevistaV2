@@ -12,7 +12,6 @@ import CONFIGURACION.UMBRAL_FORTALEZA
 import CONFIGURACION.UMBRAL_NIVEL_LOGRADO
 import CONFIGURACION.VENTANA_RESCATE_SESIONES
 import CONFIGURACION.VIGENCIA_RESERVA_IA
-import CONFIGURACION.ZONA_CORTE_CUOTA_IA
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
@@ -52,7 +51,6 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Clock
 import java.time.Instant
-import java.time.YearMonth
 import java.util.UUID
 
 /** ¿El usuario tiene premium? (decide si sus respuestas se evalúan con IA). */
@@ -262,12 +260,10 @@ class ServicioReporteEntrevista(
     private suspend fun reservarCupoIa(sesion: SesionEntrevista): Instant? {
         if (evaluacionesIaMensuales <= 0) return null
         val ahora = reloj.instant()
-        val mes = YearMonth.from(ahora.atZone(ZONA_CORTE_CUOTA_IA))
-        val desde = mes.atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
-        val hasta = mes.plusMonths(1).atDay(1).atStartOfDay(ZONA_CORTE_CUOTA_IA).toInstant()
+        val periodo = periodoMensualIa(ahora)
         val reservada = try {
             reportes.reservarEvaluacionIa(
-                sesion.id, sesion.usuarioId, evaluacionesIaMensuales, desde, hasta, ahora.minus(VIGENCIA_RESERVA_IA), ahora
+                sesion.id, sesion.usuarioId, evaluacionesIaMensuales, periodo.desde, periodo.hasta, ahora.minus(VIGENCIA_RESERVA_IA), ahora
             )
         } catch (e: CancellationException) {
             throw e
@@ -278,7 +274,7 @@ class ServicioReporteEntrevista(
         if (!reservada) {
             log.info(
                 "Tope mensual de evaluaciones con IA alcanzado: usuario {} ({} por mes, {}); la entrevista {} se evalúa con el motor freemium",
-                sesion.usuarioId, evaluacionesIaMensuales, mes, sesion.id
+                sesion.usuarioId, evaluacionesIaMensuales, periodo.mes, sesion.id
             )
             return null
         }

@@ -33,6 +33,29 @@ data class RespuestaCostoIaModelo(
     val gasto: RespuestaGastoIa
 )
 
+/**
+ * Gasto del mes UTC en curso frente al tope de la generación de preguntas con IA (D23, D28). Es lo mismo que revisa el
+ * servidor antes de cada generación: la próxima responde 429 tope_generacion_ia_alcanzado si estaAgotado o
+ * estaDesactivado es true. El panel debe usar esos booleanos y no recalcularlos con los montos redondeados.
+ */
+@Serializable
+data class RespuestaTopeGeneracionIa(
+    /** Mes calendario UTC en curso (AAAA-MM); no depende de desde ni de hasta. */
+    val mes: String,
+    /** Lotes y llamadas fallidas (con su costo estimado) del mes, en USD con 6 decimales. */
+    val gastadoUsd: Double,
+    /** LIMITE_GASTO_GENERACION_IA_MENSUAL_USD tal cual (sin redondear). */
+    val topeUsd: Double,
+    /** max(0, tope − gastado), 6 decimales; 0 si está desactivado. */
+    val restanteUsd: Double,
+    /** Día 1 del mes siguiente (AAAA-MM-DD, UTC); null si está desactivado. Viaja siempre, también en null. */
+    val fechaReposicion: String?,
+    /** Tope 0 (o un valor ilegible en la variable): la generación con IA está apagada. */
+    val estaDesactivado: Boolean,
+    /** Gastado ≥ tope (sin redondear): la próxima generación responde 429. Nunca true junto a estaDesactivado. */
+    val estaAgotado: Boolean
+)
+
 @Serializable
 data class RespuestaCostosIa(
     /** Primer día incluido (UTC). */
@@ -45,5 +68,6 @@ data class RespuestaCostosIa(
     /** Solo los días con gasto, del más antiguo al más reciente. */
     val porDia: List<RespuestaCostoIaDia>,
     /** De mayor a menor costo. */
-    val porModelo: List<RespuestaCostoIaModelo>
+    val porModelo: List<RespuestaCostoIaModelo>,
+    val topeGeneracionPreguntas: RespuestaTopeGeneracionIa
 )

@@ -23,6 +23,7 @@ import SERVICIOS.EvaluadorEntrevista
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.PedidoEntrevista
 import SERVICIOS.RespuestaUsuario
+import SERVICIOS.ServicioCupoIa
 import SERVICIOS.ServicioReporteEntrevista
 import UTILIDADES.TareasSegundoPlano
 import kotlinx.coroutines.CompletableDeferred
@@ -484,6 +485,96 @@ class PruebaServicioReporte {
         assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "la reserva todavía está vigente")
         sistema.reloj.adelantar(Duration.ofMinutes(11))
         assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "pasados 10 minutos la reserva ya no cuenta")
+    }
+
+    // ---------- Cupo de IA que ve el premium (D29) ----------
+
+    /** Lo que ve la app: el mismo repositorio y el mismo reloj que la reserva del reporte. */
+    private fun cupo(tope: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO, iaDisponible: Boolean = true) =
+        ServicioCupoIa(sistema.reportesRepo, tope, iaDisponible, sistema.reloj)
+
+    private fun restantes(servicio: ServicioCupoIa, usuario: UUID = ana): Int = runBlocking { servicio.consultar(usuario)!!.restantes }
+
+    @Test
+    fun `el cupo descuenta los reportes con IA del mes y dice cuando se renueva`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 3)
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+
+        val cupo = cupo(tope = 3).consultar(ana)!!
+
+        assertEquals(3, cupo.limite)
+        assertEquals(1, cupo.restantes)
+        assertEquals(FEBRERO, cupo.renovacion)
+    }
+
+    @Test
+    fun `una IA que cae al freemium no descuenta del cupo`() {
+        sistema.premium.esPremium = true
+        generar(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso("caido")), tope = 2))
+        assertEquals(2, restantes(cupo(tope = 2)))
+    }
+
+    @Test
+    fun `quedan reportes con IA si y solo si el siguiente reporte sale con IA`() {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 2)
+        repeat(3) { paso ->
+            val quedaban = restantes(cupo(tope = 2)) > 0
+            val modo = generar(entrevistaFinalizada(), servicio).modo
+            assertEquals(quedaban, modo == ModoEvaluacion.IA, "paso $paso")
+        }
+        assertEquals(0, restantes(cupo(tope = 2)))
+    }
+
+    @Test
+    fun `una reserva en curso descuenta y deja de contar a los diez minutos`() = runBlocking<Unit> {
+        // El servidor se reinició a mitad de la generación: el reporte quedó 'generando' con el cupo reservado.
+        val huerfana = entrevistaFinalizada()
+        val ahora = sistema.reloj.instant()
+        sistema.reportesRepo.crearPendiente(huerfana.id, ahora)
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3, ahora))
+        assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
+
+        assertEquals(0, restantes(cupo(tope = 1)), "mientras se genera, ese cupo está tomado")
+        sistema.reloj.adelantar(Duration.ofMinutes(9))
+        assertEquals(0, restantes(cupo(tope = 1)), "a los 9 minutos la reserva sigue vigente, igual que para reservar")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(1, restantes(cupo(tope = 1)), "a los 11 minutos la reserva caducó")
+    }
+
+    @Test
+    fun `una reserva al final del mes cuenta en ese mes y el mes siguiente empieza completo`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        // La llamada al LLM tarda 1 minuto: la reserva es el 31 de enero y el resultado se guarda el 1 de febrero.
+        val lenta = EvaluadorEntrevista { contexto -> sistema.reloj.adelantar(Duration.ofMinutes(1)); ia(proveedor).evaluar(contexto) }
+        sistema.reloj.adelantar(Duration.between(ENERO, FEBRERO).minusSeconds(10))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(lenta, tope = 1)).modo)
+
+        val ahora = sistema.reloj.instant()
+        assertEquals(1, sistema.reportesRepo.contarCupoIaUsado(ana, ENERO, FEBRERO, ahora.minusSeconds(600)), "cuenta en enero")
+        val febrero = cupo(tope = 1).consultar(ana)!!
+        assertEquals(1, febrero.restantes, "febrero empieza con su cupo completo")
+        assertEquals(Instant.parse("2026-03-01T00:00:00Z"), febrero.renovacion)
+    }
+
+    @Test
+    fun `si se baja el limite a mitad de mes los restantes quedan en 0 y nunca negativos`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 2)
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+
+        val conLimiteMenor = cupo(tope = 1).consultar(ana)!!
+
+        assertEquals(2L, conLimiteMenor.usadas)
+        assertEquals(0, conLimiteMenor.restantes)
+    }
+
+    @Test
+    fun `sin IA configurada o con limite 0 no hay cupo que mostrar`() = runBlocking<Unit> {
+        assertNull(cupo(iaDisponible = false).consultar(ana))
+        assertNull(cupo(tope = 0).consultar(ana))
     }
 
     // ---------- Apagado ordenado y rescate (D20) ----------

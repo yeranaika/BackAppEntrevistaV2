@@ -171,7 +171,12 @@ class SistemaPrueba(
      * Tope mensual de la generación con IA (D23). Usa el reloj del sistema, no [reloj]: la auditoría en H2 se fecha con
      * la hora real.
      */
-    topeGastoGeneracionIaUsd: Double = CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
+    topeGastoGeneracionIaUsd: Double = CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO,
+    /**
+     * Reloj del tope de generación (D23, D28). Solo para fijar el mes en pruebas que insertan filas a mano: no mezclarlo
+     * con una generación real, que se audita con la hora real.
+     */
+    relojTopeGeneracionIa: java.time.Clock = java.time.Clock.systemUTC()
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -195,7 +200,11 @@ class SistemaPrueba(
     val catalogo = LectorCatalogoExposed()
     val preguntas = RepositorioPreguntaExposed()
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
-    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), reloj)
+    /** Como en producción, una sola instancia del tope para el 429 de generar-ia y para Costos IA (D28). */
+    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
+        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa)
+    )
+    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj)
     val pregunta = ServicioPregunta(preguntas, catalogo)
     val mercadoRepo = RepositorioMercadoExposed()
     /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */
@@ -203,7 +212,7 @@ class SistemaPrueba(
     val contextoMercado = SERVICIOS.ServicioContextoMercado(ofertas, mercadoRepo)
     val generacion = ServicioGeneracionPregunta(
         mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
-        SERVICIOS.TopeGastoGeneracionIa(usdMensual = topeGastoGeneracionIaUsd),
+        topeGeneracionIa,
         mercado = contextoMercado
     )
     val cobertura = SERVICIOS.ServicioCoberturaPreguntas(mercadoRepo, MODELOS.LectorCoberturaPreguntasExposed())
@@ -215,7 +224,11 @@ class SistemaPrueba(
     val consentimiento = ServicioConsentimiento(RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos)
     val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
     val suscripciones = RepositorioSuscripcionExposed()
-    val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras)
+    // Antes que la suscripción, que lee de él el cupo de reportes con IA (D29): declarado después quedaría en null.
+    val reportesRepo = RepositorioReporteExposed()
+    /** Como en producción: el tope de IA del reporte y IA disponible (hay evaluador con IA), con el [reloj] de la prueba. */
+    val cupoIa = SERVICIOS.ServicioCupoIa(reportesRepo, CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO, iaDisponible = true, reloj)
+    val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras, cupoIa = cupoIa)
 
     val sesionesEntrevista = RepositorioSesionEntrevistaExposed()
     val metricasVideo = RepositorioMetricaVideoExposed()
@@ -244,8 +257,8 @@ class SistemaPrueba(
     val testsNivelacion = ServicioTestNivelacion(testsNivelacionRepo, preguntas, mercadoRepo)
     val pruebasApp = ServicioPruebasApp(entrevista, practica, nivelacion, sesionesEntrevista, practicasRepo, nivelacionesRepo)
 
-    // Reporte de feedback. En las pruebas se llama a reporte.procesar(...) a mano para que sea determinista.
-    val reportesRepo = RepositorioReporteExposed()
+    // Reporte de feedback (reportesRepo está más arriba). En las pruebas se llama a reporte.procesar(...) a mano para que
+    // sea determinista.
     val premium = PremiumFalso()
     val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluador)
     val evaluadorEntrevistaIa = EvaluadorEntrevistaIa(proveedorIa, "gpt-4o-mini", evaluadorEntrevistaGratis)

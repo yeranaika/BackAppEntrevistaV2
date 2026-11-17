@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [decisiones, adr]
-actualizado: 2026-11-07
+actualizado: 2026-11-17
 ---
 
 # Decisiones
@@ -81,7 +81,8 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   si la IA cae al freemium o el reporte termina en error, el cupo se devuelve. Un reporte `generando` con modo `ia` es
   una reserva que caduca a los 10 minutos (servidor reiniciado a mitad). Una evaluación con IA queda con la fecha de su
   reserva, así cuenta en el mes en que tomó el cupo aunque termine pasada la medianoche. Sin migración. El mes se corta a medianoche
-  UTC (20:00 o 21:00 del último día en Chile). El usuario todavía no ve cuántas le quedan (pendiente con Android).
+  UTC (20:00 o 21:00 del último día en Chile). Desde D29 `/billing/status` le informa cuántas le quedan y la app lo
+  muestra en Perfil › Mi suscripción (rama `feature/offline-automatico-y-reportes-ia` de la app, sin integrar).
 
 ## D18 · Límite por IP compartido en Redis, con respaldo en memoria (2026-11)
 - **Contexto**: el límite por IP vivía en la memoria de cada instancia: con N instancias el cupo real era N veces el configurado.
@@ -248,3 +249,67 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   ofertas se limpia con las etiquetas de bloque como saltos de línea (así `<strong>Kotlin</strong>` no parte la frase) y
   de una descripción larga se guarda el comienzo y el final (ahí van los requisitos y los tags). `GET /api/v1/admin/preguntas`
   acepta `paraCargoId` (del cargo o sin cargo) para listar las mismas pendientes que cuenta la cobertura.
+
+## D27 · Una compra de Google Play solo activa la cuenta de la app que la pagó (2026-11)
+- **Contexto**: el backend solo impedía que un mismo token de compra activara dos cuentas (se queda con él la primera
+  que lo registra). La app abre cada compra con `obfuscatedAccountId` = hash de su cuenta y filtra en el teléfono, pero
+  el backend no lo revisaba: una app antigua o modificada podía activar en una cuenta la compra que pagó otra.
+- **Decisión**: `ClienteGooglePlay` lee `obfuscatedExternalAccountId` de `purchases.subscriptions.get` (v3) y
+  `verificarCompraGoogle`, después de la regla de compra inválida y antes de registrar, lo compara (sin distinguir
+  mayúsculas) con `cuentaOfuscadaDe(usuarioId)`: SHA-256 en hex minúscula de `UUID.toString()` en UTF-8, lo mismo que
+  calcula la app (`ServicioPagos.cuentaOfuscada`) con el `id` de `/me`. Si no coincide → `409 compra_ya_registrada`
+  con el mismo mensaje que el token de otra cuenta (una sola función, `compraDeOtraCuenta()`): la app ya lo muestra
+  como «asociada a otra cuenta» y no reintenta. Si la compra no trae el campo (hecha desde la tienda de Play, código
+  promocional, app antigua o `GOOGLE_PLAY_BILLING_MOCK`), se acepta y decide solo la regla del dueño del token.
+- **Por qué**: un pago solo debe dar premium a la cuenta que pagó (RNF04, control de acceso), sin cambiar el contrato
+  de la app ni migrar. El rechazo ocurre fuera de la política de reintentos; la cuenta ofuscada no se guarda ni va al
+  log ni al mensaje, y se siguen ignorando los datos personales que trae la respuesta de Google (RNF05).
+- **Consecuencias**: la fórmula del hash es **parte del contrato con la app**: si un lado la cambia, toda compra real
+  responde 409 y la persona pagaría sin recibir premium (el mismo vector fijo, `3f2504e0-…` → `d1bfaf4a…`, se prueba
+  en los dos lados: `PRUEBA_SERVICIO_SUSCRIPCION` en el backend y `FlujoCompraTest` sobre `ServicioPagos.cuentaOfuscada`
+  en la app, rama `feature/offline-automatico-y-reportes-ia`, sin integrar). Una cuenta borrada y creada de nuevo tiene
+  otro UUID: su suscripción anterior responde 409 y hay que cancelarla en Play. Un token que otra cuenta tomó antes de
+  este cambio sigue siendo de esa cuenta (liberarlo queda como decisión pendiente). Si se migra a
+  `purchases.subscriptionsv2`, el campo pasa a `externalAccountIdentifiers.obfuscatedExternalAccountId`. Sin migración
+  ni cambios en el contrato de Android.
+
+## D28 · Gasto del mes frente al tope en Costos IA (2026-11)
+- **Contexto**: el tope de gasto de la generación con IA (D23) solo se notaba al recibir el 429; el panel no tenía
+  cómo mostrar cuánto se gastó en el mes ni cuánto queda.
+- **Decisión**: `GET /api/v1/admin/costos-ia` suma el campo `topeGeneracionPreguntas` con 7 claves: `mes` (AAAA-MM,
+  UTC), `gastadoUsd`, `topeUsd`, `restanteUsd`, `fechaReposicion` (AAAA-MM-DD o `null`), `estaDesactivado` y
+  `estaAgotado`. Describe siempre el mes UTC en curso, sin importar `desde`/`hasta`. Una sola fuente:
+  `ServicioTopeGeneracionIa` calcula `estado()` y su `verificar()` (el 429) se apoya en él; el contenedor inyecta la
+  misma instancia en la generación y en Costos IA. Sin endpoint nuevo.
+- **Por qué**: el panel ya pide `costos-ia` (Dashboard, Informes, Generar con IA) con el mismo permiso: un campo
+  aditivo no le cuesta otra petición. Con una sola fuente, lo que ve el panel es lo que decide el 429.
+- **Consecuencias**: `gastadoUsd` y `restanteUsd` van redondeados a 6 decimales y `topeUsd` tal cual se configuró;
+  `estaAgotado` se calcula sin redondear, así que el panel debe usar los booleanos y no recalcularlos. `restanteUsd`
+  nunca es negativo (sin reserva, dos generaciones pueden pasar el tope, D23). `fechaReposicion` viaja aunque valga
+  `null`. Una consulta indexada más por llamada; un `400` de rango no la hace. Sin caché: con varias instancias dejaría
+  de ser una sola fuente. El mes UTC se calcula con la misma función que el cupo de reportes (`periodoMensualIa`,
+  D29). El panel lo muestra en Informes y en Generar con IA (`TopeGeneracionIa.jsx`) y resumido en el Dashboard
+  (`services/topeGeneracion.js`, prueba `tests/topeGeneracion.test.mjs`; rama `feature/tope-gasto-ia` del panel, sin
+  integrar).
+
+## D29 · Cupo de reportes con IA visible para el premium (2026-11)
+- **Contexto**: D17 limita los reportes con IA de cada premium por mes, pero el usuario no sabía cuántos le quedaban.
+- **Decisión**: `GET /billing/status` y `POST /billing/code/redeem` suman tres campos aditivos en snake_case:
+  `reportes_ia_limite` (Int), `reportes_ia_restantes` (Int, entre 0 y el límite) y `reportes_ia_renovacion` (Long, ms
+  epoch del inicio del mes siguiente, UTC). Llegan juntos solo si el usuario es premium, hay LLM configurado y el
+  límite es mayor que 0; si no, se omiten. Lo usado se cuenta con **la misma condición SQL que la reserva** (una
+  función compartida en `RepositorioReporteExposed`): reportes con modo `ia` del mes que estén `listo`, o `generando`
+  con la reserva vigente (10 min). El conteo no bloquea la fila del usuario.
+- **Por qué**: si las reservas vigentes cuentan, «la próxima reserva funciona si y solo si quedan más de 0» se cumple.
+  `ServicioCupoIa` va aparte del reporte para no crear el ciclo suscripción ↔ reporte. La respuesta de un usuario
+  gratis queda igual que antes (minimización, RNF05) y una app antigua ignora las claves nuevas (`ignoreUnknownKeys`).
+- **Consecuencias**: el número puede subir (el cupo se devuelve si la IA cae al freemium o el reporte termina en
+  error). Si `LIMITE_EVALUACIONES_IA_MENSUAL` se baja a mitad de mes, lo ya usado en el mes sigue contando y
+  `reportes_ia_restantes` es el nuevo límite menos lo usado; queda en 0 (nunca negativo) solo si lo usado alcanza o
+  supera el nuevo límite (`CupoIaMensual.restantes`). Por ejemplo, de 30 a 20 con 5 usados quedan 15, y con 25 usados
+  quedan 0. La reserva usa el mismo límite nuevo, así que sigue valiendo «funciona si y solo si quedan más de 0».
+  Si el conteo falla, el estado sale premium sin los campos (queda en el log). `estado()` sigue sin el cupo porque lo
+  usa cada reporte.
+  La app lo muestra en Perfil › Mi suscripción con la fecha formateada en UTC (en la hora de Chile mostraría el día
+  anterior) y, si faltan los campos, no muestra nada (`textoCupoReportesIa`, prueba `CupoReportesIaTest`; rama
+  `feature/offline-automatico-y-reportes-ia` de la app, sin integrar). Sin migración.

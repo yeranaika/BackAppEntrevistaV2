@@ -489,6 +489,8 @@ JSON en snake_case (contrato de Android).
 
 `GET /billing/status` · Usuario · responde `200`
 
+`is_premium`, `plan`, `source` (`google` | `interna`), `status`, `start_at` y `expires_at` (ms epoch). A un premium con IA activa le suma `reportes_ia_limite`, `reportes_ia_restantes` (0 a límite) y `reportes_ia_renovacion` (ms epoch del inicio del mes siguiente, UTC): los reportes con IA que le quedan en el mes, contados como la reserva (D29). A un usuario gratis no le llegan.
+
 ### Crear código premium (admin)
 
 `POST /billing/admin/codes` · Admin · responde `201`
@@ -508,7 +510,7 @@ JSON en snake_case (contrato de Android).
 
 `POST /billing/code/redeem` · Usuario · responde `200`, `400`
 
-Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`.
+Atómico: nunca supera `max_uses`. Responde el mismo estado que `GET /billing/status` (con el cupo de reportes con IA, D29) más `mensaje`. `400 codigo_invalido_o_expirado`.
 
 ```json
 {
@@ -520,7 +522,7 @@ Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`.
 
 `POST /billing/google/verify` · Usuario · responde `200`
 
-Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula.
+Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Si Google dice que la pagó otra cuenta de la app (`obfuscatedExternalAccountId` distinto del SHA-256 del id de la cuenta), también `409 compra_ya_registrada` (D27); sin ese dato decide el dueño del token. Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula.
 
 ```json
 {
@@ -1297,7 +1299,7 @@ Alias antiguo: `POST /admin/users`.
 
 `GET /api/v1/admin/costos-ia?desde=2026-11-01&hasta=2026-11-30` · Admin · responde `200`
 
-Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. `fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). Costos en USD con 6 decimales.
+Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. `fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). Costos en USD con 6 decimales. `topeGeneracionPreguntas` es el gasto del mes UTC en curso (no depende del rango) frente al tope de generación con IA: `mes`, `gastadoUsd`, `topeUsd`, `restanteUsd`, `fechaReposicion` (`null` si está desactivado), `estaDesactivado` y `estaAgotado`; la próxima generación responde `429 tope_generacion_ia_alcanzado` si uno de los dos es `true` (D28).
 
 ## 17 · Cierre de sesión
 

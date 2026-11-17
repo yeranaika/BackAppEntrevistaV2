@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [pendientes, deuda-tecnica, backlog]
-actualizado: 2026-11-07
+actualizado: 2026-11-17
 ---
 
 # Pendientes y deuda técnica (backend)
@@ -34,9 +34,14 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Resumen de nivelación con IA** para premium (hoy determinista).
 - [ ] **Transcripción de audio (STT)** para preguntas de video: hoy un clip sin transcripción no se evalúa.
 - [x] Endpoint para que un admin vea costos de IA (2026-11-06, rama `feature/costos-ia-admin`): `GET /api/v1/admin/costos-ia`
-  por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. Falta mostrarlo en el panel web.
+  por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. El panel lo muestra en Dashboard, Informes
+  y Generar con IA (`getCostosIa`, commit `f912f63` del panel, rama `feature/panel-admin-v2`, sin integrar en `main`).
 - [x] `.env.example`: agregar `LIMITE_REGISTROS_POR_IP` y `LIMITE_RECUPERACIONES_POR_IP` (2026-11-06, con `CABECERA_IP_CLIENTE`).
-- [ ] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (campo opcional nuevo, coordinado con Android).
+- [x] **Mostrar al usuario premium cuántas evaluaciones con IA le quedan** en el mes (2026-11-17, rama
+  `feature/cierre-pendientes`, D29): `GET /billing/status` y el canje traen `reportes_ia_limite`,
+  `reportes_ia_restantes` y `reportes_ia_renovacion`. Android lo muestra en Perfil › Mi suscripción con la fecha en
+  UTC (`textoCupoReportesIa`, prueba `CupoReportesIaTest`; rama `feature/offline-automatico-y-reportes-ia` de la app,
+  sin integrar).
 - [ ] **Descontar del tope las llamadas pagadas que responden mal**: desde 2026-11-06 sus tokens y costo quedan en el
   reporte (modo freemium) y aparecen en `GET /api/v1/admin/costos-ia` como `fallidas`; falta decidir si descuentan cupo.
 - [ ] **Llamadas pagadas que no llegan a guardarse**: si el LLM ya respondió pero el intento se corta (apagado, rescate,
@@ -53,7 +58,7 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   rescata la tarea periódica; decidir un relleno único por SQL.
 - [x] **Tope de gasto en la generación de preguntas con IA** (2026-11-07, rama `fix/banco-preguntas`, D23):
   `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD/mes UTC, global) → `429 tope_generacion_ia_alcanzado`, y límite por IP
-  `LIMITE_GENERACIONES_IA_POR_IP`. Quedan abiertos los cinco puntos siguientes.
+  `LIMITE_GENERACIONES_IA_POR_IP`. Quedan abiertos los puntos siguientes sin marcar.
 - [ ] **Tope de generación por admin**: hoy es global porque `pregunta_generacion_ia` no guarda quién pidió la
   generación; requiere una columna `solicitado_por` (migración) y decidir el reparto.
 - [ ] **Reserva previa del tope de generación**: sin reserva, dos generaciones simultáneas pueden pasar el tope en lo
@@ -61,11 +66,26 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Cortocircuito abierto auditado como fallida**: cuando la política del LLM tiene el cortocircuito abierto
   (`*_no_disponible`), la generación se registra en `pregunta_generacion_ia` como fallida aunque no hubo llamada al
   proveedor (sin tokens, así que no suma gasto, pero ensucia la auditoría y el conteo de `fallidas`).
-- [ ] **Panel admin: gasto del mes frente al tope** de generación (hoy solo se ve el 429 al llegar).
+- [x] **Panel admin: gasto del mes frente al tope** de generación (lado backend, 2026-11-17, rama
+  `feature/cierre-pendientes`, D28): `topeGeneracionPreguntas` en `GET /api/v1/admin/costos-ia`. El panel lo muestra
+  en Informes y en Generar con IA (`TopeGeneracionIa.jsx`) y resumido en el Dashboard (prueba
+  `tests/topeGeneracion.test.mjs`; rama `feature/tope-gasto-ia` de Front-web-APPENTREVISTA, sin integrar).
 - [x] **Panel admin: texto de `GenerarPreguntas.jsx`** alineado con D23 (rama `fix/textos-costos-ia` del panel, sin
   push): fallidas con tokens, `provider_timeout` y el 429 del tope.
 - [ ] **Estimar el costo de un `provider_timeout`** para el tope (hoy cuenta 0: no hay tokens, aunque el proveedor
   pudo cobrar la llamada).
+- [x] **Compra de Google Play pagada desde otra cuenta de la app** (2026-11-17, rama `feature/cierre-pendientes`, D27):
+  `409 compra_ya_registrada` si `obfuscatedExternalAccountId` no es el hash de la cuenta. Quedan abiertos los dos
+  puntos siguientes sin marcar.
+- [ ] **Liberar un token de compra tomado por otra cuenta** antes de D27 (app antigua sin filtro): hoy el dueño legítimo
+  sigue recibiendo 409. Opción estudiada: si la cuenta ofuscada coincide, quitarle el token a la otra cuenta en la
+  misma transacción (le quita un premium que no pagó). Requiere decisión.
+- [ ] **Migrar a `purchases.subscriptionsv2.get`** (Google marca v3 como obsoleta): la cuenta que pagó pasa a
+  `externalAccountIdentifiers.obfuscatedExternalAccountId` y hay que seguir leyéndola desde ahí.
+- [x] **Prueba del hash de la cuenta en la app Android** (2026-11-17, rama `feature/offline-automatico-y-reportes-ia`
+  de la app, sin integrar): `FlujoCompraTest` prueba `ServicioPagos.cuentaOfuscada` con el mismo vector fijo que
+  `PRUEBA_SERVICIO_SUSCRIPCION` (`3f2504e0-…` → `d1bfaf4a…`), para que un cambio en la app no deje sin premium a
+  quien pagó.
 - [ ] **Limpiar las BD ya contaminadas por la semilla vieja** (preguntas y opciones duplicadas, D25): decidir un SQL
   único, **con respaldo**, que conserve la copia a la que apuntan los snapshots e historial.
 

@@ -4,6 +4,8 @@ import ESQUEMAS.RespuestaCostoIaDia
 import ESQUEMAS.RespuestaCostoIaModelo
 import ESQUEMAS.RespuestaCostosIa
 import ESQUEMAS.RespuestaGastoIa
+import ESQUEMAS.RespuestaTopeGeneracionIa
+import SERVICIOS.EstadoTopeGeneracionIa
 import SERVICIOS.GastoIa
 import SERVICIOS.ResumenCostosIa
 import java.math.BigDecimal
@@ -28,5 +30,17 @@ fun ResumenCostosIa.aRespuesta() = RespuestaCostosIa(
     reportes = reportes.aRespuesta(),
     generacionPreguntas = generacionPreguntas.aRespuesta(),
     porDia = porDia.map { RespuestaCostoIaDia(it.fecha.toString(), it.reportes.aRespuesta(), it.generacionPreguntas.aRespuesta(), (it.reportes + it.generacionPreguntas).costoUsd.usd()) },
-    porModelo = porModelo.map { (modelo, gasto) -> RespuestaCostoIaModelo(modelo, gasto.aRespuesta()) }
+    porModelo = porModelo.map { (modelo, gasto) -> RespuestaCostoIaModelo(modelo, gasto.aRespuesta()) },
+    topeGeneracionPreguntas = topeGeneracionPreguntas.aRespuesta()
+)
+
+/** Los montos gastado y restante se redondean para mostrar; el tope va tal cual se configuró. */
+fun EstadoTopeGeneracionIa.aRespuesta() = RespuestaTopeGeneracionIa(
+    mes = mes.toString(),
+    gastadoUsd = gastadoUsd.usd(),
+    topeUsd = topeUsd.toDouble(),
+    restanteUsd = restanteUsd.usd(),
+    fechaReposicion = fechaReposicion?.toString(),
+    estaDesactivado = estaDesactivado,
+    estaAgotado = estaAgotado
 )

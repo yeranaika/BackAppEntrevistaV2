@@ -17,8 +17,8 @@ import io.ktor.server.routing.*
 
 /**
  * POST /billing/google/verify   activa premium con una compra de Google Play
- * GET  /billing/status          estado de la suscripción (Android)
- * POST /billing/code/redeem     canjea un código promocional (Android)
+ * GET  /billing/status          estado de la suscripción (Android); a un premium, los reportes con IA que le quedan (D29)
+ * POST /billing/code/redeem     canjea un código promocional (Android); responde el mismo estado
  * POST /billing/admin/codes     crea códigos (admin)
  */
 fun Route.controladorSuscripcion(servicio: ServicioSuscripcion) {
@@ -31,7 +31,7 @@ fun Route.controladorSuscripcion(servicio: ServicioSuscripcion) {
             }
 
             get("/status") {
-                call.respond(servicio.estado(call.usuarioIdDesdeJwt()).aRespuesta())
+                call.respond(servicio.estadoConCupoIa(call.usuarioIdDesdeJwt()).aRespuesta())
             }
 
             post("/code/redeem") {

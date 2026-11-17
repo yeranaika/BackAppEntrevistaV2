@@ -40,7 +40,9 @@ data class ResumenCostosIa(
     val reportes: GastoIa,
     val generacionPreguntas: GastoIa,
     val porDia: List<CostoIaDia>,
-    val porModelo: List<Pair<String, GastoIa>>
+    val porModelo: List<Pair<String, GastoIa>>,
+    /** Gasto del mes UTC en curso frente al tope de generación (D28): no depende de [desde] ni de [hasta]. */
+    val topeGeneracionPreguntas: EstadoTopeGeneracionIa
 ) {
     val total: GastoIa get() = reportes + generacionPreguntas
 }
@@ -48,10 +50,12 @@ data class ResumenCostosIa(
 /**
  * Cuánto se gastó en IA, para el admin: reportes de entrevista evaluados con IA (premium, D17) y generación de preguntas.
  * Los días se cortan en UTC, igual que el tope mensual. Una llamada que falló (respuesta inválida) se pagó igual pero no
- * guardó su costo: se estima con la misma tabla de precios que usa el resto del sistema (costoLlmUsd).
+ * guardó su costo: se estima con la misma tabla de precios que usa el resto del sistema (costoLlmUsd). Agrega el gasto
+ * del mes frente al tope de generación (D28), leído de la misma instancia que decide el 429 de generar-ia.
  */
 class ServicioCostosIa(
     private val lector: LectorCostosIa,
+    private val topeGeneracion: ServicioTopeGeneracionIa,
     private val reloj: Clock = Clock.systemUTC()
 ) {
     /** [desde] y [hasta] son días incluidos (UTC). Sin ellos: los últimos [DIAS_COSTOS_IA_POR_DEFECTO] días. */
@@ -80,7 +84,9 @@ class ServicioCostosIa(
             reportes = sumar(porOrigen[OrigenUsoIa.REPORTE_ENTREVISTA].orEmpty()),
             generacionPreguntas = sumar(porOrigen[OrigenUsoIa.GENERACION_PREGUNTAS].orEmpty()),
             porDia = porDia,
-            porModelo = porModelo
+            porModelo = porModelo,
+            // Después de validar el rango: un 400 no hace esta consulta.
+            topeGeneracionPreguntas = topeGeneracion.estado()
         )
     }
 

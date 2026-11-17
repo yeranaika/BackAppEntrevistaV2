@@ -116,6 +116,57 @@ class PruebaRepositorioReporte {
         assertTrue(reservar(reporteGenerando(beto), tope = 1, usuario = beto))
     }
 
+    // ---------- Cupo que ve el usuario (D29): la misma condición que la reserva ----------
+
+    /** Cupo ocupado por [usuario] en enero visto a mitad de mes (reservas vigentes: las de los últimos 10 minutos). */
+    private suspend fun cupoUsado(usuario: UUID = ana) = repo.contarCupoIaUsado(usuario, INICIO_MES, FIN_MES, A_MEDIO_MES.minusSeconds(600))
+
+    /** Un reporte de cada tipo: 2 ocupan cupo (lista con IA el 1 de enero y reserva vigente) y 4 no. */
+    private suspend fun sembrarReportesVariados() {
+        repo.guardarResultado(reporteGenerando(), resultado(ModoEvaluacion.IA, INICIO_MES))
+        repo.guardarResultado(reporteGenerando(), resultado(ModoEvaluacion.IA, FIN_MES))
+        repo.guardarResultado(reporteGenerando(), resultado(ModoEvaluacion.FREEMIUM, A_MEDIO_MES))
+        assertTrue(reservar(reporteGenerando(), tope = 5), "reserva vigente")
+        assertTrue(reservar(reporteGenerando(), tope = 5, fecha = A_MEDIO_MES.minusSeconds(3_600)), "reserva huérfana de hace una hora")
+        val conError = reporteGenerando()
+        assertTrue(reservar(conError, tope = 5))
+        repo.marcarError(conError, "error_interno", A_MEDIO_MES)
+    }
+
+    @Test
+    fun `el cupo usado cuenta listas con IA y reservas vigentes del mes y nada mas`() = runBlocking<Unit> {
+        sembrarReportesVariados()
+        assertEquals(2, cupoUsado(), "la del 1 de enero y la reserva vigente: no la de febrero, la freemium, la huérfana ni la con error")
+    }
+
+    @Test
+    fun `el cupo usado coincide con lo que permite reservar`() = runBlocking<Unit> {
+        sembrarReportesVariados()
+        val usado = cupoUsado().toInt()
+        assertFalse(reservar(reporteGenerando(), tope = usado), "con el cupo lleno la reserva falla")
+        assertTrue(reservar(reporteGenerando(), tope = usado + 1), "con uno libre la reserva funciona")
+    }
+
+    @Test
+    fun `marcarError tambien libera el cupo en el conteo`() = runBlocking<Unit> {
+        val sesion = reporteGenerando()
+        assertTrue(reservar(sesion, tope = 1))
+        assertEquals(1, cupoUsado())
+        repo.marcarError(sesion, "error_interno", A_MEDIO_MES)
+        assertEquals(0, cupoUsado())
+    }
+
+    @Test
+    fun `el cupo usado es por usuario`() = runBlocking<Unit> {
+        val beto = runBlocking {
+            sistema.usuario.registrar(SolicitudRegistro("beto@ejemplo.com", "Clave-segura-1"))
+            sistema.usuarios.buscarPorCorreo("beto@ejemplo.com")!!.id
+        }
+        assertTrue(reservar(reporteGenerando(), tope = 1))
+        assertEquals(1, cupoUsado())
+        assertEquals(0, cupoUsado(beto))
+    }
+
     @Test
     fun `reservas simultaneas respetan el tope`() = runBlocking<Unit> {
         val reportes = List(10) { reporteGenerando() }

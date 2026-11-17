@@ -2,7 +2,7 @@
 tipo: tecnologia
 tags: [tecnologia, ia, llm, openai, anthropic]
 version: gpt-4o-mini · claude-haiku-4-5
-actualizado: 2026-11-07
+actualizado: 2026-11-17
 ---
 
 # LLM: OpenAI y Anthropic
@@ -14,7 +14,7 @@ respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se
 |---|---|
 | Proveedores | OpenAI (`gpt-4o-mini`) y Anthropic (`claude-haiku-4-5`), detrás de `ProveedorPreguntasIa` |
 | Config | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (opcionales: sin clave responde `503 provider_not_configured`) |
-| Código | `INTEGRACIONES/PROVEEDOR_LLM.kt`, `SERVICIOS/SERVICIO_GENERACION_PREGUNTA.kt`, `SERVICIOS/EVALUADOR_ENTREVISTA.kt` |
+| Código | `INTEGRACIONES/PROVEEDOR_LLM.kt`, `SERVICIOS/SERVICIO_GENERACION_PREGUNTA.kt`, `SERVICIOS/SERVICIO_TOPE_GENERACION_IA.kt`, `SERVICIOS/EVALUADOR_ENTREVISTA.kt`, `SERVICIOS/SERVICIO_CUPO_IA.kt` |
 | Costo | `costoLlmUsd(modelo, tokensEntrada, tokensSalida)`; se registra en `pregunta_generacion_ia` y `reporte_entrevista` |
 
 ## Cómo se usa
@@ -26,6 +26,7 @@ respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se
 - **Tope mensual** ([[Decisiones]] D17): cada usuario premium tiene hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes con
   IA por mes calendario UTC (por defecto 30; `0` = sin IA). El cupo se reserva en la BD **antes** de llamar al LLM, así
   que dos reportes simultáneos no lo superan. Al llegar al tope el reporte sale con el motor freemium, sin error.
+  El premium ve cuántos le quedan en `GET /billing/status` (D29), contados con la misma condición que la reserva.
 - **Cuánto se gasta**: `GET /api/v1/admin/costos-ia` (solo admin) suma por día y por modelo lo registrado en
   `reporte_entrevista` y `pregunta_generacion_ia`. Una evaluación de reporte que respondió mal guarda sus tokens y
   costo aunque el reporte salga freemium (cuenta como `fallida`); una generación de preguntas fallida no guarda costo y
@@ -43,7 +44,9 @@ respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se
   estimado, igual que `GET /api/v1/admin/costos-ia`. Se revisa después de validar el pedido y antes de llamar al
   proveedor → `429 tope_generacion_ia_alcanzado` (el mensaje dice cuándo se repone). Sin reserva previa: dos
   generaciones simultáneas pueden pasar el tope en lo que cueste una. Además, `LIMITE_GENERACIONES_IA_POR_IP` (30 cada
-  60 min) corta ráfagas → `429 demasiadas_solicitudes` → [[Redis]].
+  60 min) corta ráfagas → `429 demasiadas_solicitudes` → [[Redis]]. El gasto del mes frente al tope sale en
+  `GET /api/v1/admin/costos-ia` (`topeGeneracionPreguntas`, D28), calculado por la misma instancia de
+  `ServicioTopeGeneracionIa` que decide el 429.
 - **Seguridad**: las respuestas del candidato van en el mensaje de usuario como JSON de datos; las instrucciones dicen
   explícitamente que ignore instrucciones dentro de las respuestas.
 

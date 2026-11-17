@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [estado, fases, ramas]
-actualizado: 2026-11-07
+actualizado: 2026-11-17
 ---
 
 # Estado del proyecto
@@ -33,6 +33,9 @@ actualizado: 2026-11-07
 | Rúbrica en el snapshot de entrevista | `rubrica_snap` por pregunta servida; editar una pregunta deja su traza de IA pendiente (D24, migración 022) | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
 | Semilla re-ejecutable | Preguntas y opciones de la semilla solo se insertan si no existen; `src/DB/PROBAR_SEMILLA.ps1` 7/7 en PostgreSQL 16 (2026-11-07) (D25) | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
 | Preguntas con lo que pide el mercado | `generar-ia` usa las ofertas de empleo guardadas por la sincronización (o busca hasta 6 s) y responde `contexto_mercado`; `GET /api/v1/admin/preguntas/cobertura` muestra qué skills de cada cargo tienen pocas preguntas (D26) | `feature/preguntas-desde-mercado` | (ver git log) | 381 pruebas · revisión adversarial (2026-11-17) |
+| Compra de Google Play de otra cuenta | `POST /billing/google/verify` lee `obfuscatedExternalAccountId` y responde `409 compra_ya_registrada` si la compra la pagó otra cuenta de la app (hash SHA-256 del id, igual que la app); sin el campo decide el dueño del token (D27) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
+| Gasto del mes frente al tope en Costos IA | `GET /api/v1/admin/costos-ia` trae `topeGeneracionPreguntas` (7 claves) del mes UTC en curso; `ServicioTopeGeneracionIa` es la única fuente del 429 y del panel (D28) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
+| Cupo de reportes con IA visible | `GET /billing/status` y el canje traen `reportes_ia_limite`, `reportes_ia_restantes` y `reportes_ia_renovacion` solo para premium con IA activa, con la misma condición SQL que la reserva (D29) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
 
@@ -63,8 +66,10 @@ lotes reenviados, solapados y 6 envíos simultáneos del mismo lote sin duplicar
 > 7/7 comprobaciones en verde (14 preguntas y 24 opciones tras tres corridas).
 
 ## Qué funciona hoy (resumen)
-Registro/login (correo y Google), perfil y onboarding, consentimientos, recordatorios, premium (códigos y Google Play),
+Registro/login (correo y Google), perfil y onboarding, consentimientos, recordatorios, premium (códigos y Google Play,
+que solo activa la cuenta que pagó; el premium ve cuántos reportes con IA le quedan),
 mercado laboral, banco de preguntas (con generación IA guiada por las ofertas de empleo y cobertura por cargo), nivelación, práctica (+ offline), entrevista (+ métricas de
-video), reporte de feedback (freemium / IA premium), progreso por skill, y todo el contrato que usa la app Android.
+video), reporte de feedback (freemium / IA premium), progreso por skill, costos de IA con el gasto del mes frente al
+tope de generación, y todo el contrato que usa la app Android.
 
 Ver también [[Pendientes y deuda tecnica]] · [[Decisiones]] · [[Riesgos]]

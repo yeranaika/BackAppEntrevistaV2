@@ -48,7 +48,7 @@ class PruebaServicioGeneracionPregunta {
             mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor),
             repositorio,
             catalogo,
-            tope
+            SERVICIOS.ServicioTopeGeneracionIa(repositorio, tope)
         )
 
     private fun uso(fecha: String, costo: Double?, exitoso: Boolean = true, tokensEntrada: Int? = null, tokensSalida: Int? = null) =
@@ -296,7 +296,8 @@ class PruebaServicioGeneracionPregunta {
         repositorio: GeneracionEnMemoria = GeneracionEnMemoria(),
         tope: SERVICIOS.TopeGastoGeneracionIa = topeEn(5.0)
     ) = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor), repositorio, catalogo, tope, fuente
+        mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor), repositorio, catalogo,
+        SERVICIOS.ServicioTopeGeneracionIa(repositorio, tope), fuente
     )
 
     @Test

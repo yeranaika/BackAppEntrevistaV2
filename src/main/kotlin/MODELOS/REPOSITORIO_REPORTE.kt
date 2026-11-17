@@ -71,6 +71,13 @@ interface RepositorioReporte {
     suspend fun contarEvaluacionesIa(usuarioId: UUID, desde: Instant, hasta: Instant): Long
 
     /**
+     * Cupo de IA (D17) que [usuarioId] tiene ocupado en [desde, hasta), con la misma condición que [reservarEvaluacionIa]:
+     * reportes con modo ia listos, o reservados en reportes que siguen generando desde [vigentesDesde]. Sin bloquear la
+     * fila del usuario: es solo para mostrarle cuántos le quedan (D29).
+     */
+    suspend fun contarCupoIaUsado(usuarioId: UUID, desde: Instant, hasta: Instant, vigentesDesde: Instant): Long
+
+    /**
      * Reserva un cupo del tope mensual de IA (D17). Si el usuario tiene menos de [tope] evaluaciones con IA en
      * [desde, hasta) —listas, o reservadas en reportes que siguen generando desde [vigentesDesde], sin contar este—,
      * marca el reporte de [sesionId] (que debe estar en 'generando') con modo ia y fecha [fecha] y devuelve true.
@@ -264,6 +271,9 @@ class RepositorioReporteExposed : RepositorioReporte {
         }.count()
     }
 
+    override suspend fun contarCupoIaUsado(usuarioId: UUID, desde: Instant, hasta: Instant, vigentesDesde: Instant): Long =
+        transaccion { contarOcupanCupoIa(usuarioId, desde, hasta, vigentesDesde, excluirSesion = null) }
+
     // READ COMMITTED explícito: después de esperar el bloqueo, el conteo tiene que ver la reserva que otra transacción
     // acaba de confirmar. Es el nivel por defecto de Postgres, pero en H2 (pruebas) el por defecto es más estricto.
     override suspend fun reservarEvaluacionIa(
@@ -276,17 +286,7 @@ class RepositorioReporteExposed : RepositorioReporte {
         fecha: Instant
     ): Boolean = transaccion(Connection.TRANSACTION_READ_COMMITTED) {
         TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq usuarioId }.forUpdate().toList()
-        val listas = TablaReporteEntrevista.estado eq EstadoReporte.LISTO.valorBd
-        val reservadasVigentes = (TablaReporteEntrevista.estado eq EstadoReporte.GENERANDO.valorBd) and
-            (TablaReporteEntrevista.fechaGeneracion greaterEq vigentesDesde)
-        val usadas = reporteConSesion().select(TablaReporteEntrevista.reporteId).where {
-            (TablaSesionEntrevista.usuarioId eq usuarioId) and
-                (TablaReporteEntrevista.sesionId neq sesionId) and
-                (TablaReporteEntrevista.modoEvaluacion eq ModoEvaluacion.IA.valorBd) and
-                (TablaReporteEntrevista.fechaGeneracion greaterEq desde) and
-                (TablaReporteEntrevista.fechaGeneracion less hasta) and
-                (listas or reservadasVigentes)
-        }.count()
+        val usadas = contarOcupanCupoIa(usuarioId, desde, hasta, vigentesDesde, excluirSesion = sesionId)
         if (usadas >= tope) return@transaccion false
         TablaReporteEntrevista.update({
             (TablaReporteEntrevista.sesionId eq sesionId) and (TablaReporteEntrevista.estado eq EstadoReporte.GENERANDO.valorBd)
@@ -332,6 +332,24 @@ class RepositorioReporteExposed : RepositorioReporte {
                 )
             }
             .reversed()
+    }
+
+    /**
+     * Qué ocupa el cupo de IA (D17): una sola condición para la reserva y para lo que ve el usuario (D29), así nunca
+     * divergen. [excluirSesion]: el reporte que se está reservando (reservar dos veces no consume dos cupos). Llamar
+     * dentro de una transacción.
+     */
+    private fun contarOcupanCupoIa(usuarioId: UUID, desde: Instant, hasta: Instant, vigentesDesde: Instant, excluirSesion: UUID?): Long {
+        val listas = TablaReporteEntrevista.estado eq EstadoReporte.LISTO.valorBd
+        val reservadasVigentes = (TablaReporteEntrevista.estado eq EstadoReporte.GENERANDO.valorBd) and
+            (TablaReporteEntrevista.fechaGeneracion greaterEq vigentesDesde)
+        val ocupaCupo = (TablaSesionEntrevista.usuarioId eq usuarioId) and
+            (TablaReporteEntrevista.modoEvaluacion eq ModoEvaluacion.IA.valorBd) and
+            (TablaReporteEntrevista.fechaGeneracion greaterEq desde) and
+            (TablaReporteEntrevista.fechaGeneracion less hasta) and
+            (listas or reservadasVigentes)
+        val condicion = if (excluirSesion == null) ocupaCupo else ocupaCupo and (TablaReporteEntrevista.sesionId neq excluirSesion)
+        return reporteConSesion().select(TablaReporteEntrevista.reporteId).where { condicion }.count()
     }
 
     // Las tablas no declaran sus FK en Exposed: los joins indican las columnas.

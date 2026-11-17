@@ -25,6 +25,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -162,13 +164,26 @@ class PruebaControladorPregunta {
         val (cargoId, _) = sistema.crearCatalogo()
         val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":1,"tipo":"abierta_texto","categoria":"blanda"}"""
 
+        // Lo que ve el panel en Costos IA es lo mismo que decide el 429 (D28): misma instancia, mismo reloj (el real).
+        val antes = topeEnCostosIa(admin)
+        assertFalse(antes["estaAgotado"]!!.jsonPrimitive.boolean)
+        assertEquals(0.0, antes["gastadoUsd"]!!.jsonPrimitive.double, 0.0)
+
         assertEquals(HttpStatusCode.Created, enviar("POST", "$base/generar-ia", pedido, admin).status)
+        val despues = topeEnCostosIa(admin)
+        assertTrue(despues["estaAgotado"]!!.jsonPrimitive.boolean, "el panel ya sabe que la próxima da 429")
+        assertEquals(0.000135, despues["gastadoUsd"]!!.jsonPrimitive.double, 1e-9)
+        assertEquals(0.0, despues["restanteUsd"]!!.jsonPrimitive.double, 0.0, "nunca negativo")
+
         val agotado = enviar("POST", "$base/generar-ia", pedido, admin)
         assertEquals(HttpStatusCode.TooManyRequests, agotado.status)
         assertEquals("tope_generacion_ia_alcanzado", agotado.objeto().texto("error"))
         assertTrue(!agotado.objeto().texto("mensaje").isNullOrBlank())
         assertEquals(1, proveedor.solicitudes.size)
     }
+
+    private suspend fun ApplicationTestBuilder.topeEnCostosIa(admin: String): JsonObject =
+        enviar("GET", "/api/v1/admin/costos-ia", token = admin).objeto()["topeGeneracionPreguntas"]!!.jsonObject
 
     @Test
     fun `el limite por IP de generar-ia es comun a la ruta nueva y al alias y no lo gasta un no admin`() = testApplication {

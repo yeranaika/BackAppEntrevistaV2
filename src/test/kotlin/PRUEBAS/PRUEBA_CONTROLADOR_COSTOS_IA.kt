@@ -8,6 +8,7 @@ import MODELOS.ROL_ADMIN
 import MODELOS.ResultadoReporte
 import MODELOS.TablaGeneracionPreguntaIa
 import MODELOS.UsoLlm
+import PRUEBAS.DOBLES.RelojAjustable
 import PRUEBAS.DOBLES.SistemaPrueba
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -18,7 +19,9 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -33,18 +36,22 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
+/** Las 7 claves del gasto del mes frente al tope de generación (D28): el panel cuenta con todas. */
+private val CLAVES_TOPE_GENERACION = setOf("mes", "gastadoUsd", "topeUsd", "restanteUsd", "fechaReposicion", "estaDesactivado", "estaAgotado")
 
 /** GET /api/v1/admin/costos-ia: permisos, JSON y lectura real de las dos tablas (H2). */
 class PruebaControladorCostosIa {
     private val sistema = SistemaPrueba()
 
-    private fun token(correo: String, rol: String? = null): String = runBlocking {
-        val par = sistema.usuario.registrar(SolicitudRegistro(correo, "Clave-segura-1"))
+    private fun token(correo: String, rol: String? = null, en: SistemaPrueba = sistema): String = runBlocking {
+        val par = en.usuario.registrar(SolicitudRegistro(correo, "Clave-segura-1"))
         if (rol == null) return@runBlocking par.tokenAcceso
-        val id = sistema.usuarios.buscarPorCorreo(correo)!!.id
-        sistema.usuarios.actualizarRol(id, rol)
-        sistema.tokens.emitirPar(id, rol).tokenAcceso
+        val id = en.usuarios.buscarPorCorreo(correo)!!.id
+        en.usuarios.actualizarRol(id, rol)
+        en.tokens.emitirPar(id, rol).tokenAcceso
     }
 
     /** Un reporte de entrevista evaluado con IA, guardado por el flujo real del repositorio. */
@@ -62,7 +69,7 @@ class PruebaControladorCostosIa {
         )
     }
 
-    private fun generacion(fecha: String, costo: Double?, exitosa: Boolean, entrada: Int = 1_000, salida: Int = 500) = transaction(sistema.db) {
+    private fun generacion(fecha: String, costo: Double?, exitosa: Boolean, entrada: Int = 1_000, salida: Int = 500, en: SistemaPrueba = sistema) = transaction(en.db) {
         TablaGeneracionPreguntaIa.insert {
             it[generacionId] = UUID.randomUUID()
             it[modeloLlm] = "gpt-4o-mini"
@@ -97,7 +104,7 @@ class PruebaControladorCostosIa {
     @Test
     fun `una evaluacion de reporte que respondio mal cuenta como llamada fallida con su costo`() = runBlocking<Unit> {
         reporteConIa("2026-11-02T10:00:00Z", 0.0003, modo = ModoEvaluacion.FREEMIUM) // el LLM respondió algo inválido
-        val resumen = SERVICIOS.ServicioCostosIa(LectorCostosIaExposed(), sistema.reloj)
+        val resumen = SERVICIOS.ServicioCostosIa(LectorCostosIaExposed(), sistema.topeGeneracionIa, sistema.reloj)
             .resumen(java.time.LocalDate.parse("2026-11-01"), java.time.LocalDate.parse("2026-11-30"))
         assertEquals(0, resumen.reportes.usos)
         assertEquals(1, resumen.reportes.fallidas)
@@ -139,6 +146,45 @@ class PruebaControladorCostosIa {
         assertEquals(listOf("2026-11-02", "2026-11-03"), dias)
         assertEquals("gpt-4o-mini", cuerpo["porModelo"]!!.jsonArray.single().jsonObject["modelo"]!!.jsonPrimitive.content)
         assertEquals(0, cuerpo["reportes"]!!.jsonObject["fallidas"]!!.jsonPrimitive.int, "campos presentes aunque valgan 0")
+    }
+
+    @Test
+    fun `el admin ve el gasto del mes frente al tope aunque consulte otro rango`() = testApplication {
+        // El reloj del tope fija noviembre: las filas se insertan a mano, sin generación real (que usa la hora real).
+        val conTope = SistemaPrueba(topeGastoGeneracionIaUsd = 0.001, relojTopeGeneracionIa = RelojAjustable(Instant.parse("2026-11-15T12:00:00Z")))
+        application { conTope.montar(this) }
+        generacion("2026-11-02T11:00:00Z", 0.0002, exitosa = true, en = conTope)
+        generacion("2026-11-03T11:00:00Z", null, exitosa = false, en = conTope) // 1000 + 500 tokens: 0,00045 estimado
+        generacion("2026-10-31T23:59:59Z", 1.0, exitosa = true, en = conTope) // octubre: fuera del mes del tope
+        val admin = token("admin@ejemplo.com", ROL_ADMIN, en = conTope)
+
+        val cuerpo = pedir(admin, "?desde=2026-10-01&hasta=2026-10-31").json()
+
+        assertEquals(1.0, cuerpo["generacionPreguntas"]!!.jsonObject["costoUsd"]!!.jsonPrimitive.double, 1e-9, "el rango pedido es octubre")
+        val tope = cuerpo["topeGeneracionPreguntas"]!!.jsonObject
+        assertEquals(CLAVES_TOPE_GENERACION, tope.keys)
+        assertEquals("2026-11", tope["mes"]!!.jsonPrimitive.content)
+        assertEquals(0.00065, tope["gastadoUsd"]!!.jsonPrimitive.double, 1e-9)
+        assertEquals(0.001, tope["topeUsd"]!!.jsonPrimitive.double, 0.0)
+        assertEquals(0.00035, tope["restanteUsd"]!!.jsonPrimitive.double, 1e-9)
+        assertEquals("2026-12-01", tope["fechaReposicion"]!!.jsonPrimitive.content)
+        assertFalse(tope["estaAgotado"]!!.jsonPrimitive.boolean)
+        assertFalse(tope["estaDesactivado"]!!.jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `con el tope en 0 la fecha de reposicion viaja en null y estan las 7 claves`() = testApplication {
+        val desactivado = SistemaPrueba(topeGastoGeneracionIaUsd = 0.0)
+        application { desactivado.montar(this) }
+        val admin = token("admin@ejemplo.com", ROL_ADMIN, en = desactivado)
+
+        val tope = pedir(admin).json()["topeGeneracionPreguntas"]!!.jsonObject
+
+        assertEquals(CLAVES_TOPE_GENERACION, tope.keys)
+        assertEquals(JsonNull, tope["fechaReposicion"], "la clave viaja aunque valga null")
+        assertTrue(tope["estaDesactivado"]!!.jsonPrimitive.boolean)
+        assertFalse(tope["estaAgotado"]!!.jsonPrimitive.boolean)
+        assertEquals(0.0, tope["restanteUsd"]!!.jsonPrimitive.double, 0.0)
     }
 
     @Test

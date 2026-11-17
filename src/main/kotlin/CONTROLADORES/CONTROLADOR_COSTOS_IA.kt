@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
  * GET /api/v1/admin/costos-ia?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
  *     Gasto en IA por día (UTC) y por modelo: reportes de entrevista con IA y generación de preguntas.
  *     Sin fechas: los últimos 30 días. Máximo 92 días (400 rango_invalido). Fecha mal escrita: 400 parametro_invalido.
+ *     topeGeneracionPreguntas: gasto del mes UTC en curso frente al tope de generación con IA (D28), sea cual sea el rango.
  */
 fun Route.controladorCostosIa(servicio: ServicioCostosIa) {
     route("/api/v1/admin") {
