@@ -25,6 +25,12 @@ const val PLAN_PREMIUM = "premium"
 const val PROVEEDOR_GOOGLE_PLAY = "google_play"
 const val PROVEEDOR_CODIGO = "codigo"
 
+/**
+ * 409 de una compra de Google Play que pertenece a otra cuenta: su token ya activó otra cuenta, o Google dice que la
+ * pagó otra cuenta de la app (D27). Un solo texto para los dos casos: la app los trata igual y no reintenta.
+ */
+fun compraDeOtraCuenta() = ErrorConflicto("compra_ya_registrada", "Esta compra ya está asociada a otra cuenta")
+
 data class Suscripcion(
     val plan: String,
     val proveedor: String?,
@@ -144,8 +150,6 @@ class RepositorioSuscripcionExposed : RepositorioSuscripcion {
         guardarPlan(usuarioId, PLAN_PREMIUM, PROVEEDOR_CODIGO, nuevaExpiracion, fila[TablaCodigoSuscripcion.id].value, hashToken = null)
         true
     }
-
-    private fun compraDeOtraCuenta() = ErrorConflicto("compra_ya_registrada", "Esta compra ya está asociada a otra cuenta")
 
     /** Una fila por (usuario, plan): se crea o se renueva. Debe llamarse dentro de una transacción. */
     private fun guardarPlan(usuarioId: UUID, plan: String, proveedor: String, expiracion: Instant?, codigoId: UUID?, hashToken: String?) {

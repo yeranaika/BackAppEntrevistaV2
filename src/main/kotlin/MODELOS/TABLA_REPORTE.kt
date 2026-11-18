@@ -16,7 +16,7 @@ object TablaReporteEntrevista : Table("reporte_entrevista") {
     val puntajeGlobal = decimal("puntaje_global", 5, 2).default(java.math.BigDecimal.ZERO)
     val puntajeTecnico = decimal("puntaje_tecnico", 5, 2).default(java.math.BigDecimal.ZERO)
     val puntajeBlando = decimal("puntaje_blando", 5, 2).default(java.math.BigDecimal.ZERO)
-    val puntajeLenguajeCorporal = decimal("puntaje_lenguaje_corporal", 5, 2).default(java.math.BigDecimal.ZERO)
+    val puntajeLenguajeCorporal = decimal("puntaje_lenguaje_corporal", 5, 2).nullable() // null = sin medir (D22)
     val fortalezas = jsonb("fortalezas", Json, listaDeTextos).default(emptyList())
     val areasMejora = jsonb("areas_mejora", Json, listaDeTextos).default(emptyList())
     val recomendaciones = jsonb("recomendaciones_skills", Json, ListSerializer(RecomendacionSkill.serializer())).default(emptyList())
@@ -29,6 +29,8 @@ object TablaReporteEntrevista : Table("reporte_entrevista") {
     val tokensSalida = integer("tokens_salida").nullable()
     val costoUsd = decimal("costo_usd", 8, 6).nullable()
     val intentos = short("intentos_generacion").default(0)
+    /** Identifica el intento de generación en curso: solo ese intento puede escribir el resultado (D20). */
+    val intentoId = uuid("intento_id").nullable()
     val fechaGeneracion = timestamp("fecha_generacion")
 
     override val primaryKey = PrimaryKey(reporteId)

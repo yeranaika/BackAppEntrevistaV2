@@ -9,6 +9,9 @@ import MODELOS.NuevoCodigo
 import MODELOS.PLAN_GRATUITO
 import MODELOS.RepositorioSuscripcion
 import MODELOS.Suscripcion
+import MODELOS.compraDeOtraCuenta
+import kotlinx.coroutines.CancellationException
+import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
@@ -16,6 +19,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.util.Base64
+import java.util.HexFormat
 import java.util.UUID
 
 private val TIPOS_LICENCIA = setOf("PROM", "INST", "GOOG")
@@ -23,14 +27,28 @@ private const val CARACTERES_CODIGO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 private const val LARGO_PARTE_ALEATORIA = 8
 private const val LARGO_MAXIMO_ETIQUETA = 80
 
-/** Estado que ve la app: premium si hay un plan pagado, activo y sin vencer. */
-data class EstadoSuscripcion(val esPremium: Boolean, val vigente: Suscripcion?)
+/**
+ * Estado que ve la app: premium si hay un plan pagado, activo y sin vencer. [cupoIa] solo viene en el estado para la
+ * app (estadoConCupoIa) de un premium con IA activa (D29).
+ */
+data class EstadoSuscripcion(val esPremium: Boolean, val vigente: Suscripcion?, val cupoIa: CupoIaMensual? = null)
+
+/**
+ * La cuenta ofuscada que la app manda a Google Play al comprar (ServicioPagos.cuentaOfuscada en Android): SHA-256 en hex
+ * minúscula del id de /me, que es el UUID en su forma canónica (minúsculas, con guiones) en UTF-8. Es parte del contrato
+ * con la app (D27): si uno de los dos lados la cambia, toda compra real responde 409.
+ */
+internal fun cuentaOfuscadaDe(usuarioId: UUID): String =
+    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(usuarioId.toString().toByteArray(Charsets.UTF_8)))
 
 class ServicioSuscripcion(
     private val repositorio: RepositorioSuscripcion,
     private val verificadorGoogle: VerificadorCompraGoogle,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    /** Reportes con IA que le quedan al premium en el mes (D29). Por defecto ninguno que mostrar. */
+    private val cupoIa: ConsultorCupoIa = ConsultorCupoIa { null }
 ) {
+    private val log = LoggerFactory.getLogger(ServicioSuscripcion::class.java)
     private val generadorAleatorio = SecureRandom()
 
     /**
@@ -43,10 +61,36 @@ class ServicioSuscripcion(
         return EstadoSuscripcion(esPremium = premium != null, vigente = premium ?: suscripciones.firstOrNull())
     }
 
+    /**
+     * El estado para la app (GET /billing/status y el canje): a un premium se le suma cuántos reportes con IA le quedan
+     * en el mes (D29). A un usuario gratis no se le consulta nada. Si el cupo no se puede leer, el estado sale igual sin
+     * él: el contador es informativo y no debe tapar el premium. [estado] queda sin el cupo porque lo usa cada reporte.
+     */
+    suspend fun estadoConCupoIa(usuarioId: UUID): EstadoSuscripcion {
+        val estado = estado(usuarioId)
+        if (!estado.esPremium) return estado
+        val cupo = try {
+            cupoIa.consultar(usuarioId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("No se pudo leer el cupo de reportes con IA del usuario {}; el estado sale sin él", usuarioId, e)
+            null
+        }
+        return estado.copy(cupoIa = cupo)
+    }
+
     suspend fun verificarCompraGoogle(usuarioId: UUID, productoId: String, tokenCompra: String) {
         if (productoId.isBlank() || tokenCompra.isBlank()) throw ErrorValidacion("compra_incompleta", "Faltan el producto o el token de compra")
         val compra = verificadorGoogle.verificar(productoId.trim(), tokenCompra.trim())
         if (!compra.esValida || !compra.estaActiva) throw ErrorValidacion("compra_invalida", "Compra no válida o no activa")
+        // La app abre la compra con el hash de su cuenta (D27): si Google dice que la pagó otra cuenta de la app, no se
+        // activa en esta. Sin ese dato (compra desde la tienda, app antigua o simulada) decide solo el dueño del token.
+        // La cuenta ofuscada no se guarda ni va al log ni al mensaje.
+        val cuentaDeLaCompra = compra.cuentaOfuscada
+        if (cuentaDeLaCompra != null && !cuentaDeLaCompra.equals(cuentaOfuscadaDe(usuarioId), ignoreCase = true)) {
+            throw compraDeOtraCuenta()
+        }
         // Se guarda solo el hash: el token es una credencial de pago.
         repositorio.registrarCompraGoogle(usuarioId, productoId.trim(), compra.expiracion, hashear(tokenCompra.trim()))
     }
@@ -56,7 +100,7 @@ class ServicioSuscripcion(
         if (normalizado.isEmpty() || !repositorio.canjearCodigo(usuarioId, normalizado, reloj.instant())) {
             throw ErrorValidacion("codigo_invalido_o_expirado", "El código no existe, venció o ya se usó")
         }
-        return estado(usuarioId)
+        return estadoConCupoIa(usuarioId)
     }
 
     suspend fun crearCodigo(solicitud: SolicitudCrearCodigo): CodigoSuscripcion {

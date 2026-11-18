@@ -34,7 +34,7 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 403 | Sesión válida sin permiso (rutas de admin) |
 | 404 | No existe, o es de otro usuario (no se revela que existe) |
 | 409 | Choca con el estado actual (`entrevista_en_progreso`, `pregunta_ya_respondida`, `compra_ya_registrada`…) |
-| 429 | Límite superado: `demasiadas_solicitudes` (por IP) o `demasiados_intentos` (login) |
+| 429 | Límite superado: `demasiadas_solicitudes` (por IP), `demasiados_intentos` (login) o `tope_generacion_ia_alcanzado` (gasto mensual en generar preguntas con IA) |
 | 500 | Error inesperado (`error_interno`); el detalle queda en el log, nunca en la respuesta |
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
@@ -54,8 +54,8 @@ Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay en
 - **Ids**: UUID. Un id mal formado en la ruta responde `400 id_invalido`.
 - **Niveles**: `junior | semisenior | senior` (también se aceptan `jr | mid | sr`).
 - **Paginación**: `?pagina=1&tamano=20` donde aplica (tamaño máximo 100).
-- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min. **Login**: 5 contraseñas
-  incorrectas bloquean el correo 15 min.
+- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min; generación de preguntas con
+  IA (admin) 30 cada 60 min. **Login**: 5 contraseñas incorrectas bloquean el correo 15 min.
 - ⚠️ en una descripción = cuesta dinero (LLM), consume cuota de APIs externas, manda correos o borra datos.
 
 ## Índice
@@ -489,6 +489,8 @@ JSON en snake_case (contrato de Android).
 
 `GET /billing/status` · Usuario · responde `200`
 
+`is_premium`, `plan`, `source` (`google` | `interna`), `status`, `start_at` y `expires_at` (ms epoch). A un premium con IA activa le suma `reportes_ia_limite`, `reportes_ia_restantes` (0 a límite) y `reportes_ia_renovacion` (ms epoch del inicio del mes siguiente, UTC): los reportes con IA que le quedan en el mes, contados como la reserva (D29). A un usuario gratis no le llegan.
+
 ### Crear código premium (admin)
 
 `POST /billing/admin/codes` · Admin · responde `201`
@@ -508,7 +510,7 @@ JSON en snake_case (contrato de Android).
 
 `POST /billing/code/redeem` · Usuario · responde `200`, `400`
 
-Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`.
+Atómico: nunca supera `max_uses`. Responde el mismo estado que `GET /billing/status` (con el cupo de reportes con IA, D29) más `mensaje`. `400 codigo_invalido_o_expirado`.
 
 ```json
 {
@@ -520,7 +522,7 @@ Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`.
 
 `POST /billing/google/verify` · Usuario · responde `200`
 
-Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula.
+Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Si Google dice que la pagó otra cuenta de la app (`obfuscatedExternalAccountId` distinto del SHA-256 del id de la cuenta), también `409 compra_ya_registrada` (D27); sin ese dato decide el dueño del token. Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula.
 
 ```json
 {
@@ -619,6 +621,7 @@ Administración (solo admin) y lectura para usuarios.
 | `DELETE` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Borrar pregunta (admin) |
 | `PATCH` | `/api/v1/admin/preguntas/{{preguntaId}}/rechazar` | Admin | Rechazar pregunta (admin) |
 | `POST` | `/api/v1/admin/preguntas/generar-ia` | Admin | Generar preguntas con IA (admin) |
+| `GET` | `/api/v1/admin/preguntas/cobertura` | Admin | Cobertura del banco frente al mercado (admin) |
 | `GET` | `/api/v1/preguntas` | Usuario | Preguntas para usuarios |
 
 ### Crear pregunta de alternativas (admin)
@@ -718,7 +721,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
 
 `GET /api/v1/admin/preguntas?estado=aprobada&cargoId={{cargoId}}&pagina=1&tamano=20` · Admin · responde `200`
 
-Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano.
+Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano.
 
 ### Ver pregunta (admin)
 
@@ -732,7 +735,7 @@ Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina
 
 `PUT /api/v1/admin/preguntas/{{preguntaId}}` · Admin · responde `200`
 
-Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión.
+Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión (y su traza de IA, si la tiene, a `pendiente_revision` sin revisor).
 
 ```json
 {
@@ -775,7 +778,7 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
 
 `POST /api/v1/admin/preguntas/generar-ia` · Admin · responde `200`
 
-⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10.
+⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).
 
 ```json
 {
@@ -784,9 +787,16 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
   "cantidad": 2,
   "tipo": "abierta_texto",
   "categoria": "tecnica",
-  "modelo": "gpt-4o-mini"
+  "modelo": "gpt-4o-mini",
+  "usar_mercado": true
 }
 ```
+
+### Cobertura del banco frente al mercado (admin)
+
+`GET /api/v1/admin/preguntas/cobertura?cargoId={{cargoId}}&minimo=5` · Admin · responde `200`
+
+Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y pendientes que le sirven, por nivel, y cuántas faltan para llegar a `minimo` aprobadas (1 a 50, por defecto 5). Sirve para generar con IA justo lo que falta (D26). No llama al LLM ni a las APIs de empleo.
 
 ### Preguntas para usuarios
 
@@ -800,7 +810,7 @@ Simulación pregunta a pregunta.
 
 - Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.
 - Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.
-- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.
+- Cada pregunta guarda una copia fija (enunciado, tipo, opciones, respuesta ideal y rúbrica): editar o borrar el banco no cambia una entrevista rendida ni su reporte.
 - La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.
 
 | Método | Ruta | Auth | Qué hace |
@@ -819,7 +829,7 @@ Simulación pregunta a pregunta.
 
 `POST /api/v1/entrevistas` · Usuario · responde `201`
 
-Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`.
+Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`. La app Android (`POST /api/prueba-practica/front` con `ENT`) reemplaza la entrevista en curso en vez de responder 409, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.
 
 ```json
 {
@@ -855,7 +865,7 @@ En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https e
 
 `POST /api/v1/entrevistas/{{sesionId}}/metricas` · Usuario · responde `201`
 
-Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso).
+Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible).
 
 ```json
 {
@@ -863,19 +873,19 @@ Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|
     {
       "timestampMs": 0,
       "contactoVisual": 80.5,
-      "postura": 70,
-      "confianza": 65,
-      "expresion": "seguro"
+      "postura": 70
     },
     {
       "timestampMs": 500,
       "contactoVisual": 78,
       "postura": 72,
-      "confianza": 66,
       "gestos": {
-        "toca_cara": false
-      },
-      "expresion": "neutral"
+        "toca_cara": 0,
+        "mirada_fuera": 0.25
+      }
+    },
+    {
+      "timestampMs": 1000
     }
   ]
 }
@@ -908,7 +918,7 @@ Solo una entrevista en curso (`409 entrevista_no_activa` si ya terminó).
 Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.
 
 - **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.
-- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si la IA falla se usa el freemium: el reporte siempre sale.
+- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium (hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes por mes, 30 por defecto) si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si se alcanza el tope o la IA falla se usa el freemium (`modoEvaluacion = freemium`): el reporte siempre sale.
 - Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.
 
 | Método | Ruta | Auth | Qué hace |
@@ -922,7 +932,7 @@ Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso 
 
 `GET /api/v1/entrevistas/{{sesionId}}/reporte` · Usuario · responde `200`
 
-`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar.
+`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar. Un reporte que se cortó por un reinicio del servidor pasa a `error` reintentable (al instante si el apagado fue ordenado; si no, en unos 15 min como máximo).
 
 ### Reintentar reporte
 
@@ -1184,7 +1194,7 @@ Contrato que ya usa la app: crea y rinde cada prueba de una vez.
 
 `POST /api/prueba-practica/front` · Usuario · responde `201`, `409`
 
-`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`.
+`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`. Con `ENT` la entrevista en curso se reemplaza (se cancela en la misma transacción que crea la nueva) y con `PR`/`BL` la práctica en curso queda abandonada, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso.
 
 ```json
 {
@@ -1232,6 +1242,7 @@ Solo admin.
 | `PATCH` | `/admin/usuarios/{{usuarioId}}/password` | Admin | Restablecer contraseña |
 | `DELETE` | `/admin/usuarios/{{usuarioId}}` | Admin | Desactivar usuario |
 | `PATCH` | `/admin/usuarios/{{usuarioId}}/activar` | Admin | Reactivar usuario |
+| `GET` | `/api/v1/admin/costos-ia` | Admin | Costos de IA |
 
 ### Listar usuarios
 
@@ -1283,6 +1294,12 @@ Alias antiguo: `POST /admin/users`.
 ### Reactivar usuario
 
 `PATCH /admin/usuarios/{{usuarioId}}/activar` · Admin · responde `200`
+
+### Costos de IA
+
+`GET /api/v1/admin/costos-ia?desde=2026-11-01&hasta=2026-11-30` · Admin · responde `200`
+
+Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. `fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). Costos en USD con 6 decimales. `topeGeneracionPreguntas` es el gasto del mes UTC en curso (no depende del rango) frente al tope de generación con IA: `mes`, `gastadoUsd`, `topeUsd`, `restanteUsd`, `fechaReposicion` (`null` si está desactivado), `estaDesactivado` y `estaAgotado`; la próxima generación responde `429 tope_generacion_ia_alcanzado` si uno de los dos es `true` (D28).
 
 ## 17 · Cierre de sesión
 
@@ -1359,7 +1376,7 @@ Igual que `POST /admin/usuarios`.
 
 `POST /api/v1/admin/questions/generate-ai` · Admin · responde `200`
 
-⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM).
+⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: `tope_generacion_ia_alcanzado` (gasto del mes en el tope) y `demasiadas_solicitudes` (comparte el contador por IP con la ruta nueva).
 
 ```json
 {
@@ -1377,7 +1394,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 138 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 141 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1407,7 +1424,6 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `estado_invalido` | Estado debe ser pendiente, aprobada o rechazada |
 | 400 | `etiqueta_invalida` | label no puede superar … caracteres |
 | 400 | `expiracion_invalida` | expires_at debe venir en ISO-8601 (ej: 2026-01-31T23:59:59Z) |
-| 400 | `expresion_invalida` | La expresión debe ser una de: … |
 | 400 | `genero_invalido` | Género no válido |
 | 400 | `hora_invalida` | La hora debe tener formato HH:mm (00:00 a 23:59) |
 | 400 | `id_invalido` | Formato de UUID inválido |
@@ -1422,6 +1438,7 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `max_usos_invalido` | max_uses debe ser al menos 1 |
 | 400 | `metrica_fuera_de_rango` | Los puntajes de video van de 0 a 100 |
 | 400 | `metrica_invalida` | timestampMs no puede ser negativo |
+| 400 | `minimo_invalido` | El mínimo de preguntas por nivel debe estar entre 1 y … |
 | 400 | `missing_fields` | El título y el cuerpo son obligatorios |
 | 400 | `missing_refresh` | Falta el refresh token |
 | 400 | `modelo_invalido` | Modelo no soportado: usa … |
@@ -1451,6 +1468,7 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
 | 400 | `pregunta_repetida` | Cada pregunta se responde una sola vez |
 | 400 | `pregunta_sesion_id_invalido` | El id de la pregunta no es válido |
+| 400 | `rango_invalido` | La fecha 'hasta' no puede ser anterior a 'desde' |
 | 400 | `respuesta_ideal_o_rubrica_requerida` | Indica una respuesta ideal o una rúbrica para evaluarla |
 | 400 | `respuesta_muy_larga` | La respuesta admite hasta … caracteres |
 | 400 | `respuesta_requerida` | Escribe tu respuesta |
@@ -1511,9 +1529,11 @@ Los 138 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
 | 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
+| 429 | `tope_generacion_ia_alcanzado` | La generación de preguntas con IA está desactivada en el servidor (LIMITE_GASTO_GENERACION_IA_MENSUAL_USD = 0) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |
 | 502 | `provider_invalid_output` | La IA devolvió preguntas que no cumplen las reglas de calidad |
 | 502 | `provider_refusal` | El modelo se negó a generar las preguntas |
+| 502 | `provider_timeout` | El proveedor de IA tardó demasiado en responder |
 | 502 | `provider_truncated` | La respuesta del proveedor de IA quedó incompleta |
 | 503 | `documento_no_disponible` | El documento legal no está disponible |
 | 503 | `eula_no_disponible` | No hay texto legal publicado ni archivo EULA disponible |

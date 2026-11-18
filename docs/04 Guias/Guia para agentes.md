@@ -51,4 +51,8 @@ python docs/documentacion/GENERAR_DOCUMENTACION.py
 docker exec Entrevista_APP pg_dump -U root -d DBentrevista -n app > respaldo.sql
 ```
 
+Sin Docker (PostgreSQL instalado o portátil): los E2E usan un `psql` local si se define `E2E_PSQL`
+(`$env:E2E_PSQL = 'C:\ruta\pgsql\bin\psql.exe'`); la fase 4 sigue necesitando el contenedor de Redis. Al arrancar con
+una BD nueva, el servidor sincroniza tendencias una vez (APIs de empleo: Remotive sin clave si no hay `JSEARCH_API_KEY`).
+
 Relacionado: [[Como agregar un endpoint]] · [[Pruebas]] · [[Riesgos]]

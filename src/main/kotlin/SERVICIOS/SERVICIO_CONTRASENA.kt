@@ -17,6 +17,7 @@ import UTILIDADES.validarCorreo
 import UTILIDADES.validarNuevaContrasena
 import UTILIDADES.verificarContrasena
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
@@ -124,7 +125,15 @@ class ServicioContrasena(
 
     private fun enviarEnSegundoPlano(envio: suspend () -> Unit) {
         tareasSegundoPlano.launch {
-            runCatching { envio() }.onFailure { log.error("No se pudo enviar el correo de recuperación", it) }
+            try {
+                envio()
+            } catch (e: CancellationException) {
+                // Apagado: no hay cola de correos; el código ya está guardado y el usuario puede pedir otro envío.
+                log.warn("Envío del correo de recuperación cancelado por el apagado del servidor")
+                throw e
+            } catch (e: Exception) {
+                log.error("No se pudo enviar el correo de recuperación", e)
+            }
         }
     }
 

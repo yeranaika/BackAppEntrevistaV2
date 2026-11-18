@@ -34,6 +34,16 @@ private val CONSULTAS_JSEARCH_GENERALES = listOf(
     "Software Engineer", "Backend Developer", "Frontend Developer", "Data Engineer", "Android Developer", "DevOps"
 )
 private val ETIQUETA_HTML = Regex("<[^>]*>")
+// Las de bloque separan ideas (viñetas, párrafos): quedan como salto de línea para poder cortar frases (D26).
+private val ETIQUETA_BLOQUE = Regex("""(?i)</?(p|div|li|ul|ol|br|h[1-6]|tr|td|table|section|article|header|footer)\b[^>]*>""")
+private val ESPACIOS_EN_LINEA = Regex("""[ \t\u000B\f\r]+""")
+private val SALTOS = Regex(""" *\n[ \n]*""")
+
+/** Texto plano de una oferta: etiquetas de bloque como saltos de línea, las demás como un espacio, sin espacios repetidos. */
+internal fun limpiarHtmlOferta(texto: String): String = texto.replace(ETIQUETA_BLOQUE, "\n").replace(ETIQUETA_HTML, " ")
+    .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    .replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ")
+    .replace(ESPACIOS_EN_LINEA, " ").replace(SALTOS, "\n").trim()
 
 data class OfertaLaboral(
     val titulo: String,
@@ -106,11 +116,12 @@ class ClienteMercadoLaboralHttp(
                 parameter("num_pages", "1")
             }
             datos["data"].comoArreglo().map { oferta ->
+                // Un requisito por línea: así cada uno puede ser una frase para el prompt (D26).
                 val requisitos = oferta.jsonObject["job_highlights"]?.jsonObject?.get("Qualifications").comoArreglo()
-                    .joinToString(" ") { it.jsonPrimitive.content }
+                    .joinToString("\n") { it.jsonPrimitive.content }
                 OfertaLaboral(
                     titulo = oferta.texto("job_title"),
-                    descripcion = limpiarHtml("${oferta.texto("job_description")} $requisitos"),
+                    descripcion = limpiarHtml("${oferta.texto("job_description")}\n$requisitos"),
                     fuente = "JSearch (LinkedIn/Indeed/Glassdoor)"
                 )
             }
@@ -143,7 +154,7 @@ class ClienteMercadoLaboralHttp(
 
     private fun ofertaConEtiquetas(elemento: kotlinx.serialization.json.JsonElement, fuente: String): OfertaLaboral {
         val etiquetas = elemento.jsonObject["tags"].comoArreglo().joinToString(" ") { it.jsonPrimitive.content }
-        return OfertaLaboral(elemento.texto("title"), limpiarHtml("${elemento.texto("description")} $etiquetas"), fuente)
+        return OfertaLaboral(elemento.texto("title"), limpiarHtml("${elemento.texto("description")}\n$etiquetas"), fuente)
     }
 
     private fun contingencia(consulta: String?): List<OfertaLaboral> {
@@ -152,9 +163,7 @@ class ClienteMercadoLaboralHttp(
         return filtradas.ifEmpty { OFERTAS_CONTINGENCIA }
     }
 
-    private fun limpiarHtml(texto: String) = texto.replace(ETIQUETA_HTML, " ")
-        .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        .replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ")
+    private fun limpiarHtml(texto: String) = limpiarHtmlOferta(texto)
 
     private fun kotlinx.serialization.json.JsonElement?.comoArreglo(): JsonArray = (this as? JsonArray) ?: JsonArray(emptyList())
 

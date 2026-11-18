@@ -14,7 +14,8 @@ import CONFIGURACION.TAMANO_PAGINA_ENTREVISTAS_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
-import MODELOS.EXPRESIONES_VALIDAS
+import MODELOS.GESTOS_OBSERVABLES
+import kotlinx.serialization.json.JsonObject
 import MODELOS.EstadoSesionEntrevista
 import MODELOS.MetricaVideo
 import MODELOS.NuevaSesionEntrevista
@@ -27,6 +28,7 @@ import MODELOS.ResultadoRegistroRespuestas
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
@@ -68,8 +70,9 @@ class ServicioEntrevista(
     private val log = LoggerFactory.getLogger(ServicioEntrevista::class.java)
 
     /**
-     * @param reemplazarEnProgreso true cancela la sesión en curso en vez de responder 409
-     *   (la app Android rinde la entrevista de una vez y no puede retomarla).
+     * @param reemplazarEnProgreso true reemplaza la sesión en curso en vez de responder 409
+     *   (la app Android rinde la entrevista de una vez y no puede retomarla). La anterior se cancela solo si la
+     *   nueva se crea: un 409 preguntas_insuficientes la deja como estaba.
      */
     suspend fun iniciar(usuarioId: UUID, pedido: PedidoEntrevista, reemplazarEnProgreso: Boolean = false): SesionEntrevista {
         val cantidad = pedido.cantidadPreguntas ?: PREGUNTAS_ENTREVISTA_POR_DEFECTO
@@ -82,7 +85,7 @@ class ServicioEntrevista(
         val (cargo, nombreCargo) = contexto.cargo(usuarioId, pedido.cargoId, pedido.nombreCargo)
         val nivel = contexto.nivel(usuarioId, pedido.nivel, cargo)
 
-        liberarSesionAnterior(usuarioId, reemplazarEnProgreso)
+        val anterior = sesionAReemplazar(usuarioId, reemplazarEnProgreso)
 
         val recientes = sesiones.preguntasRecientes(usuarioId, SESIONES_SIN_REPETIR_PREGUNTAS)
         val preguntas = selector.seleccionarMixta(ContextoSeleccion(cargo, nivel, recientes), cantidad)
@@ -92,7 +95,15 @@ class ServicioEntrevista(
                 "Aún no hay suficientes preguntas aprobadas para $nombreCargo (${nivel.valorBd}); prueba con otro nivel o cargo"
             )
         }
-        return sesiones.crear(NuevaSesionEntrevista(usuarioId, cargo?.id, nombreCargo, nivel, reloj.instant()), preguntas)
+        val nueva = NuevaSesionEntrevista(usuarioId, cargo?.id, nombreCargo, nivel, reloj.instant(), reemplazaA = anterior?.id)
+        val creada = sesiones.crear(nueva, preguntas)
+        // Otra solicitud pudo finalizarla o cancelarla mientras se elegían las preguntas: se registra solo lo que pasó.
+        anterior?.let {
+            if (sesiones.buscar(it.id)?.estado == EstadoSesionEntrevista.CANCELADA) {
+                log.info("Sesión de entrevista {} cancelada al iniciar {}", it.id, creada.id)
+            }
+        }
+        return creada
     }
 
     /** La sesión en curso, o null. Una sesión abandonada hace más de 2 h se cancela y no cuenta. */
@@ -144,7 +155,7 @@ class ServicioEntrevista(
         }
         lote.forEach(::validarMetrica)
         activa(usuarioId, sesionId)
-        return metricas.insertarLote(sesionId, lote)
+        return metricas.insertarLote(sesionId, lote.map { it.copy(gestos = soloGestosObservables(it.gestos)) })
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */
@@ -156,6 +167,8 @@ class ServicioEntrevista(
         tareasSegundoPlano.launch {
             try {
                 procesador.procesar(finalizada)
+            } catch (e: CancellationException) {
+                throw e // apagado: no es un error; el reporte queda reintentable (D20)
             } catch (e: Exception) {
                 log.error("No se pudo procesar la entrevista finalizada {}", sesionId, e)
             }
@@ -187,16 +200,20 @@ class ServicioEntrevista(
 
     // ---------- Reglas ----------
 
-    private suspend fun liberarSesionAnterior(usuarioId: UUID, reemplazar: Boolean) {
-        val anterior = sesiones.buscarEnProgreso(usuarioId) ?: return
-        if (!reemplazar && !estaVencida(anterior)) {
+    /**
+     * La sesión en curso que la nueva reemplazará, o null. No la cancela: eso ocurre al crear la nueva, en la misma
+     * transacción, para que un error al elegir preguntas no la pierda. Una abandonada hace más de 2 h ya no cuenta
+     * (enProgreso la cancela).
+     */
+    private suspend fun sesionAReemplazar(usuarioId: UUID, reemplazar: Boolean): SesionEntrevista? {
+        val anterior = enProgreso(usuarioId) ?: return null
+        if (!reemplazar) {
             throw ErrorConflicto(
                 "entrevista_en_progreso",
                 "Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra"
             )
         }
-        sesiones.cerrar(anterior.id, EstadoSesionEntrevista.CANCELADA, reloj.instant())
-        log.info("Sesión de entrevista {} cancelada al iniciar una nueva", anterior.id)
+        return anterior
     }
 
     private fun estaVencida(sesion: SesionEntrevista): Boolean =
@@ -239,10 +256,11 @@ class ServicioEntrevista(
         val fueraDeRango = listOfNotNull(metrica.contactoVisual, metrica.postura, metrica.confianza)
             .any { it < BigDecimal.ZERO || it > BigDecimal(PUNTAJE_MAXIMO_RESPUESTA) }
         if (fueraDeRango) throw ErrorValidacion("metrica_fuera_de_rango", "Los puntajes de video van de 0 a 100")
-        if (metrica.expresionDominante != null && metrica.expresionDominante !in EXPRESIONES_VALIDAS) {
-            throw ErrorValidacion("expresion_invalida", "La expresión debe ser una de: ${EXPRESIONES_VALIDAS.joinToString()}")
-        }
     }
+
+    /** Solo las claves de [GESTOS_OBSERVABLES] (RNF10); null si no queda ninguna. */
+    private fun soloGestosObservables(gestos: JsonObject?): JsonObject? =
+        gestos?.filterKeys { it in GESTOS_OBSERVABLES }?.takeIf { it.isNotEmpty() }?.let(::JsonObject)
 
     private fun entrevistaNoActiva() = ErrorConflicto("entrevista_no_activa", "La entrevista ya fue finalizada o cancelada")
     private fun sinRespuestas() = ErrorValidacion("sin_respuestas", "Responde al menos una pregunta")

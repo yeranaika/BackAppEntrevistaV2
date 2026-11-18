@@ -97,7 +97,9 @@ data class SolicitudGenerarPreguntas(
     val cantidad: Int = 5,
     val tipo: String = "abierta_texto",
     val categoria: String = "tecnica",
-    val modelo: String = "gpt-4o-mini"
+    val modelo: String = "gpt-4o-mini",
+    /** Con cargo o skill, el prompt lleva lo que piden las ofertas de empleo reales (D26). false = como antes. */
+    @SerialName("usar_mercado") val usarMercado: Boolean = true
 )
 
 @Serializable
@@ -112,10 +114,41 @@ data class RespuestaPreguntaGenerada(
 )
 
 @Serializable
+data class RespuestaSkillEnOfertas(
+    val nombre: String,
+    val ofertas: Int
+)
+
+@Serializable
+data class RespuestaFragmentoOferta(
+    val texto: String,
+    @SerialName("titulo_oferta") val tituloOferta: String,
+    val fuente: String
+)
+
+/**
+ * Qué ofertas de empleo se le pasaron a la IA, o por qué no se usaron (motivo + mensaje para el admin). Sin valores
+ * por defecto: con encodeDefaults = false un campo con su valor por defecto no viajaría, y el panel lee todos.
+ */
+@Serializable
+data class RespuestaContextoMercado(
+    val usado: Boolean,
+    val motivo: String?,
+    val mensaje: String?,
+    val consulta: String?,
+    @SerialName("ofertas_analizadas") val ofertasAnalizadas: Int,
+    val fuentes: List<String>,
+    @SerialName("es_respaldo") val esRespaldo: Boolean,
+    @SerialName("skills_frecuentes") val skillsFrecuentes: List<RespuestaSkillEnOfertas>,
+    val fragmentos: List<RespuestaFragmentoOferta>
+)
+
+@Serializable
 data class RespuestaGenerarPreguntas(
     @SerialName("preguntas_generadas") val preguntasGeneradas: Int,
     @SerialName("preguntas_con_error") val preguntasConError: Int,
-    val preguntas: List<RespuestaPreguntaGenerada>
+    val preguntas: List<RespuestaPreguntaGenerada>,
+    @SerialName("contexto_mercado") val contextoMercado: RespuestaContextoMercado? = null
 )
 
 /** Filtros que llegan como query params; el servicio los valida. */
@@ -126,6 +159,8 @@ data class ConsultaPreguntas(
     val nivel: String? = null,
     val skillId: String? = null,
     val cargoId: String? = null,
+    /** De este cargo o sin cargo (D26). */
+    val paraCargoId: String? = null,
     val generadaPorIa: Boolean? = null,
     val pagina: Int? = null,
     val tamano: Int? = null

@@ -412,6 +412,9 @@ CREATE TABLE IF NOT EXISTS pregunta_generacion_ia (
     revisado_por     UUID        REFERENCES usuario(usuario_id) ON DELETE SET NULL,
     fecha_generacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- El tope mensual de gasto en IA (D23) suma por fecha en cada pedido (migración 022).
+CREATE INDEX IF NOT EXISTS idx_gen_ia_fecha
+    ON pregunta_generacion_ia(fecha_generacion);
 CREATE INDEX IF NOT EXISTS idx_gen_ia_estado
     ON pregunta_generacion_ia(estado_revision, fecha_generacion DESC)
     INCLUDE (cargo_id, skill_id, modelo_llm);
@@ -643,6 +646,9 @@ CREATE INDEX IF NOT EXISTS idx_sesion_usuario
 -- Un usuario tiene como máximo una sesión en progreso
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sesion_activa_unica
     ON sesion_entrevista(usuario_id) WHERE estado = 'en_progreso';
+-- Rescate de entrevistas finalizadas sin reporte tras una caída (D20, migración 019)
+CREATE INDEX IF NOT EXISTS idx_sesion_entrevista_finalizada
+    ON sesion_entrevista(fecha_fin) WHERE estado = 'finalizada';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 
@@ -671,6 +677,8 @@ CREATE TABLE IF NOT EXISTS sesion_pregunta_respuesta (
     skill_id             UUID      REFERENCES skill(skill_id) ON DELETE SET NULL,
     -- [{ "id": "...", "texto": "...", "es_correcta": true }]
     opciones_snap        JSONB,
+    -- Rúbrica de evaluación al servir la pregunta ('{}' si no tenía): editar el banco no cambia el reporte (migración 022)
+    rubrica_snap         JSONB,
     -- Sin FK: apunta al snapshot
     opcion_elegida_id    UUID,
     -- NULL = todavía sin responder
@@ -699,8 +707,9 @@ CREATE TABLE IF NOT EXISTS metrica_video (
     -- Versión del modelo que generó esta métrica
     modelo_vision_id    UUID       -- FK añadida en bloque 12
 );
-CREATE INDEX IF NOT EXISTS idx_metrica_video
-    ON metrica_video(sesion_id, timestamp_ms ASC);
+-- Una métrica por instante de la sesión: un lote reenviado no se duplica (D21, migración 020).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_metrica_video_sesion_ms
+    ON metrica_video(sesion_id, timestamp_ms);
 
 -- =============================================================================
 -- BLOQUE 10: REPORTES Y FEEDBACK POR SKILL
@@ -715,7 +724,8 @@ CREATE TABLE IF NOT EXISTS reporte_entrevista (
     puntaje_global            NUMERIC(5,2) NOT NULL DEFAULT 0,
     puntaje_tecnico           NUMERIC(5,2) NOT NULL DEFAULT 0,
     puntaje_blando            NUMERIC(5,2) NOT NULL DEFAULT 0,
-    puntaje_lenguaje_corporal NUMERIC(5,2) NOT NULL DEFAULT 0,
+    -- NULL = sin medir (sin video o sin evidencia suficiente), no un 0 de la persona (D22, migración 021)
+    puntaje_lenguaje_corporal NUMERIC(5,2),
     -- ["Buena estructura STAR", "Dominio claro de SQL", "Contacto visual consistente"]
     fortalezas                JSONB        NOT NULL DEFAULT '[]',
     -- ["Mejorar explicación de sistemas distribuidos", "Reducir muletillas"]
@@ -737,8 +747,13 @@ CREATE TABLE IF NOT EXISTS reporte_entrevista (
     tokens_salida             INTEGER,
     costo_usd                 NUMERIC(8,6),
     -- Primer intento + reintentos manuales (con tope)
-    intentos_generacion       SMALLINT     NOT NULL DEFAULT 0
+    intentos_generacion       SMALLINT     NOT NULL DEFAULT 0,
+    -- Intento de generación en curso: solo ese intento escribe el resultado (D20, migración 019)
+    intento_id                UUID
 );
+-- Rescate de reportes interrumpidos por un apagado sin aviso (D20, migración 019)
+CREATE INDEX IF NOT EXISTS idx_reporte_generando
+    ON reporte_entrevista(fecha_generacion) WHERE estado_generacion = 'generando';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- Desglose del reporte por skill (para el gráfico de radar en la app)

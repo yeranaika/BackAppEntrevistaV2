@@ -3,6 +3,7 @@ package SERVICIOS
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorRespuestaExterna
 import INTEGRACIONES.ProveedorPreguntasIa
+import INTEGRACIONES.RespuestaProveedorIa
 import INTEGRACIONES.SolicitudProveedorIa
 import INTEGRACIONES.costoLlmUsd
 import MODELOS.CategoriaHabilidad
@@ -122,6 +123,7 @@ class EvaluadorEntrevistaIa(
     override suspend fun evaluar(contexto: ContextoEvaluacionEntrevista): EvaluacionEntrevista {
         // Sin respuestas abiertas no hay nada que justifique el costo de una llamada.
         if (contexto.respuestas.isEmpty()) return respaldo.evaluar(contexto)
+        var pagada: RespuestaProveedorIa? = null
         return try {
             val respuesta = proveedor.generar(
                 SolicitudProveedorIa(
@@ -130,15 +132,18 @@ class EvaluadorEntrevistaIa(
                     esquemaJson = ESQUEMA,
                     instruccionUsuario = datosParaEvaluar(contexto)
                 )
-            )
-            interpretar(respuesta.contenido, contexto).copy(
-                uso = UsoLlm(modelo, respuesta.tokensEntrada, respuesta.tokensSalida, costoLlmUsd(modelo, respuesta.tokensEntrada, respuesta.tokensSalida))
-            )
+            ).also { pagada = it }
+            interpretar(respuesta.contenido, contexto).copy(uso = usoDe(respuesta))
         } catch (e: ErrorAplicacion) {
             log.warn("Evaluación con IA no disponible ({}); se usa el motor freemium", e.codigo)
-            respaldo.evaluar(contexto)
+            // Si el LLM alcanzó a responder (y cobrar) algo inválido, su uso se guarda igual para el control de costos;
+            // el reporte queda en modo freemium, así que no descuenta del tope mensual (D17).
+            respaldo.evaluar(contexto).copy(uso = pagada?.let { usoDe(it) })
         }
     }
+
+    private fun usoDe(respuesta: RespuestaProveedorIa) =
+        UsoLlm(modelo, respuesta.tokensEntrada, respuesta.tokensSalida, costoLlmUsd(modelo, respuesta.tokensEntrada, respuesta.tokensSalida))
 
     private fun datosParaEvaluar(contexto: ContextoEvaluacionEntrevista): String {
         val datos = buildJsonObject {

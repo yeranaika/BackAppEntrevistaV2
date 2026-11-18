@@ -4,6 +4,10 @@ ktor:
       - ApplicationKt.module
   deployment:
     port: 8080
+    # Netty (ms): período de gracia y tope para las solicitudes en curso al apagar. La espera de reportes y correos va
+    # aparte (APAGADO_ESPERA_TAREAS_SEGUNDOS, D20). Todo tiene que caber en RAILWAY_DEPLOYMENT_DRAINING_SECONDS.
+    shutdownGracePeriod: 1000
+    shutdownTimeout: 5000
 
 db:
   url: ${?DB_URL}

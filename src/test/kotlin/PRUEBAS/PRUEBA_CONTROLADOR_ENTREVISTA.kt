@@ -99,7 +99,7 @@ class PruebaControladorEntrevista {
         assertEquals(HttpStatusCode.NoContent, enviar("GET", "$base/$id/siguiente", token = ana).status)
 
         val metricas = """{"metricas":[{"timestampMs":0,"contactoVisual":80.5,"postura":70,"confianza":65,"expresion":"Seguro"},
-                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral"}]}"""
+                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral"}]}""" // expresion se ignora (D22)
         val lote = enviar("POST", "$base/$id/metricas", metricas, ana)
         assertEquals(HttpStatusCode.Created, lote.status)
         assertEquals("2", lote.objeto().texto("insertadas"))
@@ -198,6 +198,20 @@ class PruebaControladorEntrevista {
         val segunda = enviar("POST", "/api/prueba-practica/front", pedido, ana)
         assertEquals(HttpStatusCode.Created, segunda.status)
         assertEquals("cancelada", enviar("GET", "$base/$primera", token = ana).objeto().texto("estado"))
+    }
+
+    @Test
+    fun `si la app pide una entrevista sin banco la que tenia en curso sigue viva`() = testApplication {
+        val sistema = sistemaConBanco()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+
+        val primera = enviar("POST", "/api/prueba-practica/front", """{"sector":"backend","nivel":"junior","metaCargo":"QA","tipoPrueba":"ENT"}""", ana)
+            .objeto().texto("pruebaId")
+        val sinBanco = enviar("POST", "/api/prueba-practica/front", """{"sector":"backend","nivel":"senior","metaCargo":"QA","tipoPrueba":"ENT"}""", ana)
+        assertEquals(HttpStatusCode.Conflict, sinBanco.status)
+        assertEquals("preguntas_insuficientes", sinBanco.objeto().texto("error"))
+        assertEquals("en_progreso", enviar("GET", "$base/$primera", token = ana).objeto().texto("estado"))
     }
 
     @Test

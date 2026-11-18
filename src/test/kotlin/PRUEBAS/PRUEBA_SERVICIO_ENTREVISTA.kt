@@ -1,5 +1,6 @@
 package PRUEBAS
 
+import kotlinx.serialization.json.jsonObject
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
@@ -28,6 +29,9 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Duration
 import java.util.UUID
 import kotlin.test.Test
@@ -181,6 +185,33 @@ class PruebaServicioEntrevista {
     }
 
     @Test
+    fun `si no hay preguntas para la nueva la entrevista en curso no se cancela`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
+        val primera = iniciar()
+
+        // El banco sembrado es junior: para senior no hay preguntas y la app pide reemplazar la que está en curso.
+        fallaCon<ErrorConflicto>("preguntas_insuficientes") {
+            servicio.iniciar(ana, PedidoEntrevista(nombreCargo = "QA", nivel = "sr"), reemplazarEnProgreso = true)
+        }
+        val sigue = servicio.obtener(ana, primera.id)
+        assertEquals(EstadoSesionEntrevista.EN_PROGRESO, sigue.estado)
+        assertNull(sigue.fechaFin)
+        assertEquals(primera.id, servicio.enProgreso(ana)!!.id)
+    }
+
+    @Test
+    fun `al reemplazar evita las preguntas de la entrevista que reemplaza`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
+        val primera = iniciar()
+        val segunda = servicio.iniciar(ana, PedidoEntrevista(nombreCargo = "Backend Developer"), reemplazarEnProgreso = true)
+
+        assertTrue(primera.preguntas.map { it.preguntaId }.intersect(segunda.preguntas.map { it.preguntaId }.toSet()).isEmpty())
+        val cancelada = servicio.obtener(ana, primera.id)
+        assertEquals(EstadoSesionEntrevista.CANCELADA, cancelada.estado)
+        assertEquals(segunda.fechaInicio, cancelada.fechaFin)
+    }
+
+    @Test
     fun `una entrevista abandonada mas de 2 horas se cancela sola`() = runBlocking<Unit> {
         sistema.sembrarBancoGeneral(tecnicas = 10, blandas = 6)
         val abandonada = iniciar()
@@ -295,13 +326,20 @@ class PruebaServicioEntrevista {
         val original = sesion.preguntas.first()
         sistema.preguntas.reemplazarContenido(
             original.preguntaId!!,
-            ContenidoPregunta(null, null, TipoPregunta.ABIERTA_TEXTO, CategoriaHabilidad.TECNICA, NivelExperiencia.JUNIOR, "Otro enunciado", null, null, emptyList())
+            ContenidoPregunta(
+                null, null, TipoPregunta.ABIERTA_TEXTO, CategoriaHabilidad.TECNICA, NivelExperiencia.JUNIOR, "Otro enunciado", null,
+                kotlinx.serialization.json.Json.parseToJsonElement("""{"palabras_clave":["nueva"]}""").jsonObject, emptyList()
+            )
         )
         sistema.preguntas.eliminar(sesion.preguntas[1].preguntaId!!)
 
         val despues = servicio.obtener(ana, sesion.id)
         assertEquals(original.enunciado, despues.preguntas.first().enunciado)
         assertEquals(original.opciones, despues.preguntas.first().opciones)
+        // La rúbrica también es copia: sin rúbrica en el banco se guarda {} (no null) y no sigue a la edición.
+        assertEquals(kotlinx.serialization.json.JsonObject(emptyMap()), original.rubrica)
+        assertEquals(original.rubrica, despues.preguntas.first().rubrica)
+        assertTrue(despues.preguntas.all { it.rubrica != null }, "la copia sigue aunque la pregunta se borre")
         assertEquals(8, despues.preguntas.size)
     }
 
@@ -344,8 +382,8 @@ class PruebaServicioEntrevista {
 
     // ---------- Métricas de video ----------
 
-    private fun metrica(ms: Long, contacto: String? = "80.5", expresion: String? = "seguro") =
-        MetricaVideo(ms, contacto?.let(::BigDecimal), BigDecimal("70"), BigDecimal("65.25"), null, expresion)
+    private fun metrica(ms: Long, contacto: String? = "80.5", gestos: JsonObject? = null) =
+        MetricaVideo(ms, contacto?.let(::BigDecimal), BigDecimal("70"), BigDecimal("65.25"), gestos)
 
     @Test
     fun `las metricas se guardan en lote y se validan`() = runBlocking<Unit> {
@@ -358,12 +396,56 @@ class PruebaServicioEntrevista {
         fallaCon<ErrorValidacion>("lote_invalido") { servicio.registrarMetricas(ana, sesion.id, emptyList()) }
         fallaCon<ErrorValidacion>("lote_invalido") { servicio.registrarMetricas(ana, sesion.id, (0..300).map { metrica(it.toLong()) }) }
         fallaCon<ErrorValidacion>("metrica_fuera_de_rango") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1, contacto = "100.01"))) }
-        fallaCon<ErrorValidacion>("expresion_invalida") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1, expresion = "feliz"))) }
         fallaCon<ErrorValidacion>("metrica_invalida") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(-1))) }
 
         servicio.cancelar(ana, sesion.id)
         fallaCon<ErrorConflicto>("entrevista_no_activa") { servicio.registrarMetricas(ana, sesion.id, listOf(metrica(1))) }
         assertEquals(30, transaction { TablaMetricaVideo.selectAll().count() }, "los lotes rechazados no guardan nada")
+    }
+
+    @Test
+    fun `solo se guardan gestos observables (RNF10)`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral()
+        val sesion = iniciar()
+        val gestos = buildJsonObject {
+            put("toca_cara", 1.0)
+            put("mirada_fuera", 0.25)
+            put("nervioso", 0.8)
+            put("sonrisa", 1.0)
+        }
+        servicio.registrarMetricas(ana, sesion.id, listOf(metrica(0, gestos = gestos), metrica(500, gestos = buildJsonObject { put("feliz", 1) })))
+
+        val guardados = transaction { TablaMetricaVideo.selectAll().orderBy(TablaMetricaVideo.timestampMs).map { it[TablaMetricaVideo.gestos] } }
+        assertEquals(setOf("toca_cara", "mirada_fuera"), guardados[0]!!.keys)
+        assertNull(guardados[1], "sin gestos observables queda null")
+        assertTrue(transaction { TablaMetricaVideo.selectAll().all { it[TablaMetricaVideo.expresionDominante] == null } })
+    }
+
+    @Test
+    fun `un lote reenviado no duplica las metricas`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral()
+        val sesion = iniciar()
+        val lote = (0 until 20).map { metrica(it * 500L) }
+        assertEquals(20, servicio.registrarMetricas(ana, sesion.id, lote))
+
+        assertEquals(0, servicio.registrarMetricas(ana, sesion.id, lote), "el mismo lote otra vez no guarda nada")
+        val solapado = (15 until 25).map { metrica(it * 500L, contacto = "10") }
+        assertEquals(5, servicio.registrarMetricas(ana, sesion.id, solapado), "solo las 5 que faltaban")
+        val repetidasEnElLote = listOf(metrica(50_000, contacto = "11"), metrica(50_000, contacto = "99"))
+        assertEquals(1, servicio.registrarMetricas(ana, sesion.id, repetidasEnElLote))
+
+        assertEquals(26, transaction { TablaMetricaVideo.selectAll().count() })
+        val contactoDe = { ms: Long ->
+            transaction {
+                TablaMetricaVideo.selectAll().where { TablaMetricaVideo.timestampMs eq ms }.single()[TablaMetricaVideo.contactoVisual]
+            }
+        }
+        assertEquals(BigDecimal("80.50"), contactoDe(7_500), "una métrica ya guardada no se pisa")
+        assertEquals(BigDecimal("10.00"), contactoDe(12_000))
+        assertEquals(BigDecimal("11.00"), contactoDe(50_000), "dentro del lote vale la primera")
+
+        val otra = run { servicio.cancelar(ana, sesion.id); iniciar() }
+        assertEquals(20, servicio.registrarMetricas(ana, otra.id, lote), "el mismo instante en otra sesión sí se guarda")
     }
 
     // ---------- Historial ----------

@@ -9,7 +9,11 @@ import ESQUEMAS.RespuestaPreguntaPublica
 import MODELOS.EstadoPregunta
 import MODELOS.PaginaPreguntas
 import MODELOS.Pregunta
+import ESQUEMAS.RespuestaContextoMercado
+import ESQUEMAS.RespuestaFragmentoOferta
+import ESQUEMAS.RespuestaSkillEnOfertas
 import SERVICIOS.PreguntaCreadaPorIa
+import SERVICIOS.ResultadoContextoMercado
 
 /** Vista completa para el admin: incluye respuesta ideal, rúbrica y opción correcta. */
 fun Pregunta.aRespuestaAdmin() = RespuestaPregunta(
@@ -56,3 +60,21 @@ fun PreguntaCreadaPorIa.aRespuesta() = RespuestaPreguntaGenerada(
     tokensSalida = tokensSalida,
     costoUsd = costoUsd
 )
+
+fun ResultadoContextoMercado.aRespuesta(): RespuestaContextoMercado {
+    val ctx = contexto ?: return RespuestaContextoMercado(
+        usado = false, motivo = motivo?.codigo, mensaje = motivo?.mensaje, consulta = null, ofertasAnalizadas = 0,
+        fuentes = emptyList(), esRespaldo = false, skillsFrecuentes = emptyList(), fragmentos = emptyList()
+    )
+    return RespuestaContextoMercado(
+        usado = true,
+        motivo = null,
+        mensaje = null,
+        consulta = ctx.consulta,
+        ofertasAnalizadas = ctx.ofertasAnalizadas,
+        fuentes = ctx.fuentes,
+        esRespaldo = ctx.esRespaldo,
+        skillsFrecuentes = ctx.skillsFrecuentes.map { RespuestaSkillEnOfertas(it.nombre, it.ofertas) },
+        fragmentos = ctx.fragmentos.map { RespuestaFragmentoOferta(it.texto, it.tituloOferta, it.fuente) }
+    )
+}

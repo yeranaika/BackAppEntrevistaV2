@@ -4,6 +4,7 @@ import CONFIGURACION.ConfiguracionLimites
 import CONFIGURACION.configurarErrores
 import CONFIGURACION.configurarLimiteSolicitudes
 import CONFIGURACION.configurarSerializacion
+import CONTROLADORES.controladorCostosIa
 import CONTROLADORES.controladorAdminUsuario
 import CONTROLADORES.controladorConsentimiento
 import CONTROLADORES.controladorMercado
@@ -159,11 +160,23 @@ class SistemaPrueba(
     /** LLM falso: por defecto responde un lote válido de 1 pregunta abierta. */
     val proveedorIa: ProveedorIaGrabador = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto")),
     /** Por defecto holgados para que las pruebas no choquen con el límite; se bajan para probarlo. */
-    private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000),
+    private val limites: ConfiguracionLimites = ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000, generacionesIaPorIp = 1_000),
     val clienteMercado: ClienteMercadoLaboralFalso = ClienteMercadoLaboralFalso(emptyMap()),
     val verificadorCompras: VerificadorCompraFalso = VerificadorCompraFalso(),
     val procesadorEntrevista: ProcesadorEntrevistaGrabador = ProcesadorEntrevistaGrabador(),
-    val reloj: RelojAjustable = RelojAjustable()
+    val reloj: RelojAjustable = RelojAjustable(),
+    /** Caché compartida (hace de Redis): los contadores del límite por IP usan el [reloj] de la prueba. */
+    val cache: CacheEnMemoria = CacheEnMemoria { reloj.millis() },
+    /**
+     * Tope mensual de la generación con IA (D23). Usa el reloj del sistema, no [reloj]: la auditoría en H2 se fecha con
+     * la hora real.
+     */
+    topeGastoGeneracionIaUsd: Double = CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO,
+    /**
+     * Reloj del tope de generación (D23, D28). Solo para fijar el mes en pruebas que insertan filas a mano: no mezclarlo
+     * con una generación real, que se audita con la hora real.
+     */
+    relojTopeGeneracionIa: java.time.Clock = java.time.Clock.systemUTC()
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -187,21 +200,35 @@ class SistemaPrueba(
     val catalogo = LectorCatalogoExposed()
     val preguntas = RepositorioPreguntaExposed()
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
-    val pregunta = ServicioPregunta(preguntas, catalogo)
-    val generacion = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo
+    /** Como en producción, una sola instancia del tope para el 429 de generar-ia y para Costos IA (D28). */
+    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
+        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa)
     )
-
-    val cache = CacheEnMemoria()
+    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj)
+    val pregunta = ServicioPregunta(preguntas, catalogo)
     val mercadoRepo = RepositorioMercadoExposed()
-    val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, clienteMercado)
+    /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */
+    val ofertas = INTEGRACIONES.OfertasEnCache(clienteMercado, cache)
+    val contextoMercado = SERVICIOS.ServicioContextoMercado(ofertas, mercadoRepo)
+    val generacion = ServicioGeneracionPregunta(
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
+        topeGeneracionIa,
+        mercado = contextoMercado
+    )
+    val cobertura = SERVICIOS.ServicioCoberturaPreguntas(mercadoRepo, MODELOS.LectorCoberturaPreguntasExposed())
+
+    val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, ofertas)
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
-    val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, clienteMercado, requisitos) { mercado.invalidarCache() }
+    val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, ofertas, requisitos) { mercado.invalidarCache() }
     val documentos = FuenteDocumentosLegalesArchivo()
     val consentimiento = ServicioConsentimiento(RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos)
     val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
     val suscripciones = RepositorioSuscripcionExposed()
-    val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras)
+    // Antes que la suscripción, que lee de él el cupo de reportes con IA (D29): declarado después quedaría en null.
+    val reportesRepo = RepositorioReporteExposed()
+    /** Como en producción: el tope de IA del reporte y IA disponible (hay evaluador con IA), con el [reloj] de la prueba. */
+    val cupoIa = SERVICIOS.ServicioCupoIa(reportesRepo, CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO, iaDisponible = true, reloj)
+    val suscripcion = ServicioSuscripcion(suscripciones, verificadorCompras, cupoIa = cupoIa)
 
     val sesionesEntrevista = RepositorioSesionEntrevistaExposed()
     val metricasVideo = RepositorioMetricaVideoExposed()
@@ -230,8 +257,8 @@ class SistemaPrueba(
     val testsNivelacion = ServicioTestNivelacion(testsNivelacionRepo, preguntas, mercadoRepo)
     val pruebasApp = ServicioPruebasApp(entrevista, practica, nivelacion, sesionesEntrevista, practicasRepo, nivelacionesRepo)
 
-    // Reporte de feedback. En las pruebas se llama a reporte.procesar(...) a mano para que sea determinista.
-    val reportesRepo = RepositorioReporteExposed()
+    // Reporte de feedback (reportesRepo está más arriba). En las pruebas se llama a reporte.procesar(...) a mano para que
+    // sea determinista.
     val premium = PremiumFalso()
     val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluador)
     val evaluadorEntrevistaIa = EvaluadorEntrevistaIa(proveedorIa, "gpt-4o-mini", evaluadorEntrevistaGratis)
@@ -256,7 +283,7 @@ class SistemaPrueba(
         // La misma serialización que producción: el contrato JSON depende de ella.
         configurarSerializacion()
         configurarErrores()
-        configurarLimiteSolicitudes(limites)
+        configurarLimiteSolicitudes(limites, cache)
         install(Authentication) {
             jwt("auth-jwt") {
                 verifier(JWT.require(JWT_PRUEBA.algoritmo).withIssuer(JWT_PRUEBA.emisor).withAudience(JWT_PRUEBA.audiencia).build())
@@ -284,7 +311,8 @@ class SistemaPrueba(
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
-            controladorPregunta(pregunta, generacion)
+            controladorPregunta(pregunta, generacion, cobertura)
+            controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)
             controladorRecordatorio(recordatorio)

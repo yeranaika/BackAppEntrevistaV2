@@ -244,6 +244,19 @@ object NormalizadorSkill {
     }
 
     /**
+     * true si el texto menciona la skill: por sus alias conocidos o, si el normalizador no la conoce (una skill creada
+     * a mano, como "Excel"), por su nombre como palabra completa.
+     */
+    fun mencionaSkill(texto: String, skill: String): Boolean {
+        val nombre = skill.trim()
+        if (nombre.isEmpty()) return false
+        // Primero el nombre exacto: normalizarNombre("Android (Kotlin)") devolvería "Kotlin".
+        val patrones = SKILL_PATTERNS[nombre] ?: SKILL_PATTERNS[normalizarNombre(nombre)]
+        if (patrones != null) return patrones.any { it.matcher(texto).find() }
+        return Regex("""(?<![\p{L}\p{N}])${Regex.escape(nombre)}(?![\p{L}\p{N}])""", RegexOption.IGNORE_CASE).containsMatchIn(texto)
+    }
+
+    /**
      * Recorre las ofertas y, por cada skill mencionada, cuenta menciones, en cuántas ofertas aparece
      * y qué nivel piden con más frecuencia. Analiza título y descripción completos de cada oferta.
      */

@@ -4,6 +4,7 @@ import UTILIDADES.transaccion
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -31,7 +32,13 @@ data class TrazaGeneracion(
 
 data class IdsGenerados(val preguntaId: UUID, val generacionId: UUID)
 
-interface RepositorioGeneracionPreguntaIa {
+/** Lectura del gasto de la generación con IA: lo único que necesita el tope mensual (D23). */
+fun interface LectorUsosGeneracionIa {
+    /** Usos registrados (lotes y fallos) con fecha en [desde, hasta): base del tope mensual de gasto (D23). */
+    suspend fun usosEntre(desde: Instant, hasta: Instant): List<UsoIaRegistrado>
+}
+
+interface RepositorioGeneracionPreguntaIa : LectorUsosGeneracionIa {
     /** Guarda las preguntas (estado pendiente) con su trazabilidad, todo o nada. */
     suspend fun guardarLote(traza: TrazaGeneracion, preguntas: List<PreguntaGenerada>): List<IdsGenerados>
 
@@ -77,6 +84,9 @@ class RepositorioGeneracionPreguntaIaExposed : RepositorioGeneracionPreguntaIa {
             }
         }
     }
+
+    override suspend fun usosEntre(desde: Instant, hasta: Instant): List<UsoIaRegistrado> =
+        transaccion { leerUsosGeneracionPreguntas(desde, hasta) }
 
     private fun escribirTraza(fila: UpdateBuilder<*>, traza: TrazaGeneracion, ahora: OffsetDateTime) {
         fila[TablaGeneracionPreguntaIa.cargoId] = traza.cargoId

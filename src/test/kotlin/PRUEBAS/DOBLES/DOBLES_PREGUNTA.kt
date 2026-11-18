@@ -44,6 +44,14 @@ class ProveedorIaGrabador(
 class GeneracionEnMemoria(private val fallaAlAuditar: Boolean = false) : RepositorioGeneracionPreguntaIa {
     val lotes = mutableListOf<Pair<TrazaGeneracion, List<PreguntaGenerada>>>()
     val fallos = mutableListOf<TrazaGeneracion>()
+    /** Gasto ya registrado (para probar el tope mensual) y los rangos que consultó el servicio. */
+    val usosPrevios = mutableListOf<MODELOS.UsoIaRegistrado>()
+    val rangosConsultados = mutableListOf<Pair<java.time.Instant, java.time.Instant>>()
+
+    override suspend fun usosEntre(desde: java.time.Instant, hasta: java.time.Instant): List<MODELOS.UsoIaRegistrado> {
+        rangosConsultados += desde to hasta
+        return usosPrevios.filter { it.fecha >= desde && it.fecha < hasta }
+    }
 
     override suspend fun guardarLote(traza: TrazaGeneracion, preguntas: List<PreguntaGenerada>): List<IdsGenerados> {
         lotes += traza to preguntas

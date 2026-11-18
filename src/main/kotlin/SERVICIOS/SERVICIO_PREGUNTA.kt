@@ -155,6 +155,7 @@ class ServicioPregunta(
         nivel = consulta.nivel.sinVacios()?.let { leerNivel(it) },
         skillId = consulta.skillId.sinVacios()?.let(::leerUuid),
         cargoId = consulta.cargoId.sinVacios()?.let(::leerUuid),
+        paraCargoId = consulta.paraCargoId.sinVacios()?.let(::leerUuid),
         generadaPorIa = consulta.generadaPorIa
     )
 

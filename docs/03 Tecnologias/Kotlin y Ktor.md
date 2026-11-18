@@ -31,6 +31,14 @@ actualizado: 2026-10-03
 - `call.parameters` incluye ruta y query; para query usar `enteroDeConsulta`, `booleanoDeConsulta`, `uuidDeConsulta`
   (`UTILIDADES/UTILIDAD_PARAMETROS.kt`), que responden 400 con código claro.
 
+## Apagado (D20, verificado en Ktor 3.3.1)
+Ante SIGTERM, el hook de EngineMain llama `EmbeddedServer.stop(shutdownGracePeriod, shutdownTimeout)`. Orden real:
+1. `ApplicationStopPreparing`: los sockets **todavía** aceptan conexiones y se puede emitir **dos veces**. No bloquear aquí.
+2. Netty cierra los sockets y termina las solicitudes en curso (`ktor.deployment.shutdownGracePeriod`/`shutdownTimeout`, ms).
+3. `ApplicationStopping` (una sola vez): **aquí se esperan los reportes y correos en curso** (`detenerTareas`); la BD y
+   Redis siguen abiertos.
+4. `ApplicationStopped`: se cierran el pool de la BD, OAuth, los clientes HTTP y Redis, en orden de suscripción.
+
 ## Ejecutar
 ```bash
 ./gradlew run                                       # puerto 8080

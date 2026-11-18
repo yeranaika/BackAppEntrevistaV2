@@ -2,7 +2,9 @@ package CONFIGURACION
 
 import INTEGRACIONES.OfertaLaboral
 
-private const val FUENTE = "Dataset-Estructurado"
+/** Fuente de las ofertas de respaldo: no son mercado real, así que no se guardan por mucho tiempo (ver OfertasEnCache). */
+const val FUENTE_CONTINGENCIA = "Dataset-Estructurado"
+private const val FUENTE = FUENTE_CONTINGENCIA
 
 /** Ofertas de referencia para cuando ninguna API de empleo responde (sin internet, cuota agotada). */
 val OFERTAS_CONTINGENCIA = listOf(

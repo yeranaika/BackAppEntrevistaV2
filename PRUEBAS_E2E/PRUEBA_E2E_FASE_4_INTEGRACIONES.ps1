@@ -42,6 +42,9 @@ Write-Host "Prueba E2E Fase 4 (integraciones) contra $UrlBase"
 
 try {
     Seccion 'Preparación'
+    # El límite por IP vive en Redis (sobrevive a reiniciar el servidor): una corrida anterior con -ConLimites
+    # dejaría la IP bloqueada hasta 10 min y fallarían los registros de abajo.
+    docker exec $ContenedorRedis redis-cli --scan --pattern 'limite:*' | ForEach-Object { docker exec $ContenedorRedis redis-cli DEL $_ | Out-Null }
     foreach ($correo in @($correoAdmin, $correoAna, $correoBeto, $correoBloqueo)) {
         Llamar-Api POST '/auth/register' @{ email = $correo; password = $CONTRASENA } | Out-Null
     }
@@ -209,6 +212,10 @@ try {
         Probar 'con el formato estándar demasiadas_solicitudes' {
             (Llamar-Api POST '/auth/register' @{ email = "e2e_fase4_limite_extra_$sufijo@prueba.local"; password = $CONTRASENA }).Json.error -eq 'demasiadas_solicitudes'
         }
+        Probar 'el contador vive en Redis con vencimiento (compartido entre instancias)' {
+            $claves = @(docker exec $ContenedorRedis redis-cli --scan --pattern 'limite:registro:*')
+            $claves.Count -ge 1 -and @($claves | Where-Object { $ttl = [long](Redis @('PTTL', $_)); $ttl -gt 0 -and $ttl -le 600000 }).Count -eq $claves.Count
+        }
     }
 }
 finally {
@@ -220,7 +227,7 @@ finally {
     Ejecutar-Sql "delete from app.recordatorio_preferencia where $condicion" | Out-Null
     Ejecutar-Sql "delete from app.consentimiento where $condicion" | Out-Null
     $usuarios = Ejecutar-Sql "delete from app.usuario where correo like 'e2e\_fase4\_%@prueba.local'"
-    foreach ($patron in @('login:fallos:e2e_fase4_*', 'mercado:*')) {
+    foreach ($patron in @('login:fallos:e2e_fase4_*', 'mercado:*', 'limite:*')) {
         docker exec $ContenedorRedis redis-cli --scan --pattern $patron | ForEach-Object { docker exec $ContenedorRedis redis-cli DEL $_ | Out-Null }
     }
     Write-Host "  usuarios: $usuarios · códigos: $codigos · cargo, consentimientos, recordatorios, suscripciones y claves Redis de prueba eliminados"

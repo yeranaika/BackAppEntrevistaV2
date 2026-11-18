@@ -74,7 +74,8 @@ data class ResultadoReporte(
     val puntajeGlobal: BigDecimal,
     val puntajeTecnico: BigDecimal,
     val puntajeBlando: BigDecimal,
-    val puntajeLenguajeCorporal: BigDecimal,
+    /** null si no se midió (sin video o sin evidencia suficiente). */
+    val puntajeLenguajeCorporal: BigDecimal?,
     val fortalezas: List<String>,
     val areasMejora: List<String>,
     val recomendaciones: List<RecomendacionSkill>,
@@ -93,7 +94,8 @@ data class ReporteEntrevista(
     val puntajeGlobal: BigDecimal,
     val puntajeTecnico: BigDecimal,
     val puntajeBlando: BigDecimal,
-    val puntajeLenguajeCorporal: BigDecimal,
+    /** null si no se midió (sin video o sin evidencia suficiente). */
+    val puntajeLenguajeCorporal: BigDecimal?,
     val fortalezas: List<String>,
     val areasMejora: List<String>,
     val recomendaciones: List<RecomendacionSkill>,

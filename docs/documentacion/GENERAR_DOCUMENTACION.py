@@ -144,15 +144,23 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Ver preferencias", "GET", "/recordatorios/preferencias", desc="`404 recordatorio_no_configurado` si nunca se guardaron."),
     ]),
     ("07 · Suscripción (billing)", "JSON en snake_case (contrato de Android).", [
-        req("Estado de la suscripción", "GET", "/billing/status"),
+        req("Estado de la suscripción", "GET", "/billing/status",
+            desc="`is_premium`, `plan`, `source` (`google` | `interna`), `status`, `start_at` y `expires_at` (ms epoch). "
+                 "A un premium con IA activa le suma `reportes_ia_limite`, `reportes_ia_restantes` (0 a límite) y "
+                 "`reportes_ia_renovacion` (ms epoch del inicio del mes siguiente, UTC): los reportes con IA que le quedan "
+                 "en el mes, contados como la reserva (D29). A un usuario gratis no le llegan."),
         req("Crear código premium (admin)", "POST", "/billing/admin/codes", ADMIN,
             body={"days": 30, "label": "postman", "max_uses": 1, "license_type": "PROM"}, espera=[201],
             guarda={"codigoPremium": ("j.code", lambda j: j.get("code"))}, desc="`license_type`: PROM, INST o GOOG."),
         req("Canjear código", "POST", "/billing/code/redeem", body={"code": "{{codigoPremium}}"}, espera=[200, 400],
-            desc="Atómico: nunca supera `max_uses`. `400 codigo_invalido_o_expirado`."),
+            desc="Atómico: nunca supera `max_uses`. Responde el mismo estado que `GET /billing/status` (con el cupo de "
+                 "reportes con IA, D29) más `mensaje`. `400 codigo_invalido_o_expirado`."),
         req("Verificar compra de Google Play", "POST", "/billing/google/verify",
             body={"product_id": "premium_mensual", "purchase_token": "<token de Google Play>", "purchase_time": 1735689600000}, omitir_en_prueba=True,
-            desc="Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Google caído → `503`. Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula."),
+            desc="Un token pertenece a una sola cuenta (`409 compra_ya_registrada`). Si Google dice que la pagó otra cuenta "
+                 "de la app (`obfuscatedExternalAccountId` distinto del SHA-256 del id de la cuenta), también "
+                 "`409 compra_ya_registrada` (D27); sin ese dato decide el dueño del token. Google caído → `503`. "
+                 "Con `GOOGLE_PLAY_BILLING_MOCK=true` se simula."),
     ]),
     ("08 · Mercado laboral", "Catálogo público de cargos y skills (caché Redis: cargos 6 h, matriz 12 h; crear un cargo invalida la caché). Las tendencias se sincronizan solas cada 7 días desde JSearch → Remotive → Arbeitnow → dataset de contingencia. La administración es solo para admin.", [
         req("Crear cargo (admin)", "POST", "/admin/market/cargos", ADMIN,
@@ -196,28 +204,44 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                   "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."}, espera=[201]),
         req("Listar preguntas (admin)", "GET", "/api/v1/admin/preguntas", ADMIN,
             consulta=[("estado", "aprobada"), ("cargoId", "{{cargoId}}"), ("pagina", "1"), ("tamano", "20")],
-            desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, generadaPorIa, pagina, tamano."),
+            desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano."),
         req("Ver pregunta (admin)", "GET", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN),
         req("Aprobar pregunta (admin)", "PATCH", "/api/v1/admin/preguntas/{{preguntaId}}/aprobar", ADMIN),
         req("Editar pregunta (admin)", "PUT", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN,
             body={"cargoId": "{{cargoId}}", "tipo": "opcion_multiple", "categoria": "tecnica", "nivel": "junior",
                   "enunciado": "¿Para qué sirve suspend en Kotlin?",
                   "opciones": [{"texto": "Suspender sin bloquear el hilo", "esCorrecta": True}, {"texto": "Crear un hilo"}]},
-            omitir_en_prueba=True, desc="Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión."),
+            omitir_en_prueba=True, desc="Reemplaza el contenido; la pregunta vuelve a quedar pendiente de revisión (y su traza de IA, si la tiene, a `pendiente_revision` sin revisor)."),
         req("Borrar pregunta (admin)", "DELETE", "/api/v1/admin/preguntas/{{preguntaId}}", ADMIN, omitir_en_prueba=True,
             desc="Solo si nunca se usó en una prueba; si no, conviene rechazarla."),
         req("Rechazar pregunta (admin)", "PATCH", "/api/v1/admin/preguntas/{{preguntaId}}/rechazar", ADMIN, body={"motivo": "Muy fácil"}, omitir_en_prueba=True,
             desc="Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita (vuelve a pendiente) y `DELETE` borra si nunca se usó."),
         req("Generar preguntas con IA (admin)", "POST", "/api/v1/admin/preguntas/generar-ia", ADMIN,
-            body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2, "tipo": "abierta_texto", "categoria": "tecnica", "modelo": "gpt-4o-mini"},
-            omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10."),
+            body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2, "tipo": "abierta_texto", "categoria": "tecnica",
+                  "modelo": "gpt-4o-mini", "usar_mercado": True},
+            omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. "
+            "`429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a "
+            "`LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y "
+            "el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP "
+            "(`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). "
+            "Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales "
+            "de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta "
+            "trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` "
+            "y `mensaje` si no se usaron)."),
+        req("Cobertura del banco frente al mercado (admin)", "GET", "/api/v1/admin/preguntas/cobertura", ADMIN,
+            consulta=[("cargoId", "{{cargoId}}"), ("minimo", "5")],
+            desc="Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y "
+            "pendientes que le sirven, por nivel, y cuántas faltan para llegar a `minimo` aprobadas (1 a 50, por defecto 5). "
+            "Sirve para generar con IA justo lo que falta (D26). No llama al LLM ni a las APIs de empleo."),
         req("Preguntas para usuarios", "GET", "/api/v1/preguntas", consulta=[("cargoId", "{{cargoId}}"), ("cantidad", "5")],
             desc="Solo aprobadas y sin la solución."),
     ]),
-    ("10 · Entrevista", "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones): editar o borrar el banco no cambia una entrevista rendida.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.", [
+    ("10 · Entrevista", "Simulación pregunta a pregunta.\n\n- Una sola entrevista en curso por usuario (`409 entrevista_en_progreso`); una abandonada más de 2 h se cancela sola.\n- Preguntas aprobadas del nivel pedido: primero las del cargo, luego las de sus skills, luego generales; 60 % técnicas y 40 % blandas; evita repetir las de las últimas 3 entrevistas.\n- Cada pregunta guarda una copia fija (enunciado, tipo, opciones, respuesta ideal y rúbrica): editar o borrar el banco no cambia una entrevista rendida ni su reporte.\n- La corrección se muestra recién al terminar. Las entrevistas de otro usuario responden `404`.", [
         req("Iniciar entrevista", "POST", "/api/v1/entrevistas", body={"cargoId": "{{cargoId}}", "nivel": "junior", "cantidadPreguntas": 3},
             espera=[201], guarda={"sesionId": ("j.sesionId", lambda j: j.get("sesionId"))},
-            desc="Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`."),
+            desc="Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 entrevista_en_progreso`, `409 preguntas_insuficientes`. "
+            "La app Android (`POST /api/prueba-practica/front` con `ENT`) reemplaza la entrevista en curso en vez de responder 409, "
+            "pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso."),
         req("Entrevista en curso", "GET", "/api/v1/entrevistas/actual", espera=[200, 204]),
         req("Siguiente pregunta", "GET", "/api/v1/entrevistas/{{sesionId}}/siguiente", espera=[200, 204],
             guarda={"preguntaSesionId": ("j.preguntaSesionId", lambda j: j.get("preguntaSesionId")),
@@ -227,9 +251,10 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             body={"preguntaSesionId": "{{preguntaSesionId}}", "opcionId": "{{opcionId}}", "texto": "Una corrutina se suspende sin bloquear el hilo."},
             desc="En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez."),
         req("Enviar métricas de video", "POST", "/api/v1/entrevistas/{{sesionId}}/metricas",
-            body={"metricas": [{"timestampMs": 0, "contactoVisual": 80.5, "postura": 70, "confianza": 65, "expresion": "seguro"},
-                               {"timestampMs": 500, "contactoVisual": 78, "postura": 72, "confianza": 66, "gestos": {"toca_cara": False}, "expresion": "neutral"}]},
-            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; expresión seguro|nervioso|distraido|neutral|confuso)."),
+            body={"metricas": [{"timestampMs": 0, "contactoVisual": 80.5, "postura": 70},
+                               {"timestampMs": 500, "contactoVisual": 78, "postura": 72, "gestos": {"toca_cara": 0, "mirada_fuera": 0.25}},
+                               {"timestampMs": 1000}]},
+            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible)."),
         req("Detalle de la entrevista", "GET", "/api/v1/entrevistas/{{sesionId}}", desc="La corrección se muestra recién al terminar."),
         req("Finalizar entrevista", "POST", "/api/v1/entrevistas/{{sesionId}}/finalizar",
             desc="Requiere al menos una respuesta. Lanza en segundo plano el reporte de feedback."),
@@ -237,9 +262,9 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Cancelar entrevista", "POST", "/api/v1/entrevistas/{{sesionId}}/cancelar", espera=[200, 409], omitir_en_prueba=True,
             desc="Solo una entrevista en curso (`409 entrevista_no_activa` si ya terminó)."),
     ]),
-    ("11 · Feedback", "Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.\n\n- **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.\n- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si la IA falla se usa el freemium: el reporte siempre sale.\n- Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.", [
+    ("11 · Feedback", "Reporte de la entrevista (se genera en segundo plano al finalizarla) y progreso por skill.\n\n- **Puntaje global**: técnico 50 %, blando 30 %, lenguaje corporal 20 % (promedio de las métricas de video); si algo no se midió, su peso se reparte. Las preguntas sin responder cuentan 0.\n- **Respuestas abiertas**: motor freemium (sin costo) para todos; IA para usuarios premium (hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes por mes, 30 por defecto) si hay `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`. Si se alcanza el tope o la IA falla se usa el freemium (`modoEvaluacion = freemium`): el reporte siempre sale.\n- Si la generación falla, el usuario ve un mensaje claro y `puedeReintentar`; el código del error queda solo en la BD.", [
         req("Reporte de la entrevista", "GET", "/api/v1/entrevistas/{{sesionId}}/reporte",
-            desc="`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar."),
+            desc="`estado`: generando | listo | error. Si es `generando`, volver a consultar en unos segundos. `puedeReintentar` indica si sirve reintentar. Un reporte que se cortó por un reinicio del servidor pasa a `error` reintentable (al instante si el apagado fue ordenado; si no, en unos 15 min como máximo)."),
         req("Reintentar reporte", "POST", "/api/v1/entrevistas/{{sesionId}}/reporte/reintentar", espera=[202, 409],
             desc="Solo si terminó con error (hasta 3 intentos). `409 reporte_no_reintentable`."),
         req("Mis reportes", "GET", "/api/v1/reportes"),
@@ -302,7 +327,9 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                 "preguntaAppId": ("j.preguntas[0].preguntaId", lambda j: (j.get("preguntas") or [{}])[0].get("preguntaId", "")),
                 "opcionAppId": ("(j.preguntas[0].configRespuesta.opciones || [{id: ''}])[0].id",
                                 lambda j: ((j.get("preguntas") or [{}])[0].get("configRespuesta", {}).get("opciones") or [{"id": ""}])[0]["id"])},
-            desc="`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`."),
+            desc="`tipoPrueba`: ENT entrevista · PR práctica técnica · BL práctica blanda · NV nivelación. Busca el cargo por `metaCargo`. "
+            "Con `ENT` la entrevista en curso se reemplaza (se cancela en la misma transacción que crea la nueva) y con `PR`/`BL` "
+            "la práctica en curso queda abandonada, pero solo si la nueva se crea: con `409 preguntas_insuficientes` la anterior sigue en curso."),
         req("Enviar respuestas", "POST", "/api/prueba-practica/{{pruebaId}}/respuestas",
             body={"pruebaId": "{{pruebaId}}", "respuestas": [{"preguntaId": "{{preguntaAppId}}", "opcionesSeleccionadas": ["{{opcionAppId}}"], "respuestaTexto": "Mi respuesta"}]},
             espera=[200, 400, 404],
@@ -320,6 +347,14 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Desactivar usuario", "DELETE", "/admin/usuarios/{{usuarioId}}", ADMIN, omitir_en_prueba=True,
             desc="⚠️ No borra: desactiva y cierra sus sesiones. `PATCH /admin/usuarios/{id}/activar` lo reactiva."),
         req("Reactivar usuario", "PATCH", "/admin/usuarios/{{usuarioId}}/activar", ADMIN, omitir_en_prueba=True),
+        req("Costos de IA", "GET", "/api/v1/admin/costos-ia", ADMIN, consulta=[("desde", "2026-11-01"), ("hasta", "2026-11-30")],
+            desc="Gasto en IA por día (UTC) y por modelo: `reportes` (entrevistas evaluadas con IA, premium) y `generacionPreguntas`. "
+                 "Sin fechas: los últimos 30 días; máximo 92 (`400 rango_invalido`); fecha mal escrita: `400 parametro_invalido`. "
+                 "`fallidas` son llamadas que respondieron mal: se pagaron igual y su costo va en `costoEstimadoUsd` (tabla de precios del sistema). "
+                 "Costos en USD con 6 decimales. `topeGeneracionPreguntas` es el gasto del mes UTC en curso (no depende del rango) frente al "
+                 "tope de generación con IA: `mes`, `gastadoUsd`, `topeUsd`, `restanteUsd`, `fechaReposicion` (`null` si está desactivado), "
+                 "`estaDesactivado` y `estaAgotado`; la próxima generación responde `429 tope_generacion_ia_alcanzado` si uno de los dos "
+                 "es `true` (D28)."),
     ]),
     ("17 · Cierre de sesión", "", [
         req("Cerrar sesión", "POST", "/auth/logout", PUBLICA, body={"refreshToken": "{{refreshToken}}"}, desc="Revoca el refresh token."),
@@ -337,7 +372,8 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos."),
         req("Generar preguntas con IA (alias)", "POST", "/api/v1/admin/questions/generate-ai", ADMIN,
             body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2}, omitir_en_prueba=True,
-            desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM)."),
+            desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: "
+            "`tope_generacion_ia_alcanzado` (gasto del mes en el tope) y `demasiadas_solicitudes` (comparte el contador por IP con la ruta nueva)."),
         req("Callback de Google (web)", "GET", "/auth/google/callback", PUBLICA, omitir_en_prueba=True,
             desc="Lo llama Google al terminar el login web; no se usa desde Postman."),
     ]),
@@ -446,7 +482,7 @@ Todos los errores usan el mismo cuerpo, con un código estable para el cliente y
 | 403 | Sesión válida sin permiso (rutas de admin) |
 | 404 | No existe, o es de otro usuario (no se revela que existe) |
 | 409 | Choca con el estado actual (`entrevista_en_progreso`, `pregunta_ya_respondida`, `compra_ya_registrada`…) |
-| 429 | Límite superado: `demasiadas_solicitudes` (por IP) o `demasiados_intentos` (login) |
+| 429 | Límite superado: `demasiadas_solicitudes` (por IP), `demasiados_intentos` (login) o `tope_generacion_ia_alcanzado` (gasto mensual en generar preguntas con IA) |
 | 500 | Error inesperado (`error_interno`); el detalle queda en el log, nunca en la respuesta |
 | 502 | Un proveedor externo respondió algo inutilizable (ej: el LLM) |
 | 503 | Un proveedor externo o la base de datos no está disponible |
@@ -466,8 +502,8 @@ Los `GET` devuelven solo los datos; `204` significa "no hay nada" (ej: no hay en
 - **Ids**: UUID. Un id mal formado en la ruta responde `400 id_invalido`.
 - **Niveles**: `junior | semisenior | senior` (también se aceptan `jr | mid | sr`).
 - **Paginación**: `?pagina=1&tamano=20` donde aplica (tamaño máximo 100).
-- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min. **Login**: 5 contraseñas
-  incorrectas bloquean el correo 15 min.
+- **Límites por IP**: registro 30 cada 10 min; recuperación de contraseña 5 cada 15 min; generación de preguntas con
+  IA (admin) 30 cada 60 min. **Login**: 5 contraseñas incorrectas bloquean el correo 15 min.
 - ⚠️ en una descripción = cuesta dinero (LLM), consume cuota de APIs externas, manda correos o borra datos.
 """
 

@@ -1,7 +1,7 @@
 ---
 tipo: guia
 tags: [guia, setup, local]
-actualizado: 2026-10-03
+actualizado: 2026-11-07
 ---
 
 # Puesta en marcha
@@ -26,7 +26,12 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | No | Caché (por defecto `localhost:6379`) |
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | No | API de empleo principal |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | No | IA (generación de preguntas y evaluación premium) |
-| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP |
+| `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP (compartidos entre instancias en Redis) |
+| `LIMITE_EVALUACIONES_IA_MENSUAL` | No (30) | Reportes con IA por usuario premium y mes (UTC); al llegar al tope el reporte sale con el motor freemium; `0` = sin IA |
+| `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` | No (5) | Gasto estimado máximo (USD) en generar preguntas con IA por mes calendario UTC, sumando todos los admins y las llamadas fallidas; al llegar responde `429 tope_generacion_ia_alcanzado`. `0` = generación con IA desactivada; negativo o no numérico cuenta como `0` (D23) |
+| `LIMITE_GENERACIONES_IA_POR_IP` | No (30) | Generaciones de preguntas con IA por IP cada 60 min (anti-ráfaga, común a `generar-ia` y su alias) → `429 demasiadas_solicitudes` |
+| `APAGADO_ESPERA_TAREAS_SEGUNDOS` | No (150) | Al apagar, espera a los reportes y correos en curso antes de cortarlos (D20) |
+| `CABECERA_IP_CLIENTE` | No (vacía) | Cabecera con la IP real del cliente puesta por el proxy. En Railway `X-Real-IP`, **solo tras la prueba de humo** (abajo) |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.
@@ -37,8 +42,21 @@ cd src/DB && docker compose up -d        # primera vez: crea el esquema y carga 
 ```
 Si la BD ya existía de antes, aplicar las migraciones pendientes (son idempotentes):
 ```bash
-for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
+for m in migrations/0{14,15,16,17,18,19,20,21,22}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
 ```
+La **022** (`rubrica_snap`, D24) tiene que estar aplicada **antes** de desplegar el código que la lee, en local y en
+Railway: sin ella fallan los endpoints de entrevista y el reporte. **Volver a correrla una vez desplegado**: es
+idempotente y completa las copias y trazas que el código anterior dejó mientras convivían.
+
+### Verificar la semilla (D25)
+La semilla se puede correr varias veces sin duplicar preguntas ni opciones. `src/DB/PROBAR_SEMILLA.ps1` lo comprueba
+en una BD desechable (`semilla_prueba`, que crea y borra; no toca `DBentrevista`): corre la semilla tres veces y
+espera 14 preguntas / 24 opciones, sin repetidas, y que una pregunta rechazada o con opciones editadas no se toque.
+Necesita los binarios de PostgreSQL (`psql`, `createdb`, `dropdb`) y `PGUSER`/`PGPASSWORD` definidos:
+```powershell
+pwsh src/DB/PROBAR_SEMILLA.ps1 -Bin C:\ruta\pgsql\bin -Puerto 5432   # termina con "Semilla re-ejecutable: todo OK"
+```
+> [!note] Aún no se ha ejecutado (2026-11-07). Una BD que ya tenga duplicados de la semilla vieja no se limpia sola.
 
 ## 3. Ejecutar
 ```bash
@@ -46,9 +64,24 @@ for m in migrations/01{4,5,6,7,8}_*.sql; do docker exec -i Entrevista_APP psql -
 ```
 En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `OK` mientras el proceso esté vivo. `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
 
+### Apagado ordenado en Railway (D20)
+- `railway.json` fija `deploy.drainingSeconds: 200`: Railway espera hasta 200 s entre SIGTERM y SIGKILL (por defecto da 0).
+  La espera de tareas (150 s) más los cierres caben con margen. Si se cambia una, revisar la otra.
+- El proceso de **Java tiene que recibir la señal**: el comando de inicio debe ejecutar java directamente (`java -jar …`
+  o el script de `installDist`, que termina en `exec`), nunca un `sh -c` que no la reenvíe.
+- Aunque el proceso muera sin aviso, nada queda colgado: al arrancar y cada 5 min los reportes interrumpidos pasan a
+  `error` reintentable.
+
+### Prueba de humo antes de activar `CABECERA_IP_CLIENTE` (Railway, staging)
+Comprueba que el proxy **sobrescribe** `X-Real-IP` (si no, cualquiera podría inventarse una IP y saltarse el límite, D19):
+1. Con `CABECERA_IP_CLIENTE=X-Real-IP`, enviar 31 `POST /auth/register` con cuerpo inválido (responde 422: no crea
+   datos ni manda correos; el límite corre antes y cuenta igual), cada uno con un `X-Real-IP` falso distinto.
+2. Si la 31.ª responde **429**, el proxy reemplaza la cabecera: es seguro dejarla. Si no, **volver a dejarla vacía**.
+3. Desbloquear la IP al terminar: `redis-cli --scan --pattern 'limite:*'` y `DEL` de esa clave.
+
 ## 4. Probar
 ```bash
-./gradlew test                                                       # ~260 pruebas
+./gradlew test                                                       # ~360 pruebas
 pwsh PRUEBAS_E2E/PRUEBA_E2E_FASE_7_FEEDBACK.ps1 -UrlBase http://127.0.0.1:8080
 ```
 Y en Postman: importar `docs/documentacion/postman/` → [[Postman y documentacion de la API]].
@@ -66,6 +99,7 @@ docker exec Entrevista_APP psql -U root -d DBentrevista -c "update app.usuario s
 | `NoSuchMethodError` en Ktor | Dependencias Ktor con versión dinámica → fijarlas en 3.3.1 |
 | `409 preguntas_insuficientes` | El banco no tiene preguntas aprobadas para ese cargo/nivel: crearlas (admin) |
 | `503 provider_not_configured` | Falta `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` |
+| `429 tope_generacion_ia_alcanzado` | Se llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` en el mes (UTC) o vale `0`; se repone el día 1 |
 | Columna inexistente | Falta aplicar una migración |
 
 Relacionado: [[Kotlin y Ktor]] · [[Pruebas]] · [[Docker]]

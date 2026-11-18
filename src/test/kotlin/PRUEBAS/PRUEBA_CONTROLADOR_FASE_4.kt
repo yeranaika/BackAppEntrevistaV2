@@ -1,6 +1,7 @@
 package PRUEBAS
 
 import CONFIGURACION.ConfiguracionLimites
+import MODELOS.TablaConsentimiento
 import ESQUEMAS.SolicitudRegistro
 import MODELOS.ROL_ADMIN
 import PRUEBAS.DOBLES.SistemaPrueba
@@ -21,12 +22,20 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import io.ktor.client.request.header
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/** Las claves que la app Android lee hoy de /billing/status: a un usuario gratis le llegan estas y ninguna más (D29). */
+private val CLAVES_ESTADO_SUSCRIPCION = setOf("is_premium", "plan", "source", "status", "start_at", "expires_at")
 
 /** Contrato HTTP de mercado, consentimientos, recordatorios, billing, límites y salud (rutas que usa Android). */
 class PruebaControladorFase4 {
@@ -107,6 +116,37 @@ class PruebaControladorFase4 {
         assertEquals(HttpStatusCode.NotFound, enviar("POST", "/me/consent/revoke", token = ana).status)
     }
 
+    /** Otorga el consentimiento de [token] enviando [ipEnCabecera] en X-Real-IP y devuelve la ip_origen guardada. */
+    private suspend fun ApplicationTestBuilder.ipGuardadaAlConsentir(token: String, ipEnCabecera: String): String? {
+        val version = enviar("GET", "/consent/current").objeto().texto("version")!!
+        val respuesta = client.post("/me/consent") {
+            bearerAuth(token)
+            header("X-Real-IP", ipEnCabecera)
+            contentType(ContentType.Application.Json)
+            setBody("""{"version":"$version","alcances":{"uso_datos":true}}""")
+        }
+        assertEquals(HttpStatusCode.Created, respuesta.status)
+        return transaction { TablaConsentimiento.selectAll().single()[TablaConsentimiento.ipOrigen] }
+    }
+
+    @Test
+    fun `el consentimiento guarda la IP real del cliente con la cabecera de confianza`() = testApplication {
+        val sistema = SistemaPrueba(limites = ConfiguracionLimites(1_000, 1_000, cabeceraIpCliente = "X-Real-IP"))
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        assertEquals("203.0.113.9", ipGuardadaAlConsentir(ana, "203.0.113.9"), "la del cliente, no la del proxy")
+    }
+
+    @Test
+    fun `sin cabecera de confianza el consentimiento ignora la IP que manda el cliente`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        val guardada = ipGuardadaAlConsentir(ana, "198.51.100.77")
+        assertTrue(guardada != "198.51.100.77", "una cabecera inventada no es evidencia: se guarda la conexión ($guardada)")
+        assertTrue(!guardada.isNullOrBlank())
+    }
+
     @Test
     fun `documentos legales publicos y publicacion solo para admin`() = testApplication {
         val sistema = SistemaPrueba()
@@ -152,7 +192,9 @@ class PruebaControladorFase4 {
         val beto = tokenDe(sistema, "beto@ejemplo.com")
         val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
 
-        assertEquals("false", enviar("GET", "/billing/status", token = ana).objeto().texto("is_premium"))
+        val gratis = enviar("GET", "/billing/status", token = ana).objeto()
+        assertEquals("false", gratis.texto("is_premium"))
+        assertEquals(CLAVES_ESTADO_SUSCRIPCION, gratis.keys, "a un usuario gratis no le llega ninguna clave reportes_ia_*")
 
         val pedido = """{"days":30,"max_uses":1,"license_type":"PROM"}"""
         assertEquals(HttpStatusCode.Forbidden, enviar("POST", "/billing/admin/codes", pedido, ana).status)
@@ -166,6 +208,39 @@ class PruebaControladorFase4 {
         val compra = """{"product_id":"premium_mensual","purchase_token":"tok-1","purchase_time":1}"""
         assertEquals("premium_active", enviar("POST", "/billing/google/verify", compra, beto).objeto().texto("status"))
         assertEquals(HttpStatusCode.Conflict, enviar("POST", "/billing/google/verify", compra, ana).status)
+
+        // D27: Google dice que la compra la pagó beto (obfuscatedExternalAccountId = hash de su cuenta): ana no la activa.
+        val idBeto = runBlocking { sistema.usuarios.buscarPorCorreo("beto@ejemplo.com")!!.id }
+        sistema.verificadorCompras.compra = INTEGRACIONES.CompraGoogle(
+            esValida = true, estaActiva = true, expiracion = java.time.Instant.now().plusSeconds(86_400), cuentaOfuscada = SERVICIOS.cuentaOfuscadaDe(idBeto)
+        )
+        val deOtraCuenta = enviar("POST", "/billing/google/verify", compra.replace("tok-1", "tok-2"), ana)
+        assertEquals(HttpStatusCode.Conflict, deOtraCuenta.status)
+        assertEquals("compra_ya_registrada", deOtraCuenta.objeto().texto("error"))
+    }
+
+    @Test
+    fun `billing informa al premium los reportes con IA que le quedan`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val codigo = enviar("POST", "/billing/admin/codes", """{"days":30,"max_uses":1,"license_type":"PROM"}""", admin).objeto().texto("code")!!
+        // El reloj de prueba está en enero de 2026: el cupo se renueva el 2026-02-01T00:00:00Z.
+        val febrero = 1_769_904_000_000L
+
+        val canje = enviar("POST", "/billing/code/redeem", """{"code":"$codigo"}""", ana).objeto()
+        val estado = enviar("GET", "/billing/status", token = ana).objeto()
+
+        listOf(canje, estado).forEach { cuerpo ->
+            assertEquals("true", cuerpo.texto("is_premium"))
+            assertEquals(30, cuerpo["reportes_ia_limite"]!!.jsonPrimitive.int)
+            assertEquals(30, cuerpo["reportes_ia_restantes"]!!.jsonPrimitive.int)
+            assertEquals(febrero, cuerpo["reportes_ia_renovacion"]!!.jsonPrimitive.long)
+        }
+        assertEquals("Código canjeado; tu cuenta ya es premium", canje.texto("mensaje"))
+        assertEquals(CLAVES_ESTADO_SUSCRIPCION + setOf("reportes_ia_limite", "reportes_ia_restantes", "reportes_ia_renovacion"), estado.keys)
+        assertEquals(HttpStatusCode.Unauthorized, enviar("GET", "/billing/status").status)
     }
 
     // ---------- Límites y bloqueo ----------

@@ -1,5 +1,6 @@
 package MODELOS
 
+import kotlinx.serialization.json.JsonObject
 import ERRORES.ErrorConflicto
 import UTILIDADES.SQLSTATE_VALOR_DUPLICADO
 import UTILIDADES.transaccion
@@ -25,7 +26,9 @@ enum class ResultadoRegistroRespuestas { REGISTRADAS, SESION_NO_ACTIVA, YA_RESPO
 interface RepositorioSesionEntrevista {
     /**
      * Crea la sesión con un slot por pregunta (en ese orden) y suma un uso a cada pregunta.
-     * ErrorConflicto("entrevista_en_progreso") si el usuario ya tiene una sesión en progreso.
+     * Si [NuevaSesionEntrevista.reemplazaA] viene, cancela esa sesión (si sigue en progreso) en la misma transacción:
+     * si la nueva no se crea, la anterior sigue en curso.
+     * ErrorConflicto("entrevista_en_progreso") si después de eso el usuario aún tiene una sesión en progreso.
      */
     suspend fun crear(nueva: NuevaSesionEntrevista, preguntas: List<Pregunta>): SesionEntrevista
 
@@ -54,6 +57,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             transaccion {
                 // Bloquear al usuario serializa dos "iniciar" simultáneos (en Postgres además lo impide el índice único).
                 TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq nueva.usuarioId }.forUpdate().toList()
+                nueva.reemplazaA?.let { cerrarSiSigueEnProgreso(it, EstadoSesionEntrevista.CANCELADA, nueva.inicio) }
                 if (existeEnProgreso(nueva.usuarioId)) throw entrevistaEnProgreso()
                 insertarSesion(id, nueva)
                 insertarPreguntas(id, preguntas)
@@ -133,14 +137,8 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         ResultadoRegistroRespuestas.REGISTRADAS
     }
 
-    override suspend fun cerrar(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean = transaccion {
-        TablaSesionEntrevista.update({
-            (TablaSesionEntrevista.sesionId eq sesionId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd)
-        }) {
-            it[TablaSesionEntrevista.estado] = estado.valorBd
-            it[fechaFin] = fecha
-        } > 0
-    }
+    override suspend fun cerrar(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean =
+        transaccion { cerrarSiSigueEnProgreso(sesionId, estado, fecha) }
 
     override suspend fun preguntasRecientes(usuarioId: UUID, sesiones: Int): Set<UUID> = transaccion {
         val recientes = TablaSesionEntrevista.select(TablaSesionEntrevista.sesionId)
@@ -189,6 +187,14 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 
     // ---------- Apoyo (dentro de una transacción) ----------
 
+    private fun cerrarSiSigueEnProgreso(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean =
+        TablaSesionEntrevista.update({
+            (TablaSesionEntrevista.sesionId eq sesionId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd)
+        }) {
+            it[TablaSesionEntrevista.estado] = estado.valorBd
+            it[fechaFin] = fecha
+        } > 0
+
     private fun existeEnProgreso(usuarioId: UUID): Boolean =
         TablaSesionEntrevista.selectAll()
             .where { (TablaSesionEntrevista.usuarioId eq usuarioId) and (TablaSesionEntrevista.estado eq EstadoSesionEntrevista.EN_PROGRESO.valorBd) }
@@ -213,6 +219,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             this[TablaSesionPreguntaRespuesta.preguntaId] = pregunta.id
             this[TablaSesionPreguntaRespuesta.enunciado] = pregunta.enunciado
             this[TablaSesionPreguntaRespuesta.respuestaIdeal] = pregunta.respuestaIdeal
+            this[TablaSesionPreguntaRespuesta.rubrica] = pregunta.rubrica ?: RUBRICA_VACIA
             this[TablaSesionPreguntaRespuesta.tipoPregunta] = pregunta.tipo.valorBd
             this[TablaSesionPreguntaRespuesta.categoriaHabilidad] = pregunta.categoria.valorBd
             this[TablaSesionPreguntaRespuesta.skillId] = pregunta.skillId
@@ -258,6 +265,7 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         orden = this[TablaSesionPreguntaRespuesta.orden].toInt(),
         enunciado = this[TablaSesionPreguntaRespuesta.enunciado],
         respuestaIdeal = this[TablaSesionPreguntaRespuesta.respuestaIdeal],
+        rubrica = this[TablaSesionPreguntaRespuesta.rubrica],
         // Filas anteriores a la migración 016 no tienen snapshot de tipo: eran preguntas abiertas.
         tipo = this[TablaSesionPreguntaRespuesta.tipoPregunta]?.let(TipoPregunta::desdeBd) ?: TipoPregunta.ABIERTA_TEXTO,
         categoria = this[TablaSesionPreguntaRespuesta.categoriaHabilidad]?.let(CategoriaHabilidad::desdeBd) ?: CategoriaHabilidad.TECNICA,
@@ -277,6 +285,10 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 
 interface RepositorioMetricaVideo {
     /** Inserta el lote completo en una sola operación. Devuelve cuántas filas guardó. */
+    /**
+     * Guarda el lote y devuelve cuántas métricas eran nuevas. Es idempotente: una métrica con un timestampMs que la
+     * sesión ya tiene (un lote reenviado) se ignora, y dentro del lote vale la primera de cada timestampMs (D21).
+     */
     suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int
 
     /** Promedios de la sesión calculados en la BD (una entrevista puede tener miles de filas). null si no hay métricas. */
@@ -287,13 +299,28 @@ data class ResumenMetricasVideo(
     val cantidad: Long,
     val contactoVisual: BigDecimal?,
     val postura: BigDecimal?,
-    val confianza: BigDecimal?,
-    val expresionMasFrecuente: String?
+    val confianza: BigDecimal?
 )
 
 class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
-    override suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int = transaccion {
-        TablaMetricaVideo.batchInsert(metricas, shouldReturnGeneratedValues = false) { metrica ->
+    override suspend fun insertarLote(sesionId: UUID, metricas: List<MetricaVideo>): Int {
+        val unicas = metricas.distinctBy { it.timestampMs }
+        return try {
+            insertarNuevas(sesionId, unicas)
+        } catch (e: ExposedSQLException) {
+            // Otro envío del mismo lote entró entre la lectura y la inserción: se reintenta una vez y ya se filtra.
+            if (e.sqlState != SQLSTATE_VALOR_DUPLICADO) throw e
+            insertarNuevas(sesionId, unicas)
+        }
+    }
+
+    private suspend fun insertarNuevas(sesionId: UUID, metricas: List<MetricaVideo>): Int = transaccion {
+        val existentes = TablaMetricaVideo.select(TablaMetricaVideo.timestampMs)
+            .where { (TablaMetricaVideo.sesionId eq sesionId) and (TablaMetricaVideo.timestampMs inList metricas.map { it.timestampMs }) }
+            .mapTo(HashSet()) { it[TablaMetricaVideo.timestampMs] }
+        val nuevas = metricas.filterNot { it.timestampMs in existentes }
+        if (nuevas.isEmpty()) return@transaccion 0
+        TablaMetricaVideo.batchInsert(nuevas, shouldReturnGeneratedValues = false) { metrica ->
             this[TablaMetricaVideo.metricaId] = UUID.randomUUID()
             this[TablaMetricaVideo.sesionId] = sesionId
             this[TablaMetricaVideo.timestampMs] = metrica.timestampMs
@@ -301,9 +328,8 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             this[TablaMetricaVideo.postura] = metrica.postura
             this[TablaMetricaVideo.confianza] = metrica.confianza
             this[TablaMetricaVideo.gestos] = metrica.gestos
-            this[TablaMetricaVideo.expresionDominante] = metrica.expresionDominante
         }
-        metricas.size
+        nuevas.size
     }
 
     override suspend fun resumir(sesionId: UUID): ResumenMetricasVideo? = transaccion {
@@ -315,13 +341,9 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             .where { TablaMetricaVideo.sesionId eq sesionId }
             .single()
         if (fila[cantidad] == 0L) return@transaccion null
-        val conteoExpresion = TablaMetricaVideo.expresionDominante.count()
-        val expresion = TablaMetricaVideo.select(TablaMetricaVideo.expresionDominante, conteoExpresion)
-            .where { (TablaMetricaVideo.sesionId eq sesionId) and TablaMetricaVideo.expresionDominante.isNotNull() }
-            .groupBy(TablaMetricaVideo.expresionDominante)
-            .orderBy(conteoExpresion to SortOrder.DESC)
-            .limit(1)
-            .firstOrNull()?.get(TablaMetricaVideo.expresionDominante)
-        ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza], expresion)
+        ResumenMetricasVideo(fila[cantidad], fila[contacto], fila[postura], fila[confianza])
     }
 }
+
+/** Una pregunta sin rúbrica se guarda como objeto vacío: NULL queda solo para las filas anteriores a la migración 022. */
+private val RUBRICA_VACIA = JsonObject(emptyMap())

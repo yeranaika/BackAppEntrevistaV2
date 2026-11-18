@@ -17,8 +17,13 @@ enum class EstadoSesionEntrevista(val valorBd: String) {
     }
 }
 
-/** Expresiones que admite metrica_video.expresion_dominante. */
-val EXPRESIONES_VALIDAS = setOf("seguro", "nervioso", "distraido", "neutral", "confuso")
+/**
+ * Gestos que se guardan de una métrica de video: solo conductas OBSERVABLES (RNF10, D22). Es la misma lista que
+ * GESTOS_PERMITIDOS de la app Android; cualquier otra clave (una emoción, un blendshape crudo) se descarta.
+ */
+val GESTOS_OBSERVABLES = setOf(
+    "toca_cara", "manos_visibles", "gesticula_manos", "movimiento_cabeza", "cabeza_inclinada", "mirada_fuera", "rostro_visible"
+)
 
 /** Opción de una pregunta tal como estaba al armar la sesión (se guarda en opciones_snap). */
 @Serializable
@@ -37,6 +42,8 @@ data class PreguntaSesion(
     val orden: Int,
     val enunciado: String,
     val respuestaIdeal: String?,
+    /** Copia de la rúbrica del banco al servir la pregunta; null solo en filas anteriores a la migración 022 (D24). */
+    val rubrica: JsonObject?,
     val tipo: TipoPregunta,
     val categoria: CategoriaHabilidad,
     val skillId: UUID?,
@@ -72,7 +79,9 @@ data class NuevaSesionEntrevista(
     val cargoId: UUID?,
     val cargoObjetivo: String,
     val nivel: NivelExperiencia,
-    val inicio: Instant
+    val inicio: Instant,
+    /** Sesión en curso que esta reemplaza: se cancela al crear la nueva, en la misma transacción. */
+    val reemplazaA: UUID? = null
 )
 
 /** Respuesta ya validada por el servicio, lista para guardar. */
@@ -89,8 +98,7 @@ data class MetricaVideo(
     val contactoVisual: BigDecimal?,
     val postura: BigDecimal?,
     val confianza: BigDecimal?,
-    val gestos: JsonObject?,
-    val expresionDominante: String?
+    val gestos: JsonObject?
 )
 
 /** Resumen para el historial (sin las preguntas). */

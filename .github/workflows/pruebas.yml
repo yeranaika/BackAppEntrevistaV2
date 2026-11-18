@@ -1,0 +1,44 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    name: ./gradlew test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Gradle con caché
+        uses: gradle/actions/setup-gradle@v4
+
+      # Las pruebas usan H2 en memoria y dobles de prueba: no necesitan PostgreSQL, Redis,
+      # LLM ni correo. FREEMIUM_HTTP_WARMUP=0 evita el calentamiento HTTP del evaluador.
+      - name: Ejecutar pruebas
+        env:
+          FREEMIUM_HTTP_WARMUP: "0"
+        run: |
+          chmod +x gradlew
+          ./gradlew test --no-daemon --console=plain
+
+      - name: Subir reporte de pruebas
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pruebas
+          path: build/reports/tests/test
+          retention-days: 7

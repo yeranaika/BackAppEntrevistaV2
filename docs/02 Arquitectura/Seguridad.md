@@ -1,7 +1,7 @@
 ---
 tipo: arquitectura
 tags: [seguridad, privacidad]
-actualizado: 2026-10-03
+actualizado: 2026-11-17
 ---
 
 # Seguridad
@@ -13,9 +13,9 @@ actualizado: 2026-10-03
 | Roles | `user` / `admin`; `soloAdmin { }` responde 401 sin token y 403 sin rol. El rol se relee al rotar tokens |
 | Recursos ajenos | Responden **404** (no se revela que existen) |
 | Login | 5 contraseñas incorrectas bloquean el correo 15 min (contador en Redis, compartido entre instancias) |
-| Límite por IP | Registro 30/10 min, recuperación 5/15 min (en memoria por instancia → ver [[Pendientes y deuda tecnica]]) |
+| Límite por IP | Registro 30/10 min, recuperación 5/15 min, **compartido entre instancias en Redis** (D18); si Redis cae, cada instancia limita en memoria. La IP es la de la conexión, o la de `CABECERA_IP_CLIENTE` (X-Real-IP en Railway) solo si es una IP literal válida; nunca `X-Forwarded-For`, cuyo primer valor controla el cliente (D19) |
 | Recuperación | Código de 6 dígitos, 15 min, intentos limitados; misma respuesta exista o no la cuenta |
-| Pagos | Solo se guarda el **hash** del token de Google Play; un pago no activa dos cuentas |
+| Pagos | Solo se guarda el **hash** del token de Google Play; un pago no activa dos cuentas, y una compra que Google atribuye a otra cuenta de la app (`obfuscatedExternalAccountId` ≠ hash de la cuenta) responde 409 (D27). No se leen ni guardan los datos personales que trae la respuesta de Google |
 | IA | Las respuestas del candidato van como **datos** en el mensaje de usuario, nunca en las instrucciones (limita inyección de prompts). Modelo, tokens y costo no se exponen |
 | Errores | Al cliente solo código + mensaje; trazas y detalles al log |
 | Secretos | Solo en `.env` / variables de entorno (ignorado por git). La config falla al arrancar si falta uno obligatorio |

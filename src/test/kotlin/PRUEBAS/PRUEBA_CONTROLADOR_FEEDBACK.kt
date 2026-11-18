@@ -112,7 +112,7 @@ class PruebaControladorFeedback {
         val id = rendir(ana)
         runBlocking {
             sistema.reportesRepo.crearPendiente(UUID.fromString(id), java.time.Instant.now())
-            sistema.reportesRepo.tomarParaGenerar(UUID.fromString(id), 3)
+            sistema.reportesRepo.tomarParaGenerar(UUID.fromString(id), 3, java.time.Instant.now())
             sistema.reportesRepo.marcarError(UUID.fromString(id), "error_interno", java.time.Instant.now())
         }
 

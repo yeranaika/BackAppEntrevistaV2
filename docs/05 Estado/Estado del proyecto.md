@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [estado, fases, ramas]
-actualizado: 2026-10-03
+actualizado: 2026-11-17
 ---
 
 # Estado del proyecto
@@ -22,6 +22,22 @@ actualizado: 2026-10-03
 | Docs | `docs/documentacion/` (API.md + Postman) y esta bóveda | `refactor/documentacion-api` | `ae49742` + esta bóveda | colección 78/78 |
 | Mensajes | `mensaje` en todo éxito de escritura (todas las fases) | `refactor/mensajes-exito` | — | 261 · colección 78/78 |
 | Disponibilidad Freemium | `/ready` espera el calentamiento, `/health` conserva liveness y se filtran sus logs | `codex/freemium-main-port` | `6de97b2` + filtro de logs | 265 pruebas · colección generada con 106 solicitudes |
+| Tope mensual de IA | Cupo de reportes con IA por usuario premium y mes (`LIMITE_EVALUACIONES_IA_MENSUAL`, D17); al agotarlo, motor freemium | `feature/tope-mensual-ia` | (ver git log) | 281 pruebas · 6 mutaciones detectadas · revisión adversarial |
+| Integración | Las tres ramas anteriores (CI, tope de IA, límite por IP) juntas y verificadas | `integracion/backend-v2` | (ver git log) | 305 pruebas |
+| Apagado ordenado | Espera con tope al apagar, reporte cortado reintentable y rescate periódico (D20) | `feature/apagado-ordenado` | (ver git log) | 323 pruebas · 13 mutaciones detectadas · revisión adversarial |
+| Costos de IA (admin) | `GET /api/v1/admin/costos-ia`: gasto por día y por modelo, con el estimado de las llamadas fallidas | `feature/costos-ia-admin` | (ver git log) | 337 pruebas · 8 mutaciones detectadas · revisión adversarial final del conjunto |
+| Métricas de video idempotentes | Un lote reenviado por la app no se duplica: una métrica por `timestampMs` de la sesión (D21, migración 020) | `feature/metricas-idempotentes` | (ver git log) | 338 pruebas |
+| Métricas sin emociones | `expresion` se ignora, gestos solo observables, lenguaje corporal `null` si no se midió (D22, migración 021) | `feature/metricas-idempotentes` | (ver git log) | 340 pruebas · humo en Postgres 16 real 20/20 (2026-11-07) |
+| Reemplazo de entrevista sin pérdida | La app (`ENT`) reemplaza la entrevista en curso en la misma transacción que crea la nueva: un `409 preguntas_insuficientes` deja la anterior en curso | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
+| Tope de gasto en generación con IA | `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD/mes UTC, global) → `429 tope_generacion_ia_alcanzado`; fallidas con tokens; límite por IP `LIMITE_GENERACIONES_IA_POR_IP` (D23) | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
+| Rúbrica en el snapshot de entrevista | `rubrica_snap` por pregunta servida; editar una pregunta deja su traza de IA pendiente (D24, migración 022) | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
+| Semilla re-ejecutable | Preguntas y opciones de la semilla solo se insertan si no existen; `src/DB/PROBAR_SEMILLA.ps1` 7/7 en PostgreSQL 16 (2026-11-07) (D25) | `fix/banco-preguntas` | (ver git log) | 360 pruebas · 4 mutaciones detectadas · revisión adversarial |
+| Preguntas con lo que pide el mercado | `generar-ia` usa las ofertas de empleo guardadas por la sincronización (o busca hasta 6 s) y responde `contexto_mercado`; `GET /api/v1/admin/preguntas/cobertura` muestra qué skills de cada cargo tienen pocas preguntas (D26) | `feature/preguntas-desde-mercado` | (ver git log) | 381 pruebas · revisión adversarial (2026-11-17) |
+| Compra de Google Play de otra cuenta | `POST /billing/google/verify` lee `obfuscatedExternalAccountId` y responde `409 compra_ya_registrada` si la compra la pagó otra cuenta de la app (hash SHA-256 del id, igual que la app); sin el campo decide el dueño del token (D27) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
+| Gasto del mes frente al tope en Costos IA | `GET /api/v1/admin/costos-ia` trae `topeGeneracionPreguntas` (7 claves) del mes UTC en curso; `ServicioTopeGeneracionIa` es la única fuente del 429 y del panel (D28) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
+| Cupo de reportes con IA visible | `GET /billing/status` y el canje traen `reportes_ia_limite`, `reportes_ia_restantes` y `reportes_ia_renovacion` solo para premium con IA activa, con la misma condición SQL que la reserva (D29) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
+| IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
+| Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
@@ -36,9 +52,24 @@ Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLA
 ## Base de datos local
 Migraciones aplicadas hasta **018** (con respaldo previo de cada una).
 
+**2026-11-07:** las migraciones 014–021 se probaron en PostgreSQL 16.15 real (sin Docker): sobre el esquema del primer
+commit (`21b065f`) se aplicaron dos veces seguidas sin errores, y el esquema resultante es idéntico al de
+`src/DB/BasedeDatos.EntrevistaApp.sql` (comparado con `pg_dump --schema-only`). Prueba de humo por HTTP contra esa BD:
+lotes reenviados, solapados y 6 envíos simultáneos del mismo lote sin duplicar; reporte sin emociones; lenguaje corporal
+`null` sin video o sin evidencia (20/20).
+
+> [!warning] Migración 022 pendiente en Railway
+> `migrations/022_rubrica_snap_y_traza_editada.sql` (rama `fix/banco-preguntas`, D24) está aplicada en la BD local
+> (PostgreSQL 16 portátil, con respaldo previo, 2026-11-07; el backend en 8093 inicia entrevistas y responde el 409 sin
+> cancelar la anterior). En Railway **aún no**: aplicarla (con respaldo) **antes** de desplegar —sin `rubrica_snap`
+> fallan los endpoints de entrevista y el reporte— y volver a correrla después. `src/DB/PROBAR_SEMILLA.ps1` (D25):
+> 7/7 comprobaciones en verde (14 preguntas y 24 opciones tras tres corridas).
+
 ## Qué funciona hoy (resumen)
-Registro/login (correo y Google), perfil y onboarding, consentimientos, recordatorios, premium (códigos y Google Play),
-mercado laboral, banco de preguntas (con generación IA), nivelación, práctica (+ offline), entrevista (+ métricas de
-video), reporte de feedback (freemium / IA premium), progreso por skill, y todo el contrato que usa la app Android.
+Registro/login (correo y Google), perfil y onboarding, consentimientos, recordatorios, premium (códigos y Google Play,
+que solo activa la cuenta que pagó; el premium ve cuántos reportes con IA le quedan),
+mercado laboral, banco de preguntas (con generación IA guiada por las ofertas de empleo y cobertura por cargo), nivelación, práctica (+ offline), entrevista (+ métricas de
+video), reporte de feedback (freemium / IA premium), progreso por skill, costos de IA con el gasto del mes frente al
+tope de generación, y todo el contrato que usa la app Android.
 
 Ver también [[Pendientes y deuda tecnica]] · [[Decisiones]] · [[Riesgos]]

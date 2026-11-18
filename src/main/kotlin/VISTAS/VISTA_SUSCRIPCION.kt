@@ -15,7 +15,10 @@ fun EstadoSuscripcion.aRespuesta() = RespuestaEstadoSuscripcion(
     origen = vigente?.proveedor?.lowercase()?.let { if (it == PROVEEDOR_GOOGLE_PLAY || it == ORIGEN_GOOGLE) ORIGEN_GOOGLE else ORIGEN_INTERNO },
     estado = vigente?.estado,
     inicio = vigente?.inicio?.toEpochMilli(),
-    expiracion = vigente?.expiracion?.toEpochMilli()
+    expiracion = vigente?.expiracion?.toEpochMilli(),
+    limiteReportesIa = cupoIa?.limite,
+    reportesIaRestantes = cupoIa?.restantes,
+    renovacionReportesIa = cupoIa?.renovacion?.toEpochMilli()
 )
 
 fun CodigoSuscripcion.aRespuesta() = RespuestaCodigoCreado(

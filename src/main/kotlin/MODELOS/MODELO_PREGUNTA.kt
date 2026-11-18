@@ -88,6 +88,8 @@ data class FiltroPreguntas(
     val nivel: NivelExperiencia? = null,
     val skillId: UUID? = null,
     val cargoId: UUID? = null,
+    /** De este cargo o sin cargo: las que la entrevista puede elegir para él (lo que cuenta la cobertura, D26). */
+    val paraCargoId: UUID? = null,
     val generadaPorIa: Boolean? = null
 )
 

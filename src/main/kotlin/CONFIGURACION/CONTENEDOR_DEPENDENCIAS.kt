@@ -5,6 +5,7 @@ import INTEGRACIONES.ClienteCorreoSmtp
 import INTEGRACIONES.ClienteGooglePlay
 import INTEGRACIONES.ClienteGoogleIdentidad
 import INTEGRACIONES.ClienteMercadoLaboralHttp
+import INTEGRACIONES.OfertasEnCache
 import INTEGRACIONES.ContadorIntentosCache
 import INTEGRACIONES.EnviadorCorreo
 import INTEGRACIONES.FuenteDocumentosLegalesArchivo
@@ -21,6 +22,7 @@ import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioCuentaOAuthExposed
 import MODELOS.RepositorioGeneracionPreguntaIaExposed
 import MODELOS.RepositorioMercadoExposed
+import MODELOS.LectorCoberturaPreguntasExposed
 import MODELOS.RepositorioObjetivoCarrera
 import MODELOS.RepositorioObjetivoCarreraExposed
 import MODELOS.RepositorioPerfil
@@ -38,8 +40,12 @@ import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
 import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.ServicioTopeGeneracionIa
+import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
 import SERVICIOS.ServicioMercado
+import SERVICIOS.ServicioContextoMercado
+import SERVICIOS.ServicioCoberturaPreguntas
 import SERVICIOS.ServicioOnboarding
 import SERVICIOS.ServicioPregunta
 import SERVICIOS.ServicioRecordatorio
@@ -62,6 +68,7 @@ import SERVICIOS.EvaluadorEntrevistaFreemium
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.ResolutorContextoPrueba
 import SERVICIOS.ServicioReporteEntrevista
+import SERVICIOS.ServicioCupoIa
 import SERVICIOS.VerificadorPremium
 import MODELOS.RepositorioReporteExposed
 import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
@@ -72,11 +79,12 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import MODELOS.LectorCostosIaExposed
+import SERVICIOS.ServicioCostosIa
+import SERVICIOS.TareaRescateReportes
 import SERVICIOS.TareaSincronizacionMercado
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import UTILIDADES.TareasSegundoPlano
+import kotlin.time.Duration
 
 private const val PREFIJO_INTENTOS_LOGIN = "login:fallos:"
 
@@ -86,8 +94,8 @@ private const val PREFIJO_INTENTOS_LOGIN = "login:fallos:"
  */
 class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseable {
 
-    /** Tareas que no deben bloquear la respuesta HTTP (ej: enviar correos). Se cancelan al apagar. */
-    private val tareasSegundoPlano = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Tareas que no deben bloquear la respuesta HTTP (reportes, correos). Al apagar se esperan: ver detenerTareas (D20). */
+    private val tareasSegundoPlano = TareasSegundoPlano()
 
     // ---------- Repositorios ----------
     // Una sola instancia sirve a RepositorioUsuario y a LectorUsuarioSesion.
@@ -107,6 +115,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val cache = CacheRedis(configuracion.redis)
     val enviadorCorreo: EnviadorCorreo = ClienteCorreoSmtp(configuracion.correo)
     val clienteMercadoLaboral = ClienteMercadoLaboralHttp(configuracion.mercadoLaboral)
+    /** Cada búsqueda de la sincronización queda guardada por consulta: la generación de preguntas la reutiliza (D26). */
+    val ofertasEnCache = OfertasEnCache(clienteMercadoLaboral, cache)
     val verificadorGoogle = ClienteGoogleIdentidad(configuracion.google.clientId)
     private val clienteGooglePlay = if (configuracion.googlePlay.esSimulado) null else ClienteGooglePlay(configuracion.googlePlay)
     val verificadorCompras: VerificadorCompraGoogle = clienteGooglePlay ?: VerificadorCompraSimulado()
@@ -153,16 +163,31 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
 
-    val servicioGeneracionPregunta = ServicioGeneracionPregunta(proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo)
+    /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
+    val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
 
-    val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, clienteMercadoLaboral)
+    /** Tope de gasto de la generación con IA (D23): una sola instancia para el 429 y para Costos IA (D28). */
+    private val topeGeneracionIa = ServicioTopeGeneracionIa(
+        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+    )
+
+    val servicioGeneracionPregunta = ServicioGeneracionPregunta(
+        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado
+    )
+
+    /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
+    val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())
+    /** Gasto en IA para el admin (reportes con IA y generación de preguntas) y gasto del mes frente al tope (D28). */
+    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa)
+
+    val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, ofertasEnCache)
 
     val servicioMercado = ServicioMercado(repositorioMercado, repositorioMercado, servicioRequisitosCargo, cache)
 
     val servicioTendencias = ServicioTendenciasSkill(
         lector = repositorioMercado,
         escritor = repositorioMercado,
-        clienteMercado = clienteMercadoLaboral,
+        clienteMercado = ofertasEnCache,
         requisitos = servicioRequisitosCargo,
         alActualizar = { servicioMercado.invalidarCache() }
     )
@@ -173,7 +198,14 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioRecordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
 
-    val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras)
+    // Se crea antes que la suscripción: el cupo de reportes con IA que ve la app (D29) lo lee del mismo repositorio.
+    private val repositorioReporte = RepositorioReporteExposed()
+    /** Reportes con IA que le quedan al premium en el mes, con el mismo tope y la misma condición que la reserva (D17). */
+    private val servicioCupoIa = ServicioCupoIa(
+        repositorioReporte, configuracion.llm.evaluacionesIaMensuales, iaDisponible = configuracion.llm.tieneProveedor
+    )
+
+    val servicioSuscripcion = ServicioSuscripcion(RepositorioSuscripcionExposed(), verificadorCompras, cupoIa = servicioCupoIa)
 
     private val selectorPreguntas = SelectorPreguntas(repositorioPregunta, repositorioMercado)
     private val repositorioSesionEntrevista = RepositorioSesionEntrevistaExposed()
@@ -194,7 +226,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     private val repositorioNivelSkill = RepositorioNivelSkillExposed()
 
     val servicioReporte = ServicioReporteEntrevista(
-        reportes = RepositorioReporteExposed(),
+        reportes = repositorioReporte,
         sesiones = repositorioSesionEntrevista,
         metricas = repositorioMetricaVideo,
         preguntas = repositorioPregunta,
@@ -203,7 +235,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         evaluadorGratis = evaluadorEntrevistaGratis,
         evaluadorIa = evaluadorEntrevistaIa,
         premium = VerificadorPremium { servicioSuscripcion.estado(it).esPremium },
-        tareasSegundoPlano = tareasSegundoPlano
+        tareasSegundoPlano = tareasSegundoPlano,
+        evaluacionesIaMensuales = configuracion.llm.evaluacionesIaMensuales
     )
 
     val servicioEntrevista = ServicioEntrevista(
@@ -251,14 +284,29 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     )
 
     private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)
+    private val tareaRescate = TareaRescateReportes(servicioReporte)
 
     fun iniciarTareasSegundoPlano() {
         tareaMercado.iniciar()
+        tareaRescate.iniciar()
+    }
+
+    /**
+     * Apagado ordenado (D20). Se llama en ApplicationStopping: Netty ya no atiende solicitudes, pero la BD y Redis siguen
+     * abiertos. Para las tareas periódicas y espera hasta [espera] a los reportes y correos en curso; lo que no termine
+     * queda reintentable.
+     */
+    suspend fun detenerTareas(espera: Duration) {
+        tareaMercado.detener()
+        tareaRescate.detener()
+        tareasSegundoPlano.esperarYCerrar(espera)
     }
 
     override fun close() {
-        tareasSegundoPlano.cancel()
+        tareasSegundoPlano.cancelar()
         tareaMercado.close()
+        tareaRescate.close()
+        servicioContextoMercado.close()
         clienteMercadoLaboral.close()
         clienteGooglePlay?.close()
         clienteHttpLlm.close()

@@ -1,6 +1,8 @@
 ﻿# Utilidades compartidas por las pruebas de punta a punta (E2E).
 # Se cargan con:  . "$PSScriptRoot/UTILIDAD_E2E.ps1"
 # Requieren PowerShell 7+, el backend corriendo y el contenedor de Postgres de src/DB/docker-compose.yml.
+# Sin Docker: definir E2E_PSQL con la ruta a psql.exe (ej. $env:E2E_PSQL = 'C:\ruta\pgsql\bin\psql.exe'); la fase 4
+# además necesita el contenedor de Redis para sus pruebas del límite por IP.
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -23,7 +25,21 @@ function Inicializar-E2E([string]$UrlBase, [string]$ContenedorBd) {
     Get-Content $archivoEnv | Where-Object { $_ -match '^\s*([A-Z_]+)\s*=\s*(.*)$' } |
         ForEach-Object { $variables[$Matches[1]] = $Matches[2].Trim() }
     $script:UsuarioBd = $variables['DB_USER']
-    $script:NombreBd = ($variables['DB_URL'] -replace '^.*/', '') -replace '\?.*$', ''
+    $script:ClaveBd = $variables['DB_PASS']
+    # jdbc:postgresql://host[:puerto]/bd[?params] o la forma corta jdbc:postgresql:bd (localhost:5432).
+    $url = [string]$variables['DB_URL']
+    $script:NombreBd = ($url -replace '^jdbc:postgresql:(//[^/]*/)?', '') -replace '\?.*$', ''
+    $script:HostBd = 'localhost'
+    $script:PuertoBd = '5432'
+    if ($url -match '^jdbc:postgresql://') {
+        # Host y puerto, para usar un psql local en vez de Docker (E2E_PSQL).
+        if ($url -match '^jdbc:postgresql://([^:/\[\],]+)(?::(\d+))?/') {
+            $script:HostBd = $Matches[1]
+            if ($Matches[2]) { $script:PuertoBd = $Matches[2] }
+        } elseif ($env:E2E_PSQL) {
+            throw "DB_URL no soportado con E2E_PSQL (IPv6 o varios hosts): $url"
+        }
+    }
 
     try {
         $salud = Llamar-Api GET '/health'
@@ -76,8 +92,26 @@ function Llamar-ApiEnParalelo([System.Net.Http.HttpRequestMessage[]]$Solicitudes
     $tareas | ForEach-Object { Convertir-Respuesta $_.Result }
 }
 
+<# SQL directo a la BD. Por defecto con `docker exec` al contenedor; si la variable de entorno E2E_PSQL apunta a un
+   psql.exe (PostgreSQL sin Docker), usa ese psql con el host, puerto y clave del .env. #>
 function Ejecutar-Sql([string]$Sql) {
-    $salida = docker exec $script:ContenedorBd psql -U $script:UsuarioBd -d $script:NombreBd -tAc $Sql 2>&1
+    $salida = if ($env:E2E_PSQL) {
+        # El SQL va por la entrada estándar en UTF-8: como argumento, psql.exe lo recibiría en la página ANSI de
+        # Windows y una 'é' llegaría a Postgres como un byte UTF-8 inválido. Clave y codificación solo para esta llamada.
+        $claveAnterior = $env:PGPASSWORD
+        $codificacionAnterior = $env:PGCLIENTENCODING
+        $OutputEncoding = [Text.UTF8Encoding]::new($false)
+        try {
+            $env:PGPASSWORD = $script:ClaveBd
+            $env:PGCLIENTENCODING = 'UTF8'
+            $Sql | & $env:E2E_PSQL -X -v ON_ERROR_STOP=1 -h $script:HostBd -p $script:PuertoBd -U $script:UsuarioBd -d $script:NombreBd -tA 2>&1
+        } finally {
+            $env:PGPASSWORD = $claveAnterior
+            $env:PGCLIENTENCODING = $codificacionAnterior
+        }
+    } else {
+        docker exec $script:ContenedorBd psql -U $script:UsuarioBd -d $script:NombreBd -tAc $Sql 2>&1
+    }
     if ($LASTEXITCODE -ne 0) { throw "SQL falló: $salida" }
     return ($salida | Out-String).Trim()
 }

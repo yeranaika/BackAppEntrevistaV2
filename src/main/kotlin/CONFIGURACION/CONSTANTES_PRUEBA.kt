@@ -1,5 +1,9 @@
 package CONFIGURACION
 
+import java.time.Duration
+import java.time.ZoneId
+import java.time.ZoneOffset
+
 /** Una respuesta abierta (0-100) cuenta como correcta desde este puntaje. */
 const val UMBRAL_RESPUESTA_CORRECTA = 60.0
 
@@ -39,6 +43,42 @@ const val UMBRAL_FORTALEZA = 75.0
 
 /** Generación del reporte: primer intento + reintentos manuales. */
 const val INTENTOS_MAXIMOS_REPORTE = 3
+
+/** Reporte de entrevista: evaluaciones con IA por usuario premium en cada mes calendario. 0 = sin IA. Se cambia con LIMITE_EVALUACIONES_IA_MENSUAL (D17). */
+const val EVALUACIONES_IA_MENSUALES_POR_DEFECTO = 30
+
+/** Zona en la que se corta el mes del tope de IA: UTC, como el resto de las fechas (TIMESTAMPTZ). */
+val ZONA_CORTE_CUOTA_IA: ZoneId = ZoneOffset.UTC
+
+/**
+ * Generación de preguntas con IA (admin): gasto máximo estimado en USD por mes calendario UTC, sumando las llamadas de
+ * todos los admins (también las fallidas, con su costo estimado). 0 = generación con IA desactivada. Se cambia con
+ * LIMITE_GASTO_GENERACION_IA_MENSUAL_USD (D23).
+ */
+const val GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO = 5.0
+
+/**
+ * Una reserva de IA en un reporte que sigue "generando" deja de contar pasado este tiempo (el servidor se reinició
+ * a mitad de la generación). La llamada al LLM tiene un tope de ~70 s, así que una generación real nunca dura tanto.
+ * También es el umbral desde el cual un reporte en "generando" se considera abandonado y se rescata (D20): debe ser
+ * mayor que la generación más larga posible (~2 × 70 s).
+ */
+val VIGENCIA_RESERVA_IA: Duration = Duration.ofMinutes(10)
+
+/** Espera máxima a reportes y correos en curso al apagar (D20). Un reporte con IA tarda hasta ~2 × 70 s. */
+const val ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO = 150
+
+/** error_detalle de un reporte cortado por un apagado o una caída: el intento no cuenta y se puede reintentar. */
+const val CODIGO_GENERACION_INTERRUMPIDA = "generacion_interrumpida"
+
+/** Cada cuánto se buscan reportes interrumpidos (también al arrancar). */
+val INTERVALO_RESCATE_REPORTES: Duration = Duration.ofMinutes(5)
+
+/** Solo se rescatan entrevistas finalizadas sin reporte dentro de esta ventana (no datos anteriores a la Fase 7). */
+val VENTANA_RESCATE_SESIONES: Duration = Duration.ofHours(24)
+
+/** Máximo de entrevistas sin reporte que se rescatan por pasada. */
+const val LIMITE_RESCATE_SESIONES = 100
 
 /** Progreso por skill: últimos N puntos (skill × entrevista). */
 const val PUNTOS_PROGRESO_LIMITE = 200

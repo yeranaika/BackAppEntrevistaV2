@@ -25,6 +25,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -150,6 +152,59 @@ class PruebaControladorPregunta {
         // La ruta antigua sigue respondiendo igual.
         assertEquals(HttpStatusCode.Created, enviar("POST", "/api/v1/admin/questions/generate-ai", pedido, admin).status)
         assertEquals("4", enviar("GET", "$base?generadaPorIa=true&estado=pendiente", token = admin).objeto().texto("total"))
+    }
+
+    @Test
+    fun `al agotar el tope mensual responde 429 con un codigo que el panel puede mostrar`() = testApplication {
+        val proveedor = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+        // gpt-4o-mini con 100 + 200 tokens cuesta ~USD 0.000135: la primera llamada agota un tope de 0.0001.
+        val sistema = SistemaPrueba(proveedorIa = proveedor, topeGastoGeneracionIaUsd = 0.0001)
+        application { sistema.montar(this) }
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val (cargoId, _) = sistema.crearCatalogo()
+        val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":1,"tipo":"abierta_texto","categoria":"blanda"}"""
+
+        // Lo que ve el panel en Costos IA es lo mismo que decide el 429 (D28): misma instancia, mismo reloj (el real).
+        val antes = topeEnCostosIa(admin)
+        assertFalse(antes["estaAgotado"]!!.jsonPrimitive.boolean)
+        assertEquals(0.0, antes["gastadoUsd"]!!.jsonPrimitive.double, 0.0)
+
+        assertEquals(HttpStatusCode.Created, enviar("POST", "$base/generar-ia", pedido, admin).status)
+        val despues = topeEnCostosIa(admin)
+        assertTrue(despues["estaAgotado"]!!.jsonPrimitive.boolean, "el panel ya sabe que la próxima da 429")
+        assertEquals(0.000135, despues["gastadoUsd"]!!.jsonPrimitive.double, 1e-9)
+        assertEquals(0.0, despues["restanteUsd"]!!.jsonPrimitive.double, 0.0, "nunca negativo")
+
+        val agotado = enviar("POST", "$base/generar-ia", pedido, admin)
+        assertEquals(HttpStatusCode.TooManyRequests, agotado.status)
+        assertEquals("tope_generacion_ia_alcanzado", agotado.objeto().texto("error"))
+        assertTrue(!agotado.objeto().texto("mensaje").isNullOrBlank())
+        assertEquals(1, proveedor.solicitudes.size)
+    }
+
+    private suspend fun ApplicationTestBuilder.topeEnCostosIa(admin: String): JsonObject =
+        enviar("GET", "/api/v1/admin/costos-ia", token = admin).objeto()["topeGeneracionPreguntas"]!!.jsonObject
+
+    @Test
+    fun `el limite por IP de generar-ia es comun a la ruta nueva y al alias y no lo gasta un no admin`() = testApplication {
+        val proveedor = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+        val sistema = SistemaPrueba(
+            proveedorIa = proveedor,
+            limites = CONFIGURACION.ConfiguracionLimites(registrosPorIp = 1_000, recuperacionesPorIp = 1_000, generacionesIaPorIp = 1)
+        )
+        application { sistema.montar(this) }
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val usuario = tokenDe(sistema, "ana@ejemplo.com")
+        val (cargoId, _) = sistema.crearCatalogo()
+        val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":1,"tipo":"abierta_texto","categoria":"blanda"}"""
+
+        // Un no admin recibe 403 antes del límite: no consume el cupo de la IP.
+        repeat(2) { assertEquals(HttpStatusCode.Forbidden, enviar("POST", "$base/generar-ia", pedido, usuario).status) }
+        assertEquals(HttpStatusCode.Created, enviar("POST", "$base/generar-ia", pedido, admin).status)
+        val alias = enviar("POST", "/api/v1/admin/questions/generate-ai", pedido, admin)
+        assertEquals(HttpStatusCode.TooManyRequests, alias.status)
+        assertEquals("demasiadas_solicitudes", alias.objeto().texto("error"))
+        assertEquals(1, proveedor.solicitudes.size)
     }
 
     @Test

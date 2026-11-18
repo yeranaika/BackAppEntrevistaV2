@@ -1,5 +1,7 @@
 package PRUEBAS
 
+import CONFIGURACION.CODIGO_GENERACION_INTERRUMPIDA
+import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ESQUEMAS.SolicitudRegistro
@@ -21,21 +23,37 @@ import SERVICIOS.EvaluadorEntrevista
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.PedidoEntrevista
 import SERVICIOS.RespuestaUsuario
+import SERVICIOS.ServicioCupoIa
 import SERVICIOS.ServicioReporteEntrevista
+import UTILIDADES.TareasSegundoPlano
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+
+private val ENERO: Instant = Instant.parse("2026-01-01T00:00:00Z")
+private val FEBRERO: Instant = Instant.parse("2026-02-01T00:00:00Z")
 
 class PruebaServicioReporte {
     private val sistema = SistemaPrueba()
@@ -72,9 +90,12 @@ class PruebaServicioReporte {
         usuario: UUID = ana,
         aciertaAlternativas: Boolean = true,
         textoBlandas: String? = "no sé",
-        textoTecnicas: String = ideal
+        textoTecnicas: String = ideal,
+        /** Se ejecuta con la sesión ya servida y antes de responder (p. ej. para editar el banco). */
+        antesDeResponder: (SesionEntrevista) -> Unit = {}
     ): SesionEntrevista = runBlocking {
         val sesion = sistema.entrevista.iniciar(usuario, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+        antesDeResponder(sesion)
         val respuestas = sesion.preguntas.mapNotNull { p ->
             when {
                 p.tipo == TipoPregunta.OPCION_MULTIPLE ->
@@ -91,10 +112,16 @@ class PruebaServicioReporte {
         sistema.reportesRepo.buscarPorSesion(sesion.id)!!
     }
 
-    private fun servicioCon(evaluadorIa: EvaluadorEntrevista?) = ServicioReporteEntrevista(
+    private fun servicioCon(evaluadorIa: EvaluadorEntrevista?, tope: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO) = ServicioReporteEntrevista(
         sistema.reportesRepo, sistema.sesionesEntrevista, sistema.metricasVideo, sistema.preguntas, sistema.mercadoRepo, sistema.nivelesSkill,
-        sistema.evaluadorEntrevistaGratis, evaluadorIa, sistema.premium, CoroutineScope(Dispatchers.IO), sistema.reloj
+        sistema.evaluadorEntrevistaGratis, evaluadorIa, sistema.premium, CoroutineScope(Dispatchers.IO), sistema.reloj,
+        evaluacionesIaMensuales = tope
     )
+
+    private fun ia(proveedor: ProveedorEvaluacionFalso) = EvaluadorEntrevistaIa(proveedor, "gpt-4o-mini", sistema.evaluadorEntrevistaGratis)
+
+    /** Evaluaciones con IA entregadas a [usuario] en enero de 2026 (el mes en que arranca el reloj de prueba). */
+    private fun usadasEnEnero(usuario: UUID = ana): Long = runBlocking { sistema.reportesRepo.contarEvaluacionesIa(usuario, ENERO, FEBRERO) }
 
     private fun esperarFin(sesionId: UUID): ReporteEntrevista = runBlocking {
         withTimeout(10_000) {
@@ -104,6 +131,59 @@ class PruebaServicioReporte {
                 delay(20)
             }
             @Suppress("UNREACHABLE_CODE") error("inalcanzable")
+        }
+    }
+
+    /** Cambia la rúbrica de las preguntas abiertas técnicas en el banco (como si un admin la editara). */
+    private fun cambiarRubricaEnBanco(sesion: SesionEntrevista, json: String) {
+        val ids = sesion.preguntas.filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+            .mapNotNull { it.preguntaId }
+        org.jetbrains.exposed.sql.transactions.transaction {
+            ids.forEach { id ->
+                MODELOS.TablaPregunta.update({ MODELOS.TablaPregunta.preguntaId eq id }) {
+                    it[MODELOS.TablaPregunta.rubricaEvaluacion] = Json.parseToJsonElement(json).jsonObject
+                }
+            }
+        }
+    }
+
+    private fun abiertasTecnicas(sesion: SesionEntrevista) = runBlocking {
+        sistema.sesionesEntrevista.buscar(sesion.id)!!.preguntas
+            .filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+    }
+
+    // ---------- Rúbrica copiada al servir la pregunta (D24) ----------
+
+    @Test
+    fun `editar la rubrica del banco despues de servir la pregunta no cambia la evaluacion`() {
+        val sesion = entrevistaFinalizada(antesDeResponder = { servida ->
+            val copias = servida.preguntas.filter { it.tipo == TipoPregunta.ABIERTA_TEXTO && it.categoria == CategoriaHabilidad.TECNICA }
+            assertEquals(2, copias.size)
+            assertTrue(copias.all { SERVICIOS.palabrasClaveDe(it.rubrica) == listOf("corrutina", "hilo") })
+            cambiarRubricaEnBanco(servida, """{"palabras_clave":["inmutabilidad","sellada"]}""")
+        })
+        assertEquals(EstadoReporte.LISTO, generar(sesion).estado)
+        // La respuesta es la ideal: con la rúbrica copiada (corrutina, hilo) cubre todo; con la del banco quedaría en 60.
+        abiertasTecnicas(sesion).forEach { pregunta ->
+            assertTrue(pregunta.puntaje!!.toDouble() > 90.0, "puntaje ${pregunta.puntaje}")
+            assertTrue(!pregunta.feedback.toString().contains("inmutabilidad"))
+        }
+    }
+
+    @Test
+    fun `una fila sin copia de la rubrica anterior a la migracion 022 usa la del banco`() {
+        val sesion = entrevistaFinalizada(antesDeResponder = { servida ->
+            org.jetbrains.exposed.sql.transactions.transaction {
+                MODELOS.TablaSesionPreguntaRespuesta.update({ MODELOS.TablaSesionPreguntaRespuesta.sesionId eq servida.id }) {
+                    it[MODELOS.TablaSesionPreguntaRespuesta.rubrica] = null
+                }
+            }
+            cambiarRubricaEnBanco(servida, """{"palabras_clave":["inmutabilidad","sellada"]}""")
+        })
+        assertEquals(EstadoReporte.LISTO, generar(sesion).estado)
+        abiertasTecnicas(sesion).forEach { pregunta ->
+            assertTrue(pregunta.puntaje!!.toDouble() < 90.0, "puntaje ${pregunta.puntaje}")
+            assertTrue(pregunta.feedback.toString().contains("inmutabilidad"))
         }
     }
 
@@ -118,7 +198,7 @@ class PruebaServicioReporte {
         assertNull(reporte.uso)
         assertTrue(reporte.puntajeTecnico.toDouble() > 90, "alternativas correctas y abiertas iguales a la ideal: ${reporte.puntajeTecnico}")
         assertTrue(reporte.puntajeBlando.toDouble() < 30, "\"no sé\" en las blandas: ${reporte.puntajeBlando}")
-        assertEquals(0, BigDecimal.ZERO.compareTo(reporte.puntajeLenguajeCorporal), "sin métricas de video")
+        assertNull(reporte.puntajeLenguajeCorporal, "sin métricas de video no se midió: null, no 0")
         val esperado = (reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3) / 0.8
         assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02, "sin video el peso se reparte entre técnico y blando")
 
@@ -131,6 +211,19 @@ class PruebaServicioReporte {
         assertTrue("Reforzar Habilidades blandas" in reporte.areasMejora)
         assertTrue(reporte.recomendaciones.isEmpty(), "Kotlin está bien")
         assertTrue(reporte.resumen!!.contains("Android Developer"))
+        assertTrue(
+            reporte.resumen!!.startsWith("Obtuviste ${reporte.puntajeGlobal.toDouble().roundToInt()}/100"),
+            "el resumen usa el mismo entero que muestra la app: ${reporte.puntajeGlobal} → ${reporte.resumen}"
+        )
+    }
+
+    @Test
+    fun `el puntaje del resumen se redondea como en la app y no se trunca`() {
+        assertEquals(79, SERVICIOS.puntajeEnteroVisible(78.81), "caso visto en el emulador: anillo 79, texto 78")
+        assertEquals(79, SERVICIOS.puntajeEnteroVisible(78.495), "se guarda 78.50 y la app muestra 79")
+        assertEquals(78, SERVICIOS.puntajeEnteroVisible(78.494))
+        assertEquals(100, SERVICIOS.puntajeEnteroVisible(100.0))
+        assertEquals(0, SERVICIOS.puntajeEnteroVisible(0.0))
     }
 
     @Test
@@ -167,18 +260,34 @@ class PruebaServicioReporte {
     @Test
     fun `las metricas de video dan el puntaje corporal y entran al global`() = runBlocking<Unit> {
         val sesion = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
-        val metrica = { ms: Long, expresion: String -> MetricaVideo(ms, BigDecimal("40"), BigDecimal("50"), BigDecimal("60"), null, expresion) }
-        sistema.entrevista.registrarMetricas(ana, sesion.id, listOf(metrica(0, "nervioso"), metrica(500, "nervioso"), metrica(1000, "seguro")))
+        val metrica = { ms: Long -> MetricaVideo(ms, BigDecimal("40"), BigDecimal("50"), BigDecimal("60"), null) }
+        sistema.entrevista.registrarMetricas(ana, sesion.id, listOf(metrica(0), metrica(500), metrica(1000)))
         val p = sesion.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
         val finalizada = sistema.entrevista.responderYFinalizar(ana, sesion.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id)))
 
         val reporte = generar(finalizada)
 
-        assertEquals(0, BigDecimal(50).compareTo(reporte.puntajeLenguajeCorporal))
+        assertEquals(0, BigDecimal(50).compareTo(reporte.puntajeLenguajeCorporal!!))
         val esperado = reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3 + 50 * 0.2
         assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02)
         assertTrue(reporte.areasMejora.any { it.contains("contacto visual") })
-        assertTrue(reporte.areasMejora.any { it.contains("nervioso") })
+        assertTrue(reporte.areasMejora.none { it.contains("Se te notó") }, "nunca se infieren emociones (RNF10)")
+    }
+
+    @Test
+    fun `ventanas sin evidencia no dan lenguaje corporal 0 sino sin medir`() = runBlocking<Unit> {
+        val sesion = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+        // La app manda ventanas vacías cuando el detector no está seguro de lo que vio.
+        sistema.entrevista.registrarMetricas(ana, sesion.id, (0 until 5).map { MetricaVideo(it * 500L, null, null, null, null) })
+        val p = sesion.preguntas.first { it.tipo == TipoPregunta.OPCION_MULTIPLE }
+        val finalizada = sistema.entrevista.responderYFinalizar(ana, sesion.id, listOf(RespuestaUsuario(p.id, opcionId = p.opcionCorrecta!!.id)))
+
+        val reporte = generar(finalizada)
+
+        assertNull(reporte.puntajeLenguajeCorporal)
+        val esperado = (reporte.puntajeTecnico.toDouble() * 0.5 + reporte.puntajeBlando.toDouble() * 0.3) / 0.8
+        assertEquals(esperado, reporte.puntajeGlobal.toDouble(), 0.02, "el peso corporal se reparte")
+        assertTrue(reporte.areasMejora.none { it.contains("contacto visual") })
     }
 
     // ---------- IA (premium) ----------
@@ -214,6 +323,19 @@ class PruebaServicioReporte {
     }
 
     @Test
+    fun `una respuesta invalida del LLM queda registrada como gasto aunque el reporte sea freemium`() {
+        sistema.premium.esPremium = true
+        val respondioMal = generar(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso("json_roto"))))
+        assertEquals(ModoEvaluacion.FREEMIUM, respondioMal.modo, "el usuario recibe el reporte freemium")
+        val uso = assertNotNull(respondioMal.uso, "pero los tokens que se pagaron quedan registrados")
+        assertEquals(10, uso.tokensEntrada)
+        assertEquals(0, usadasEnEnero(), "no descuenta del tope: no recibió IA")
+
+        val noRespondio = generar(entrevistaFinalizada(usuario = nuevoUsuario("beto@ejemplo.com")), servicioCon(ia(ProveedorEvaluacionFalso("caido"))))
+        assertNull(noRespondio.uso, "si el LLM no respondió no hubo gasto")
+    }
+
+    @Test
     fun `sin premium nunca se llama al LLM`() {
         val proveedor = ProveedorEvaluacionFalso()
         val reporte = generar(entrevistaFinalizada(), servicioCon(EvaluadorEntrevistaIa(proveedor, "gpt-4o-mini", sistema.evaluadorEntrevistaGratis)))
@@ -231,6 +353,371 @@ class PruebaServicioReporte {
         servicio.procesar(sesion)
         assertEquals(1, proveedor.solicitudes.size, "no paga dos veces la misma evaluación")
         assertEquals(1, sistema.reportesRepo.buscarPorSesion(sesion.id)!!.intentos)
+    }
+
+    // ---------- Tope mensual de IA (D17) ----------
+
+    @Test
+    fun `con el tope mensual alcanzado el premium recibe el reporte freemium sin llamar al LLM`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 2)
+
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+        val tercero = generar(entrevistaFinalizada(), servicio)
+
+        assertEquals(EstadoReporte.LISTO, tercero.estado, "el reporte sale igual, sin error")
+        assertEquals(ModoEvaluacion.FREEMIUM, tercero.modo)
+        assertNull(tercero.uso, "sin costo registrado")
+        assertTrue(!tercero.resumen.isNullOrBlank())
+        assertEquals(2, proveedor.solicitudes.size, "el LLM solo se pagó dos veces")
+        assertEquals(2, usadasEnEnero())
+    }
+
+    @Test
+    fun `al cambiar de mes el premium vuelve a tener evaluaciones con IA`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo)
+        sistema.reloj.adelantar(Duration.ofDays(31))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "en febrero el cupo empieza de nuevo")
+        assertEquals(2, proveedor.solicitudes.size)
+    }
+
+    @Test
+    fun `el tope es por usuario`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        val beto = nuevoUsuario("beto@ejemplo.com")
+
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "ana agotó su cupo")
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(usuario = beto), servicio).modo, "beto conserva el suyo")
+    }
+
+    @Test
+    fun `con tope cero nunca se llama al LLM aunque sea premium`() {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val reporte = generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 0))
+        assertEquals(EstadoReporte.LISTO, reporte.estado)
+        assertEquals(ModoEvaluacion.FREEMIUM, reporte.modo)
+        assertTrue(proveedor.solicitudes.isEmpty())
+    }
+
+    @Test
+    fun `una evaluacion con IA que cae al freemium no consume cupo`() {
+        val proveedor = ProveedorEvaluacionFalso("caido")
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo)
+        assertEquals(0, usadasEnEnero(), "el usuario no recibió IA")
+        proveedor.modo = "valido"
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "el cupo seguía disponible")
+        assertEquals(1, usadasEnEnero())
+    }
+
+    @Test
+    fun `un reporte en error libera su cupo y el reintento respeta el tope`() = runBlocking<Unit> {
+        var falla = true
+        var llamadasIa = 0
+        val evaluador = EvaluadorEntrevista { contexto ->
+            llamadasIa++
+            if (falla) error("se cayó la BD a mitad del reporte") else sistema.evaluadorEntrevistaGratis.evaluar(contexto)
+        }
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(evaluador, tope = 1)
+        val sesion = entrevistaFinalizada()
+
+        val conError = generar(sesion, servicio)
+        assertEquals(EstadoReporte.ERROR, conError.estado)
+        assertEquals(1, llamadasIa, "tenía cupo: se usó la IA")
+        assertEquals(ModoEvaluacion.FREEMIUM, conError.modo, "el cupo reservado se devolvió")
+
+        // Con el cupo libre, otra entrevista sí recibe IA y lo agota.
+        val proveedor = ProveedorEvaluacionFalso()
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 1)).modo)
+
+        falla = false
+        servicio.reintentar(ana, sesion.id)
+        val listo = esperarFin(sesion.id)
+        assertEquals(EstadoReporte.LISTO, listo.estado, "el reintento funciona aunque el tope ya esté usado")
+        assertEquals(1, llamadasIa, "el reintento no volvió a llamar a la IA: el cupo del mes ya estaba agotado")
+        assertEquals(ModoEvaluacion.FREEMIUM, listo.modo)
+        assertEquals(1, usadasEnEnero())
+    }
+
+    @Test
+    fun `una evaluacion reservada al final del mes cuenta en ese mes aunque termine en el siguiente`() {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        // La llamada al LLM tarda 1 minuto: la reserva es el 31 de enero y el resultado se guarda el 1 de febrero.
+        val lenta = EvaluadorEntrevista { contexto -> sistema.reloj.adelantar(Duration.ofMinutes(1)); ia(proveedor).evaluar(contexto) }
+        val servicio = servicioCon(lenta, tope = 1)
+        sistema.reloj.adelantar(Duration.between(ENERO, FEBRERO).minusSeconds(10))
+
+        val cruzada = generar(entrevistaFinalizada(), servicio)
+
+        assertEquals(ModoEvaluacion.IA, cruzada.modo)
+        assertTrue(cruzada.fecha < FEBRERO, "queda con la fecha de la reserva: ${cruzada.fecha}")
+        assertEquals(1, usadasEnEnero())
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(ia(proveedor), tope = 1)).modo, "febrero empieza con su cupo completo")
+    }
+
+    @Test
+    fun `dos reportes simultaneos del mismo usuario no superan el tope`() = runBlocking<Unit> {
+        val proveedor = ProveedorEvaluacionFalso()
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        val sesiones = listOf(entrevistaFinalizada(), entrevistaFinalizada())
+
+        sesiones.map { async(Dispatchers.IO) { servicio.procesar(it) } }.awaitAll()
+
+        val modos = sesiones.map { sistema.reportesRepo.buscarPorSesion(it.id)!! }.onEach { assertEquals(EstadoReporte.LISTO, it.estado) }.map { it.modo }
+        assertEquals(1, modos.count { it == ModoEvaluacion.IA }, modos.toString())
+        assertEquals(1, modos.count { it == ModoEvaluacion.FREEMIUM }, modos.toString())
+        assertEquals(1, proveedor.solicitudes.size)
+    }
+
+    @Test
+    fun `una reserva huerfana de hace mas de diez minutos no cuenta`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        val servicio = servicioCon(ia(proveedor), tope = 1)
+        // El servidor se reinició a mitad de la generación: el reporte quedó 'generando' con el cupo reservado.
+        val huerfana = entrevistaFinalizada()
+        val ahora = sistema.reloj.instant()
+        sistema.reportesRepo.crearPendiente(huerfana.id, ahora)
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3, ahora))
+        assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
+
+        assertEquals(ModoEvaluacion.FREEMIUM, generar(entrevistaFinalizada(), servicio).modo, "la reserva todavía está vigente")
+        sistema.reloj.adelantar(Duration.ofMinutes(11))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo, "pasados 10 minutos la reserva ya no cuenta")
+    }
+
+    // ---------- Cupo de IA que ve el premium (D29) ----------
+
+    /** Lo que ve la app: el mismo repositorio y el mismo reloj que la reserva del reporte. */
+    private fun cupo(tope: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO, iaDisponible: Boolean = true) =
+        ServicioCupoIa(sistema.reportesRepo, tope, iaDisponible, sistema.reloj)
+
+    private fun restantes(servicio: ServicioCupoIa, usuario: UUID = ana): Int = runBlocking { servicio.consultar(usuario)!!.restantes }
+
+    @Test
+    fun `el cupo descuenta los reportes con IA del mes y dice cuando se renueva`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 3)
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+
+        val cupo = cupo(tope = 3).consultar(ana)!!
+
+        assertEquals(3, cupo.limite)
+        assertEquals(1, cupo.restantes)
+        assertEquals(FEBRERO, cupo.renovacion)
+    }
+
+    @Test
+    fun `una IA que cae al freemium no descuenta del cupo`() {
+        sistema.premium.esPremium = true
+        generar(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso("caido")), tope = 2))
+        assertEquals(2, restantes(cupo(tope = 2)))
+    }
+
+    @Test
+    fun `quedan reportes con IA si y solo si el siguiente reporte sale con IA`() {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 2)
+        repeat(3) { paso ->
+            val quedaban = restantes(cupo(tope = 2)) > 0
+            val modo = generar(entrevistaFinalizada(), servicio).modo
+            assertEquals(quedaban, modo == ModoEvaluacion.IA, "paso $paso")
+        }
+        assertEquals(0, restantes(cupo(tope = 2)))
+    }
+
+    @Test
+    fun `una reserva en curso descuenta y deja de contar a los diez minutos`() = runBlocking<Unit> {
+        // El servidor se reinició a mitad de la generación: el reporte quedó 'generando' con el cupo reservado.
+        val huerfana = entrevistaFinalizada()
+        val ahora = sistema.reloj.instant()
+        sistema.reportesRepo.crearPendiente(huerfana.id, ahora)
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(huerfana.id, 3, ahora))
+        assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
+
+        assertEquals(0, restantes(cupo(tope = 1)), "mientras se genera, ese cupo está tomado")
+        sistema.reloj.adelantar(Duration.ofMinutes(9))
+        assertEquals(0, restantes(cupo(tope = 1)), "a los 9 minutos la reserva sigue vigente, igual que para reservar")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(1, restantes(cupo(tope = 1)), "a los 11 minutos la reserva caducó")
+    }
+
+    @Test
+    fun `una reserva al final del mes cuenta en ese mes y el mes siguiente empieza completo`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val proveedor = ProveedorEvaluacionFalso()
+        // La llamada al LLM tarda 1 minuto: la reserva es el 31 de enero y el resultado se guarda el 1 de febrero.
+        val lenta = EvaluadorEntrevista { contexto -> sistema.reloj.adelantar(Duration.ofMinutes(1)); ia(proveedor).evaluar(contexto) }
+        sistema.reloj.adelantar(Duration.between(ENERO, FEBRERO).minusSeconds(10))
+        assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicioCon(lenta, tope = 1)).modo)
+
+        val ahora = sistema.reloj.instant()
+        assertEquals(1, sistema.reportesRepo.contarCupoIaUsado(ana, ENERO, FEBRERO, ahora.minusSeconds(600)), "cuenta en enero")
+        val febrero = cupo(tope = 1).consultar(ana)!!
+        assertEquals(1, febrero.restantes, "febrero empieza con su cupo completo")
+        assertEquals(Instant.parse("2026-03-01T00:00:00Z"), febrero.renovacion)
+    }
+
+    @Test
+    fun `si se baja el limite a mitad de mes los restantes quedan en 0 y nunca negativos`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val servicio = servicioCon(ia(ProveedorEvaluacionFalso()), tope = 2)
+        repeat(2) { assertEquals(ModoEvaluacion.IA, generar(entrevistaFinalizada(), servicio).modo) }
+
+        val conLimiteMenor = cupo(tope = 1).consultar(ana)!!
+
+        assertEquals(2L, conLimiteMenor.usadas)
+        assertEquals(0, conLimiteMenor.restantes)
+    }
+
+    @Test
+    fun `sin IA configurada o con limite 0 no hay cupo que mostrar`() = runBlocking<Unit> {
+        assertNull(cupo(iaDisponible = false).consultar(ana))
+        assertNull(cupo(tope = 0).consultar(ana))
+    }
+
+    // ---------- Apagado ordenado y rescate (D20) ----------
+
+    /** Deja el reporte de [sesion] tomado para generar ahora ('generando', un intento más). */
+    private fun tomado(sesion: SesionEntrevista): ReporteEntrevista = runBlocking {
+        sistema.reportesRepo.crearPendiente(sesion.id, sistema.reloj.instant())
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant()))
+        sistema.reportesRepo.buscarPorSesion(sesion.id)!!
+    }
+
+    private fun reporteDe(sesion: SesionEntrevista) = runBlocking { sistema.reportesRepo.buscarPorSesion(sesion.id)!! }
+
+    @Test
+    fun `un apagado a mitad deja el reporte reintentable al instante`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        var bloquear = true
+        val empezo = CompletableDeferred<Unit>()
+        val lento = EvaluadorEntrevista { contexto ->
+            if (bloquear) { empezo.complete(Unit); awaitCancellation() }
+            sistema.evaluadorEntrevistaGratis.evaluar(contexto)
+        }
+        val servicio = servicioCon(lento)
+        val sesion = entrevistaFinalizada()
+        val tareas = TareasSegundoPlano(Dispatchers.IO)
+        tareas.launch { servicio.procesar(sesion) }
+        empezo.await()
+        assertEquals(ModoEvaluacion.IA, reporteDe(sesion).modo, "tenía un cupo de IA reservado")
+
+        assertEquals(1, tareas.esperarYCerrar(0.seconds), "apagado sin tiempo de espera")
+
+        val interrumpido = reporteDe(sesion)
+        assertEquals(EstadoReporte.ERROR, interrumpido.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, interrumpido.errorDetalle)
+        assertEquals(ModoEvaluacion.FREEMIUM, interrumpido.modo, "el cupo de IA se devolvió")
+        assertEquals(0, interrumpido.intentos, "el intento cortado no cuenta")
+
+        bloquear = false
+        servicio.reintentar(ana, sesion.id)
+        assertEquals(EstadoReporte.LISTO, esperarFin(sesion.id).estado, "el usuario lo genera de nuevo")
+    }
+
+    @Test
+    fun `un timeout interno sigue siendo un error normal`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val conTimeout = EvaluadorEntrevista { withTimeout(1) { delay(1_000) }; error("inalcanzable") }
+        val reporte = generar(entrevistaFinalizada(), servicioCon(conTimeout))
+        assertEquals(EstadoReporte.ERROR, reporte.estado)
+        assertEquals("error_interno", reporte.errorDetalle, "no se confunde con un apagado")
+        assertEquals(1, reporte.intentos, "este intento sí cuenta")
+    }
+
+    @Test
+    fun `el rescate deja reintentable un reporte abandonado pasados diez minutos`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        sistema.reloj.adelantar(Duration.ofMinutes(9))
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "a los 9 minutos todavía puede estar generándose")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(1, sistema.reporte.rescatarInterrumpidos())
+
+        val rescatado = reporteDe(sesion)
+        assertEquals(EstadoReporte.ERROR, rescatado.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, rescatado.errorDetalle)
+        assertEquals(ModoEvaluacion.FREEMIUM, rescatado.modo)
+        assertEquals(0, rescatado.intentos)
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "una segunda pasada no hace nada")
+    }
+
+    @Test
+    fun `el rescate no toca un reintento recien tomado`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        sistema.reportesRepo.marcarError(sesion.id, "error_interno", sistema.reloj.instant())
+        sistema.reloj.adelantar(Duration.ofHours(3))
+        // El usuario reintenta ahora: el intento queda fechado ahora, no hace 3 horas.
+        assertTrue(sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant()))
+
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos())
+        assertEquals(EstadoReporte.GENERANDO, reporteDe(sesion).estado)
+    }
+
+    @Test
+    fun `un intento interrumpido no cuenta para el maximo de reintentos`() = runBlocking<Unit> {
+        val sesion = entrevistaFinalizada()
+        tomado(sesion)
+        repeat(2) {
+            sistema.reportesRepo.marcarError(sesion.id, "error_interno", sistema.reloj.instant())
+            sistema.reportesRepo.tomarParaGenerar(sesion.id, 3, sistema.reloj.instant())
+        }
+        assertEquals(3, reporteDe(sesion).intentos, "el tercer intento se cortó por una caída")
+        sistema.reloj.adelantar(Duration.ofMinutes(11))
+        sistema.reporte.rescatarInterrumpidos()
+
+        assertEquals(2, reporteDe(sesion).intentos)
+        sistema.reporte.reintentar(ana, sesion.id) // no responde reintentos_agotados
+        assertEquals(EstadoReporte.LISTO, esperarFin(sesion.id).estado)
+    }
+
+    @Test
+    fun `el rescate crea el reporte de una entrevista finalizada que se quedo sin el`() = runBlocking<Unit> {
+        val antigua = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofHours(25))
+        val huerfana = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofMinutes(6))
+        val reciente = entrevistaFinalizada()
+        sistema.reloj.adelantar(Duration.ofMinutes(5))
+        val enCurso = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
+
+        assertEquals(1, sistema.reporte.rescatarInterrumpidos())
+
+        val rescatado = reporteDe(huerfana)
+        assertEquals(EstadoReporte.ERROR, rescatado.estado)
+        assertEquals(CODIGO_GENERACION_INTERRUMPIDA, rescatado.errorDetalle)
+        assertEquals(0, rescatado.intentos)
+        listOf(antigua, reciente).forEach { assertNull(sistema.reportesRepo.buscarPorSesion(it.id), "fuera de la ventana") }
+        assertNull(sistema.reportesRepo.buscarPorSesion(enCurso.id), "una entrevista en curso no se toca")
+    }
+
+    @Test
+    fun `el rescate no toca reportes terminados`() = runBlocking<Unit> {
+        val lista = entrevistaFinalizada().also { generar(it) }
+        val conError = entrevistaFinalizada().also { tomado(it) }
+        sistema.reportesRepo.marcarError(conError.id, "error_interno", sistema.reloj.instant())
+        sistema.reloj.adelantar(Duration.ofHours(1))
+
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos())
+        assertEquals(EstadoReporte.LISTO, reporteDe(lista).estado)
+        assertEquals("error_interno", reporteDe(conError).errorDetalle)
     }
 
     // ---------- Errores y reintentos ----------

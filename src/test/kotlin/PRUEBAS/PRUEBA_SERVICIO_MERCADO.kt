@@ -95,7 +95,9 @@ class PruebaServicioMercado {
         sistema.mercado.tendencias(null, 10)
         assertTrue(sistema.cache.valores.keys.any { it.startsWith("mercado:tendencias") })
         sistema.tendencias.sincronizar()
-        assertTrue(sistema.cache.valores.isEmpty())
+        assertTrue(sistema.cache.valores.keys.none { it.startsWith("mercado:") }, sistema.cache.valores.keys.toString())
+        // Las ofertas que trajo la sincronización quedan guardadas para la generación de preguntas (D26).
+        assertTrue(sistema.cache.valores.keys.all { it.startsWith(INTEGRACIONES.PREFIJO_CACHE_OFERTAS) })
     }
 
     // ---------- Validaciones ----------
