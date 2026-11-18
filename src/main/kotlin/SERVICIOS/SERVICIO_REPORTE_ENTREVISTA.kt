@@ -52,6 +52,14 @@ import java.math.RoundingMode
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
+import kotlin.math.roundToInt
+
+/**
+ * Puntaje entero que ve la persona: el guardado con 2 decimales (HALF_UP) y redondeado al entero, igual que lo muestra
+ * la app (`roundToInt` sobre `puntaje_global`). Truncar en el texto hacía que el resumen dijera 78 con un anillo en 79.
+ */
+internal fun puntajeEnteroVisible(valor: Double): Int =
+    BigDecimal.valueOf(valor).setScale(2, RoundingMode.HALF_UP).toDouble().roundToInt()
 
 /** ¿El usuario tiene premium? (decide si sus respuestas se evalúan con IA). */
 fun interface VerificadorPremium {
@@ -360,7 +368,7 @@ class ServicioReporteEntrevista(
     }
 
     private fun resumen(sesion: SesionEntrevista, global: Double, detalles: List<DetalleSkillReporte>): String {
-        val base = "Obtuviste ${global.toInt()}/100 en tu entrevista para ${sesion.cargoObjetivo} (nivel ${nombreNivel(sesion.nivel)})."
+        val base = "Obtuviste ${puntajeEnteroVisible(global)}/100 en tu entrevista para ${sesion.cargoObjetivo} (nivel ${nombreNivel(sesion.nivel)})."
         val mejor = detalles.firstOrNull()?.takeIf { it.puntaje.toDouble() >= UMBRAL_NIVEL_LOGRADO }?.let { " Tu mejor resultado fue en ${it.nombre}." }.orEmpty()
         val reforzar = detalles.filter { it.puntaje.toDouble() < UMBRAL_NIVEL_LOGRADO }.takeIf { it.isNotEmpty() }
             ?.let { lista -> " Conviene reforzar ${lista.take(3).joinToString(", ") { it.nombre }}." }.orEmpty()

@@ -44,6 +44,7 @@ import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -210,6 +211,19 @@ class PruebaServicioReporte {
         assertTrue("Reforzar Habilidades blandas" in reporte.areasMejora)
         assertTrue(reporte.recomendaciones.isEmpty(), "Kotlin está bien")
         assertTrue(reporte.resumen!!.contains("Android Developer"))
+        assertTrue(
+            reporte.resumen!!.startsWith("Obtuviste ${reporte.puntajeGlobal.toDouble().roundToInt()}/100"),
+            "el resumen usa el mismo entero que muestra la app: ${reporte.puntajeGlobal} → ${reporte.resumen}"
+        )
+    }
+
+    @Test
+    fun `el puntaje del resumen se redondea como en la app y no se trunca`() {
+        assertEquals(79, SERVICIOS.puntajeEnteroVisible(78.81), "caso visto en el emulador: anillo 79, texto 78")
+        assertEquals(79, SERVICIOS.puntajeEnteroVisible(78.495), "se guarda 78.50 y la app muestra 79")
+        assertEquals(78, SERVICIOS.puntajeEnteroVisible(78.494))
+        assertEquals(100, SERVICIOS.puntajeEnteroVisible(100.0))
+        assertEquals(0, SERVICIOS.puntajeEnteroVisible(0.0))
     }
 
     @Test
