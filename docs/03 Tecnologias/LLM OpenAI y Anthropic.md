@@ -1,28 +1,31 @@
 ---
 tipo: tecnologia
-tags: [tecnologia, ia, llm, openai, anthropic]
-version: gpt-4o-mini · claude-haiku-4-5
-actualizado: 2026-11-17
+tags: [tecnologia, ia, llm, openai, anthropic, mimo]
+version: gpt-4o-mini · claude-haiku-4-5 · mimo-v2.6-flash · mimo-v2.6-pro
+actualizado: 2026-11-18
 ---
 
-# LLM: OpenAI y Anthropic
+# LLM: OpenAI, Anthropic y Xiaomi MiMo
 
 **Para qué**: (1) **generar preguntas** para el banco (admin, quedan pendientes de revisión) y (2) **evaluar las
 respuestas abiertas** del reporte de entrevista para usuarios **premium**. No se entrena un modelo propio (L04).
 
 | | |
 |---|---|
-| Proveedores | OpenAI (`gpt-4o-mini`) y Anthropic (`claude-haiku-4-5`), detrás de `ProveedorPreguntasIa` |
-| Config | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (opcionales: sin clave responde `503 provider_not_configured`) |
+| Proveedores | OpenAI (`gpt-4o-mini`), Anthropic (`claude-haiku-4-5`) y Xiaomi MiMo (`mimo-v2.6-flash`, `mimo-v2.6-pro`; [[Decisiones]] D30), detrás de `ProveedorPreguntasIa`. El modelo elige el proveedor: `gpt-*` → OpenAI, `mimo-*` → MiMo, el resto → Anthropic |
+| Config | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `MIMO_API_KEY` (opcionales: solo se monta el proveedor que tiene clave; pedir un modelo sin su clave responde `503 provider_not_configured` antes del tope y de las APIs de empleo). `MIMO_BASE_URL` opcional (solo `https`), para el plan de tokens |
 | Código | `INTEGRACIONES/PROVEEDOR_LLM.kt`, `SERVICIOS/SERVICIO_GENERACION_PREGUNTA.kt`, `SERVICIOS/SERVICIO_TOPE_GENERACION_IA.kt`, `SERVICIOS/EVALUADOR_ENTREVISTA.kt`, `SERVICIOS/SERVICIO_CUPO_IA.kt` |
 | Costo | `costoLlmUsd(modelo, tokensEntrada, tokensSalida)`; se registra en `pregunta_generacion_ia` y `reporte_entrevista` |
 
 ## Cómo se usa
 - **Salida estructurada**: se pide JSON con esquema estricto (`json_schema` de OpenAI / `output_config` de Anthropic) y
   luego se **valida en código** (ids, rangos, textos no vacíos). Una respuesta inválida → `502` y no se reintenta.
+  MiMo no acepta `json_schema`: se pide `json_object` con el esquema escrito en el prompt, el razonamiento apagado y la
+  clave en la cabecera `api-key`. Si envuelve el JSON en un cerco de código, se recorta de la primera a la última llave.
+  Su `finish_reason` `content_filter` es `provider_refusal`; `length` u otro corte, `provider_truncated`.
 - **Resiliencia**: `ProveedorConResiliencia` reintenta solo errores HTTP del proveedor; timeout 60 s.
 - **Evaluación de entrevistas**: una sola llamada por entrevista con todas las respuestas abiertas; si la IA falla o
-  responde mal se usa el motor freemium (el reporte siempre sale). El modelo por defecto: OpenAI si hay clave, si no Anthropic.
+  responde mal se usa el motor freemium (el reporte siempre sale). El modelo por defecto: OpenAI si hay clave, si no Anthropic, si no MiMo Flash.
 - **Tope mensual** ([[Decisiones]] D17): cada usuario premium tiene hasta `LIMITE_EVALUACIONES_IA_MENSUAL` reportes con
   IA por mes calendario UTC (por defecto 30; `0` = sin IA). El cupo se reserva en la BD **antes** de llamar al LLM, así
   que dos reportes simultáneos no lo superan. Al llegar al tope el reporte sale con el motor freemium, sin error.

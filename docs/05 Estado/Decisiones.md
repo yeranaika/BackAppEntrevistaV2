@@ -313,3 +313,36 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   La app lo muestra en Perfil › Mi suscripción con la fecha formateada en UTC (en la hora de Chile mostraría el día
   anterior) y, si faltan los campos, no muestra nada (`textoCupoReportesIa`, prueba `CupoReportesIaTest`; rama
   `feature/offline-automatico-y-reportes-ia` de la app, sin integrar). Sin migración.
+
+## D30 · Xiaomi MiMo como tercer proveedor de IA (2026-11)
+- **Contexto**: el equipo decidió usar Xiaomi MiMo para generar preguntas. Su API de pago por uso es compatible con
+  Chat Completions de OpenAI, pero no acepta `response_format: json_schema` (solo `json_object`). Además, la serie
+  v2.6 trae el razonamiento encendido por defecto.
+- **Decisión**:
+  - **Proveedor:** `ProveedorMimo` llama a `https://api.xiaomimimo.com/v1/chat/completions`, que se puede cambiar
+    con `MIMO_BASE_URL` (solo https). La clave va en la cabecera `api-key`, como en la documentación oficial.
+  - **Cuerpo del pedido:**
+    - `response_format: {type: json_object}`;
+    - `thinking: {type: disabled}`, porque el razonamiento cobra y no aporta;
+    - `max_completion_tokens: 8192`;
+    - el JSON Schema del lote escrito en el prompt de sistema.
+  - **Validación:** la respuesta se valida igual que la de los otros proveedores. Si no cumple, es
+    `provider_invalid_response` y queda auditada con sus tokens. Si el modelo envuelve el JSON en un cerco de código
+    o le suma texto, se recorta de la primera a la última llave. `content: null` es `provider_missing_content`;
+    `finish_reason` `content_filter` es `provider_refusal`, y `length` u otro corte, `provider_truncated`.
+  - **Modelos y precios:** `mimo-v2.6-flash` (por defecto, 0,14/0,28 US$ por millón de tokens de entrada/salida) y
+    `mimo-v2.6-pro` (0,435/0,87). Son los precios de tiempo real sin caché de noviembre de 2026; con caché la
+    entrada es más barata, así que el gasto queda estimado hacia arriba (lado seguro del tope D23).
+  - **Enrutamiento:** el modelo elige el proveedor: `gpt-*` va a OpenAI, `mimo-*` a MiMo y el resto a Anthropic.
+    Solo se monta el proveedor que tiene clave: sin ella, la respuesta es `503 provider_not_configured` antes del tope
+    y de consultar las APIs de empleo, sin costo.
+  - **Evaluación premium (D17):** usa el primer proveedor con clave, en el orden OpenAI, Anthropic y MiMo.
+  - **Panel:** muestra MiMo V2.6 Flash como primer modelo del selector. Orden de despliegue: primero el backend con
+    `MIMO_API_KEY` cargada y después el panel; si no, el modelo por defecto del panel daría `400 modelo_invalido` o `503`.
+  - **Arreglo de paso (OpenAI):** Chat Completions manda `"refusal": null` en toda respuesta normal y se leía como el
+    texto `"null"`, o sea como rechazo. Ahora se lee con `contentOrNull`, igual que `content`.
+- **Pruebas**: `PruebaProveedorLlm` cubre el cuerpo enviado, la cabecera, la URL, el cerco, el corte con tokens, la
+  falta de clave sin red, el error HTTP, la URL configurable, `content: null`, `content_filter`, otros cortes y el
+  `refusal: null` de OpenAI. `PruebaServicioGeneracionPregunta` cubre el
+  enrutamiento y el costo. Ninguna prueba llama a la API real.
+

@@ -10,6 +10,7 @@ import INTEGRACIONES.ContadorIntentosCache
 import INTEGRACIONES.EnviadorCorreo
 import INTEGRACIONES.FuenteDocumentosLegalesArchivo
 import INTEGRACIONES.ProveedorAnthropic
+import INTEGRACIONES.ProveedorPreguntasIa
 import INTEGRACIONES.ProveedorConResiliencia
 import INTEGRACIONES.ProveedorOpenAi
 import INTEGRACIONES.TipoProveedorIa
@@ -73,6 +74,8 @@ import SERVICIOS.VerificadorPremium
 import MODELOS.RepositorioReporteExposed
 import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
 import INTEGRACIONES.MODELO_OPENAI_POR_DEFECTO
+import INTEGRACIONES.MODELO_MIMO_POR_DEFECTO
+import INTEGRACIONES.ProveedorMimo
 import SERVICIOS.ServicioNivelacion
 import SERVICIOS.ServicioPractica
 import SERVICIOS.ServicioPruebasApp
@@ -124,11 +127,20 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     private val clienteHttpLlm = crearClienteHttpLlm()
 
-    // Siempre montados: sin API key responden 503 provider_not_configured.
-    val proveedoresIa = mapOf(
-        TipoProveedorIa.OPENAI to ProveedorConResiliencia(ProveedorOpenAi(configuracion.llm.openAiApiKey, clienteHttpLlm), "openai"),
-        TipoProveedorIa.ANTHROPIC to ProveedorConResiliencia(ProveedorAnthropic(configuracion.llm.anthropicApiKey, clienteHttpLlm), "anthropic")
-    )
+    // Solo los que tienen API key: sin la clave del modelo pedido, generate-ai responde 503 provider_not_configured
+    // antes del tope y antes de gastar cuota de las APIs de empleo.
+    val proveedoresIa: Map<TipoProveedorIa, ProveedorPreguntasIa> = buildMap {
+        val llm = configuracion.llm
+        if (llm.openAiApiKey.isNotBlank()) {
+            put(TipoProveedorIa.OPENAI, ProveedorConResiliencia(ProveedorOpenAi(llm.openAiApiKey, clienteHttpLlm), "openai"))
+        }
+        if (llm.anthropicApiKey.isNotBlank()) {
+            put(TipoProveedorIa.ANTHROPIC, ProveedorConResiliencia(ProveedorAnthropic(llm.anthropicApiKey, clienteHttpLlm), "anthropic"))
+        }
+        if (llm.mimoApiKey.isNotBlank()) {
+            put(TipoProveedorIa.MIMO, ProveedorConResiliencia(ProveedorMimo(llm.mimoApiKey, clienteHttpLlm, llm.mimoUrl), "mimo"))
+        }
+    }
 
     // ---------- Servicios de negocio ----------
     val servicioToken = ServicioToken(
@@ -220,6 +232,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
             EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), MODELO_OPENAI_POR_DEFECTO, evaluadorEntrevistaGratis)
         configuracion.llm.anthropicApiKey.isNotBlank() ->
             EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), MODELO_ANTHROPIC_POR_DEFECTO, evaluadorEntrevistaGratis)
+        configuracion.llm.mimoApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.MIMO), MODELO_MIMO_POR_DEFECTO, evaluadorEntrevistaGratis)
         else -> null
     }
     private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()

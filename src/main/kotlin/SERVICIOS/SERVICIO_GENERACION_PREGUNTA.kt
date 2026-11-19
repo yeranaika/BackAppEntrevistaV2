@@ -34,7 +34,9 @@ private const val CANTIDAD_MAXIMA_POR_LOTE = 10
 private val MODELOS_PERMITIDOS = mapOf(
     "gpt-4o-mini" to "gpt-4o-mini",
     "claude-haiku-4-5" to "claude-haiku-4-5",
-    "claude-3-5-haiku" to "claude-haiku-4-5"
+    "claude-3-5-haiku" to "claude-haiku-4-5",
+    "mimo-v2.6-flash" to "mimo-v2.6-flash",
+    "mimo-v2.6-pro" to "mimo-v2.6-pro"
 )
 
 data class PreguntaCreadaPorIa(
@@ -197,7 +199,11 @@ class ServicioGeneracionPregunta(
         return List(partes) { i -> base + if (i < resto) 1 else 0 }
     }
 
-    private fun tipoProveedor(modelo: String) = if (modelo.startsWith("gpt")) TipoProveedorIa.OPENAI else TipoProveedorIa.ANTHROPIC
+    private fun tipoProveedor(modelo: String) = when {
+        modelo.startsWith("gpt") -> TipoProveedorIa.OPENAI
+        modelo.startsWith("mimo") -> TipoProveedorIa.MIMO
+        else -> TipoProveedorIa.ANTHROPIC
+    }
 
     private fun construirPrompt(pedido: PedidoValidado, nombreCargo: String?, nombreSkill: String?, mercado: ContextoMercado?): String {
         val contexto = buildString {

@@ -3,9 +3,13 @@ package PRUEBAS
 import ERRORES.ErrorRespuestaExterna
 import ERRORES.ErrorServicioExterno
 import ESQUEMAS.EsquemaJsonLoteLlm
+import INTEGRACIONES.sinCercoDeCodigo
 import INTEGRACIONES.ProveedorAnthropic
+import INTEGRACIONES.ProveedorMimo
 import INTEGRACIONES.ProveedorOpenAi
 import INTEGRACIONES.SolicitudProveedorIa
+import INTEGRACIONES.URL_MIMO_POR_DEFECTO
+import INTEGRACIONES.costoLlmUsd
 import MODELOS.TipoPregunta
 import PRUEBAS.DOBLES.fallaCon
 import io.ktor.client.HttpClient
@@ -21,9 +25,11 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -42,13 +48,20 @@ class PruebaProveedorLlm {
             instruccionUsuario = "Genera las preguntas ahora."
         )
 
-    /** Cliente que responde [cuerpo] y deja en [capturado] lo que se envió. */
-    private fun cliente(cuerpo: String, estado: HttpStatusCode = HttpStatusCode.OK, capturado: StringBuilder = StringBuilder()) =
+    /** Cliente que responde [cuerpo] y deja en [capturado] lo que se envió (y en [cabeceras], la URL y las cabeceras). */
+    private fun cliente(
+        cuerpo: String,
+        estado: HttpStatusCode = HttpStatusCode.OK,
+        capturado: StringBuilder = StringBuilder(),
+        cabeceras: MutableMap<String, String> = mutableMapOf()
+    ) =
         HttpClient(MockEngine) {
             install(ContentNegotiation) { json(json) }
             engine {
                 addHandler { request ->
                     capturado.append((request.body as TextContent).text)
+                    cabeceras["url"] = request.url.toString()
+                    request.headers.forEach { nombre, valores -> cabeceras[nombre.lowercase()] = valores.joinToString() }
                     respond(cuerpo, estado, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
                 }
             }
@@ -106,6 +119,22 @@ class PruebaProveedorLlm {
             ProveedorOpenAi("", cliente("{}", capturado = enviado)).generar(solicitud())
         }
         assertTrue(enviado.isEmpty())
+    }
+
+    @Test
+    fun `OpenAI con refusal null es una respuesta normal y con texto es un rechazo`() = runBlocking<Unit> {
+        // Chat Completions manda "refusal": null en toda respuesta normal: no puede leerse como el texto "null".
+        val normal = """{"choices":[{"finish_reason":"stop","message":{"content":"{\"preguntas\":[]}","refusal":null}}],"usage":{"prompt_tokens":3,"completion_tokens":4}}"""
+        assertEquals("{\"preguntas\":[]}", ProveedorOpenAi("clave", cliente(normal)).generar(solicitud()).contenido)
+
+        fallaCon<ErrorRespuestaExterna>("provider_refusal") {
+            ProveedorOpenAi("clave", cliente("""{"choices":[{"finish_reason":"stop","message":{"content":null,"refusal":"No puedo ayudar"}}]}"""))
+                .generar(solicitud())
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_missing_content") {
+            ProveedorOpenAi("clave", cliente("""{"choices":[{"finish_reason":"stop","message":{"content":null,"refusal":null}}]}"""))
+                .generar(solicitud())
+        }
     }
 
     @Test
@@ -213,5 +242,127 @@ class PruebaProveedorLlm {
         fallaCon<ErrorRespuestaExterna>("provider_missing_content") {
             ProveedorAnthropic("clave", cliente("""{"content":[]}""")).generar(solicitud(modelo = "claude-haiku-4-5"))
         }
+    }
+
+    // ---------- Xiaomi MiMo (D30) ----------
+
+    private val respuestaMimo =
+        """{"choices":[{"finish_reason":"stop","message":{"content":"{\"preguntas\":[]}","reasoning_content":null}}],"usage":{"prompt_tokens":21,"completion_tokens":43}}"""
+
+    @Test
+    fun `MiMo recibe json_object con el esquema en el prompt, sin razonamiento, y la clave en api-key`() = runBlocking<Unit> {
+        val enviado = StringBuilder()
+        val cabeceras = mutableMapOf<String, String>()
+        val respuesta = ProveedorMimo("clave-mimo", cliente(respuestaMimo, capturado = enviado, cabeceras = cabeceras))
+            .generar(solicitud(10, TipoPregunta.OPCION_MULTIPLE, modelo = "mimo-v2.6-flash"))
+
+        assertEquals(URL_MIMO_POR_DEFECTO, cabeceras["url"])
+        assertEquals("clave-mimo", cabeceras["api-key"])
+        assertEquals(null, cabeceras["authorization"])
+
+        val cuerpo = json.parseToJsonElement(enviado.toString()).jsonObject
+        assertEquals("mimo-v2.6-flash", cuerpo["model"]!!.jsonPrimitive.content)
+        assertEquals("json_object", cuerpo["response_format"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("disabled", cuerpo["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals(8192, cuerpo["max_completion_tokens"]!!.jsonPrimitive.content.toInt())
+        val sistema = cuerpo["messages"]!!.jsonArray.first().jsonObject
+        assertEquals("system", sistema["role"]!!.jsonPrimitive.content)
+        val textoSistema = sistema["content"]!!.jsonPrimitive.content
+        assertTrue(textoSistema.startsWith("prompt de prueba"))
+        // El esquema (10 preguntas, 4 opciones) va escrito en el prompt: json_object no lo impone.
+        assertTrue(textoSistema.contains("\"minItems\":10"))
+        assertTrue(textoSistema.contains("JSON"))
+
+        assertEquals("{\"preguntas\":[]}", respuesta.contenido)
+        assertEquals(21, respuesta.tokensEntrada)
+        assertEquals(43, respuesta.tokensSalida)
+    }
+
+    @Test
+    fun `MiMo usa la URL configurada y quita un cerco de codigo alrededor del JSON`() = runBlocking<Unit> {
+        val cabeceras = mutableMapOf<String, String>()
+        val conCerco = """{"choices":[{"finish_reason":"stop","message":{"content":"```json\n{\"preguntas\":[]}\n```"}}],"usage":{"prompt_tokens":1,"completion_tokens":2}}"""
+        val respuesta = ProveedorMimo("clave", cliente(conCerco, cabeceras = cabeceras), "https://otro.example/v1/chat/completions")
+            .generar(solicitud(modelo = "mimo-v2.6-pro"))
+        assertEquals("https://otro.example/v1/chat/completions", cabeceras["url"])
+        assertEquals("{\"preguntas\":[]}", respuesta.contenido)
+    }
+
+    @Test
+    fun `MiMo sin clave no llama a la red y sus errores son los mismos que los de los demas proveedores`() {
+        val enviado = StringBuilder()
+        fallaCon<ErrorServicioExterno>("provider_not_configured") {
+            ProveedorMimo(" ", cliente("{}", capturado = enviado)).generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+        assertTrue(enviado.isEmpty())
+
+        val corte = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking {
+                ProveedorMimo(
+                    "clave",
+                    cliente("""{"choices":[{"finish_reason":"length","message":{"content":"{"}}],"usage":{"prompt_tokens":5,"completion_tokens":8192}}""")
+                ).generar(solicitud(modelo = "mimo-v2.6-flash"))
+            }
+        }
+        assertEquals("provider_truncated", corte.codigo)
+        assertEquals(8192, corte.tokensSalida)
+
+        fallaCon<ErrorRespuestaExterna>("provider_missing_content") {
+            ProveedorMimo("clave", cliente("""{"choices":[{"finish_reason":"stop","message":{"content":"   "}}]}""")).generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_http_error") {
+            ProveedorMimo("clave", cliente("""{"error":{"message":"clave secreta invalida"}}""", HttpStatusCode.Unauthorized))
+                .generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_invalid_response") {
+            ProveedorMimo("clave", cliente("""{"choices":[]}""")).generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+    }
+
+    @Test
+    fun `MiMo con content null, filtro de contenido u otro corte no pasa como respuesta valida`() {
+        val mimo = { cuerpo: String -> ProveedorMimo("clave", cliente(cuerpo)) }
+        val nulo = assertFailsWith<ErrorRespuestaExterna> {
+            runBlocking {
+                mimo("""{"choices":[{"finish_reason":"stop","message":{"content":null,"reasoning_content":"..."}}],"usage":{"prompt_tokens":10,"completion_tokens":5}}""")
+                    .generar(solicitud(modelo = "mimo-v2.6-flash"))
+            }
+        }
+        assertEquals("provider_missing_content", nulo.codigo)
+        assertEquals(10, nulo.tokensEntrada)
+        assertEquals(5, nulo.tokensSalida)
+
+        fallaCon<ErrorRespuestaExterna>("provider_refusal") {
+            mimo("""{"choices":[{"finish_reason":"content_filter","message":{"content":"{}"}}]}""").generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+        fallaCon<ErrorRespuestaExterna>("provider_truncated") {
+            mimo("""{"choices":[{"finish_reason":"repetition_truncation","message":{"content":"{\"preguntas\":["}}]}""")
+                .generar(solicitud(modelo = "mimo-v2.6-flash"))
+        }
+    }
+
+    @Test
+    fun `el cerco de codigo se quita aunque cambie la etiqueta o haya texto alrededor`() {
+        assertEquals("{\"a\":1}", sinCercoDeCodigo("```Json\n{\"a\":1}\n```"))
+        assertEquals("{\"a\":1}", sinCercoDeCodigo("``` json\n{\"a\":1}\n```\nListo."))
+        assertEquals("{\"a\":{\"b\":2}}", sinCercoDeCodigo("Aqui esta:\n```json\n{\"a\":{\"b\":2}}\n```"))
+        assertEquals("{\"a\":1}", sinCercoDeCodigo("  {\"a\":1}  "))
+        assertEquals("sin json", sinCercoDeCodigo(" sin json "))
+    }
+
+    @Test
+    fun `los modelos MiMo tienen precio cargado`() {
+        assertTrue(abs(0.00014 - costoLlmUsd("mimo-v2.6-flash", 1_000, 0)) < 1e-12)
+        assertTrue(abs(0.00028 - costoLlmUsd("mimo-v2.6-flash", 0, 1_000)) < 1e-12)
+        assertTrue(abs(0.000435 + 0.00087 - costoLlmUsd("mimo-v2.6-pro", 1_000, 1_000)) < 1e-12)
+    }
+
+    @Test
+    fun `MIMO_BASE_URL acepta la base o la URL completa y nunca http`() {
+        assertEquals(URL_MIMO_POR_DEFECTO, CONFIGURACION.urlChatMimo(null))
+        assertEquals(URL_MIMO_POR_DEFECTO, CONFIGURACION.urlChatMimo("  "))
+        assertEquals("https://token-plan-cn.xiaomimimo.com/v1/chat/completions", CONFIGURACION.urlChatMimo("https://token-plan-cn.xiaomimimo.com/v1/"))
+        assertEquals("https://x.example/v1/chat/completions", CONFIGURACION.urlChatMimo("https://x.example/v1/chat/completions"))
+        assertEquals(URL_MIMO_POR_DEFECTO, CONFIGURACION.urlChatMimo("http://inseguro.example/v1"))
     }
 }

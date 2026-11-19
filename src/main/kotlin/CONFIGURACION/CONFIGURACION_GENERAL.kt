@@ -1,5 +1,6 @@
 package CONFIGURACION
 
+import INTEGRACIONES.URL_MIMO_POR_DEFECTO
 import com.auth0.jwt.algorithms.Algorithm
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.server.application.*
@@ -64,12 +65,16 @@ data class ConfiguracionMercadoLaboral(
 data class ConfiguracionLlm(
     val openAiApiKey: String,
     val anthropicApiKey: String,
+    /** Xiaomi MiMo (D30). Vacía = sin MiMo. */
+    val mimoApiKey: String = "",
+    /** Endpoint de Chat Completions de MiMo (MIMO_BASE_URL); por defecto, el de pago por uso. */
+    val mimoUrl: String = URL_MIMO_POR_DEFECTO,
     /** Tope mensual de evaluaciones con IA por usuario premium; 0 = sin IA (D17). */
     val evaluacionesIaMensuales: Int = EVALUACIONES_IA_MENSUALES_POR_DEFECTO,
     /** Tope mensual (USD estimados, UTC) de la generación de preguntas con IA; 0 = desactivada (D23). */
     val gastoGeneracionIaMensualUsd: Double = GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
 ) {
-    val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank()
+    val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank() || mimoApiKey.isNotBlank()
 }
 
 /** Solicitudes permitidas por IP en cada ventana (ver CONFIGURACION_LIMITE_SOLICITUDES). */
@@ -194,6 +199,8 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         llm = ConfiguracionLlm(
             openAiApiKey = lector.opcional("OPENAI_API_KEY").orEmpty(),
             anthropicApiKey = lector.opcional("ANTHROPIC_API_KEY").orEmpty(),
+            mimoApiKey = lector.opcional("MIMO_API_KEY").orEmpty(),
+            mimoUrl = urlChatMimo(lector.opcional("MIMO_BASE_URL")),
             // Un valor negativo se toma como 0: ante la duda no se gasta en IA.
             evaluacionesIaMensuales = lector.entero("LIMITE_EVALUACIONES_IA_MENSUAL", EVALUACIONES_IA_MENSUALES_POR_DEFECTO).coerceAtLeast(0),
             gastoGeneracionIaMensualUsd = leerTopeGastoUsd(lector.opcional("LIMITE_GASTO_GENERACION_IA_MENSUAL_USD"))
@@ -209,4 +216,19 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             esperaTareas = lector.entero("APAGADO_ESPERA_TAREAS_SEGUNDOS", ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO).coerceIn(0, 600).seconds
         )
     )
+}
+
+/**
+ * MIMO_BASE_URL acepta la base que muestra la consola de MiMo (…/v1) o la URL completa de chat/completions.
+ * Vacía o ausente: el endpoint de pago por uso. Solo https, para no mandar la clave en texto plano: un valor que no
+ * empieza con https:// se ignora con un aviso (como LIMITE_GASTO_GENERACION_IA_MENSUAL_USD, nunca se cae el arranque).
+ */
+internal fun urlChatMimo(valor: String?): String {
+    val base = valor?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() } ?: return URL_MIMO_POR_DEFECTO
+    if (!base.startsWith("https://")) {
+        org.slf4j.LoggerFactory.getLogger("Configuracion")
+            .warn("MIMO_BASE_URL no empieza con https://: se usa el endpoint de pago por uso de MiMo")
+        return URL_MIMO_POR_DEFECTO
+    }
+    return if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
 }

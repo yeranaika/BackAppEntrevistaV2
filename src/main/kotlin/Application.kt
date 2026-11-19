@@ -38,7 +38,7 @@ fun Application.module() {
     monitor.subscribe(ApplicationStopping) { runBlocking { dependencias.detenerTareas(configuracion.apagado.esperaTareas) } }
 
     if (!configuracion.llm.tieneProveedor) {
-        log.warn("OPENAI_API_KEY y ANTHROPIC_API_KEY no configurados: generate-ai responderá 503 provider_not_configured.")
+        log.warn("OPENAI_API_KEY, ANTHROPIC_API_KEY y MIMO_API_KEY no configurados: generate-ai responderá 503 provider_not_configured.")
     }
 
     val disponibilidad = crearEstadoFreemiumReadiness()
