@@ -159,13 +159,20 @@ class ServicioReporteEntrevista(
      */
     private suspend fun generar(sesionId: UUID, intento: UUID) {
         try {
+            val inicio = System.nanoTime()
             val sesion = sesiones.buscar(sesionId) ?: return
             val resultado = calcular(sesion)
+            val tiempoCalculo = milisDesde(inicio)
             if (!reportes.guardarResultado(sesionId, resultado, intento)) {
                 log.warn("El reporte de la entrevista {} ya no estaba en generación (se dio por interrumpido): no se guarda", sesionId)
                 return
             }
             acumularNiveles(sesion, resultado.detalles)
+            // Tiempos por etapa para vigilar que el feedback salga en menos de 5 min (p95 objetivo: IA < 40 s, freemium < 2 s).
+            log.info(
+                "Reporte {} listo en {} ms (cálculo {} ms, guardado {} ms, modo {})",
+                sesionId, milisDesde(inicio), tiempoCalculo, milisDesde(inicio) - tiempoCalculo, resultado.modo.valorBd
+            )
         } catch (e: Exception) {
             // Apagado del servidor (no un timeout interno, que llega con la corrutina todavía activa): queda reintentable.
             if (e is CancellationException && !currentCoroutineContext().isActive) {
@@ -217,7 +224,9 @@ class ServicioReporteEntrevista(
         // Primero lo barato; la reserva del cupo (que bloquea al usuario en la BD) va al final.
         val reservaIa = if (evaluadorIa != null && abiertas.isNotEmpty() && premium.esPremium(sesion.usuarioId)) reservarCupoIa(sesion) else null
         val evaluador = if (reservaIa != null) evaluadorIa!! else evaluadorGratis
+        val inicioEvaluacion = System.nanoTime()
         val evaluacion = evaluador.evaluar(ContextoEvaluacionEntrevista(sesion.cargoObjetivo, sesion.nivel, abiertas.map { aEvaluar(it) }))
+        log.info("Evaluación de la entrevista {}: {} respuestas abiertas, modo {}, {} ms", sesion.id, abiertas.size, evaluacion.modo.valorBd, milisDesde(inicioEvaluacion))
         val porPregunta = evaluacion.evaluaciones.associateBy { it.preguntaSesionId }
 
         // Puntaje de cada pregunta. Las no respondidas cuentan 0; un clip sin transcripción no se puede evaluar y no cuenta.
@@ -387,6 +396,8 @@ class ServicioReporteEntrevista(
         val pesos = partes.sumOf { it.second }
         return if (pesos == 0.0) 0.0 else partes.sumOf { (puntaje, peso) -> puntaje * peso } / pesos
     }
+
+    private fun milisDesde(inicioNanos: Long) = (System.nanoTime() - inicioNanos) / 1_000_000
 
     private fun promedio(valores: Collection<Double>): Double? = valores.takeIf { it.isNotEmpty() }?.average()
 

@@ -523,6 +523,26 @@ class PruebaServicioReporte {
     }
 
     @Test
+    fun `una IA que no responde a tiempo entrega el reporte freemium sin consumir cupo`() = runBlocking<Unit> {
+        sistema.premium.esPremium = true
+        val lenta = object : INTEGRACIONES.ProveedorPreguntasIa {
+            override suspend fun generar(solicitud: INTEGRACIONES.SolicitudProveedorIa): INTEGRACIONES.RespuestaProveedorIa {
+                delay(60_000)
+                error("inalcanzable")
+            }
+        }
+        val evaluador = EvaluadorEntrevistaIa(lenta, "gpt-4o-mini", sistema.evaluadorEntrevistaGratis, tiempoMaximo = Duration.ofMillis(100))
+        val inicio = System.nanoTime()
+
+        val reporte = generar(entrevistaFinalizada(), servicioCon(evaluador, tope = 2))
+
+        assertEquals(EstadoReporte.LISTO, reporte.estado)
+        assertEquals(ModoEvaluacion.FREEMIUM, reporte.modo)
+        assertTrue((System.nanoTime() - inicio) / 1_000_000 < 10_000, "el tope corta la espera del proveedor")
+        assertEquals(2, restantes(cupo(tope = 2)), "el usuario no recibió IA")
+    }
+
+    @Test
     fun `una IA que cae al freemium no descuenta del cupo`() {
         sistema.premium.esPremium = true
         generar(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso("caido")), tope = 2))
@@ -551,10 +571,10 @@ class PruebaServicioReporte {
         assertTrue(sistema.reportesRepo.reservarEvaluacionIa(huerfana.id, ana, 1, ENERO, FEBRERO, ahora.minusSeconds(600), ahora))
 
         assertEquals(0, restantes(cupo(tope = 1)), "mientras se genera, ese cupo está tomado")
-        sistema.reloj.adelantar(Duration.ofMinutes(9))
-        assertEquals(0, restantes(cupo(tope = 1)), "a los 9 minutos la reserva sigue vigente, igual que para reservar")
         sistema.reloj.adelantar(Duration.ofMinutes(2))
-        assertEquals(1, restantes(cupo(tope = 1)), "a los 11 minutos la reserva caducó")
+        assertEquals(0, restantes(cupo(tope = 1)), "a los 2 minutos la reserva sigue vigente, igual que para reservar")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(1, restantes(cupo(tope = 1)), "a los 4 minutos la reserva caducó")
     }
 
     @Test
@@ -645,8 +665,8 @@ class PruebaServicioReporte {
     fun `el rescate deja reintentable un reporte abandonado pasados diez minutos`() = runBlocking<Unit> {
         val sesion = entrevistaFinalizada()
         tomado(sesion)
-        sistema.reloj.adelantar(Duration.ofMinutes(9))
-        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "a los 9 minutos todavía puede estar generándose")
+        sistema.reloj.adelantar(Duration.ofMinutes(2))
+        assertEquals(0, sistema.reporte.rescatarInterrumpidos(), "a los 2 minutos todavía puede estar generándose")
         sistema.reloj.adelantar(Duration.ofMinutes(2))
         assertEquals(1, sistema.reporte.rescatarInterrumpidos())
 
@@ -693,9 +713,9 @@ class PruebaServicioReporte {
         val antigua = entrevistaFinalizada()
         sistema.reloj.adelantar(Duration.ofHours(25))
         val huerfana = entrevistaFinalizada()
-        sistema.reloj.adelantar(Duration.ofMinutes(6))
+        sistema.reloj.adelantar(Duration.ofMinutes(4))
         val reciente = entrevistaFinalizada()
-        sistema.reloj.adelantar(Duration.ofMinutes(5))
+        sistema.reloj.adelantar(Duration.ofMinutes(1))
         val enCurso = sistema.entrevista.iniciar(ana, PedidoEntrevista(nombreCargo = "Android Developer", nivel = "jr"))
 
         assertEquals(1, sistema.reporte.rescatarInterrumpidos())

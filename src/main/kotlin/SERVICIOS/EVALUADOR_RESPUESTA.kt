@@ -29,6 +29,7 @@ private const val UMBRAL_EXCELENTE = 80.0
 private const val UMBRAL_BUENA = 60.0
 private const val TAMANO_NGRAMA = 3
 private const val PALABRAS_CLAVE_EN_FEEDBACK = 4
+private const val LARGO_MAXIMO_CLAVE_EXACTA = 3
 
 /**
  * Motor freemium (sin consumo de IA): similitud por trigramas con la respuesta ideal (40 %),
@@ -43,7 +44,7 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
             return EvaluacionTexto(0.0, 0.0, 0.0, emptyList(), palabrasClave, "No se ingresó ninguna respuesta.")
         }
         val usuario = limpiar(texto)
-        val encontradas = palabrasClave.filter { usuario.contains(limpiar(it)) }
+        val encontradas = palabrasClave.filter { aparece(usuario, limpiar(it)) }
         val faltantes = palabrasClave - encontradas.toSet()
         val cobertura = if (palabrasClave.isEmpty()) 0.0 else encontradas.size * 100.0 / palabrasClave.size
         val similitud = similitudCoseno(usuario, limpiar(respuestaIdeal)) * 100.0
@@ -75,7 +76,20 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
         }
     }
 
+    /**
+     * ¿La palabra clave (ya limpia) aparece en el texto (ya limpio)? Debe empezar en una palabra: "go" no está en "algo".
+     * Las claves de [LARGO_MAXIMO_CLAVE_EXACTA] letras o menos (go, sql, r) deben coincidir con la palabra completa; las
+     * más largas admiten plurales y conjugaciones ("proceso" aparece en "procesos").
+     */
+    private fun aparece(texto: String, clave: String): Boolean {
+        if (clave.isEmpty()) return false
+        val final = if (clave.length <= LARGO_MAXIMO_CLAVE_EXACTA) "(?= |$)" else ""
+        return Regex("(?<=^| )" + Regex.escape(clave) + final).containsMatchIn(texto)
+    }
+
+    /** Antes de quitar símbolos, los que cambian el significado se escriben con letras: "C#" no puede quedar como "c". */
     private fun limpiar(texto: String) = texto.lowercase()
+        .replace("c#", " csharp ").replace("f#", " fsharp ").replace("c++", " cpp ").replace(".net", " dotnet ")
         .replace(Regex("[^a-záéíóúüñ0-9\\s]"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
