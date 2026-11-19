@@ -64,6 +64,29 @@ private val COSTO_POR_TOKEN = mapOf(
     MODELO_MIMO_PRO to (0.000000435 to 0.00000087)
 )
 
+/**
+ * Token Plan de MiMo (D31): Credits por token (entrada sin caché, salida), según la tabla oficial de
+ * mimo.mi.com (Token Plan → Subscription, noviembre de 2026). La entrada con caché cuesta mucho menos (2,5 y 2), pero
+ * la respuesta no dice qué parte vino de caché: se cuenta todo sin caché, así lo gastado queda estimado hacia arriba.
+ * Un modelo mimo-* que no esté en la tabla se cuenta con la tarifa del más caro (pro).
+ */
+private val CREDITOS_POR_TOKEN_MIMO = mapOf(
+    MODELO_MIMO_POR_DEFECTO to (100L to 200L),
+    MODELO_MIMO_PRO to (300L to 600L)
+)
+
+/** Credits del plan Lite (US$6/mes): se asume si la clave es de Token Plan (tp-) y no se definió MIMO_TOKEN_PLAN_CREDITOS. */
+const val CREDITOS_TOKEN_PLAN_LITE = 4_100_000_000L
+
+fun esModeloMimo(modelo: String): Boolean = modelo.startsWith("mimo")
+
+/** Credits del Token Plan que consumió una llamada; 0 si no es un modelo de MiMo. */
+fun creditosTokenPlanMimo(modelo: String, tokensEntrada: Int?, tokensSalida: Int?): Long {
+    if (!esModeloMimo(modelo)) return 0
+    val (porEntrada, porSalida) = CREDITOS_POR_TOKEN_MIMO[modelo] ?: CREDITOS_POR_TOKEN_MIMO.getValue(MODELO_MIMO_PRO)
+    return (tokensEntrada ?: 0).coerceAtLeast(0) * porEntrada + (tokensSalida ?: 0).coerceAtLeast(0) * porSalida
+}
+
 /** Costo de una llamada; 0 si el modelo no tiene precio cargado. */
 fun costoLlmUsd(modelo: String, tokensEntrada: Int?, tokensSalida: Int?): Double {
     val (precioEntrada, precioSalida) = COSTO_POR_TOKEN[modelo] ?: (0.0 to 0.0)

@@ -176,7 +176,10 @@ class SistemaPrueba(
      * Reloj del tope de generación (D23, D28). Solo para fijar el mes en pruebas que insertan filas a mano: no mezclarlo
      * con una generación real, que se audita con la hora real.
      */
-    relojTopeGeneracionIa: java.time.Clock = java.time.Clock.systemUTC()
+    relojTopeGeneracionIa: java.time.Clock = java.time.Clock.systemUTC(),
+    /** Token Plan de MiMo (D31); 0 = sin Token Plan, como por defecto. Usa [relojTopeGeneracionIa]. */
+    creditosTokenPlanMimo: Long = 0,
+    diaRenovacionTokenPlanMimo: Int = 1
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -201,10 +204,14 @@ class SistemaPrueba(
     val preguntas = RepositorioPreguntaExposed()
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
     /** Como en producción, una sola instancia del tope para el 429 de generar-ia y para Costos IA (D28). */
-    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
-        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa)
+    val creditosMimo = SERVICIOS.ServicioCreditosTokenPlan(
+        MODELOS.LectorCostosIaExposed(),
+        SERVICIOS.PlanTokenMimo(creditosTokenPlanMimo, diaRenovacionTokenPlanMimo, relojTopeGeneracionIa)
     )
-    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj)
+    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
+        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa), creditosMimo
+    )
+    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj, creditosMimo)
     val pregunta = ServicioPregunta(preguntas, catalogo)
     val mercadoRepo = RepositorioMercadoExposed()
     /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */

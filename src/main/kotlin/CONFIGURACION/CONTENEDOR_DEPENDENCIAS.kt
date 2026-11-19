@@ -41,6 +41,8 @@ import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
 import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.PlanTokenMimo
+import SERVICIOS.ServicioCreditosTokenPlan
 import SERVICIOS.ServicioTopeGeneracionIa
 import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
@@ -178,9 +180,16 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
     val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
 
+    /** Credits del Token Plan de MiMo (D31): los mismos para el 429 de generar-ia y para Costos IA. */
+    private val creditosTokenPlanMimo = ServicioCreditosTokenPlan(
+        LectorCostosIaExposed(),
+        PlanTokenMimo(configuracion.llm.mimoTokenPlanCreditos, configuracion.llm.mimoTokenPlanDiaRenovacion)
+    )
+
     /** Tope de gasto de la generación con IA (D23): una sola instancia para el 429 y para Costos IA (D28). */
     private val topeGeneracionIa = ServicioTopeGeneracionIa(
-        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd),
+        creditosTokenPlanMimo
     )
 
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
@@ -190,7 +199,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
     val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())
     /** Gasto en IA para el admin (reportes con IA y generación de preguntas) y gasto del mes frente al tope (D28). */
-    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa)
+    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa, creditosMimo = creditosTokenPlanMimo)
 
     val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, ofertasEnCache)
 

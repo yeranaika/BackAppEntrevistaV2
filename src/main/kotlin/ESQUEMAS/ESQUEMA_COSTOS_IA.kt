@@ -56,6 +56,27 @@ data class RespuestaTopeGeneracionIa(
     val estaAgotado: Boolean
 )
 
+/**
+ * Credits del Token Plan de Xiaomi MiMo en el periodo en curso (D31). Los cuenta el servidor con los tokens de cada
+ * llamada a MiMo (reportes y generación, también las fallidas) y la tabla oficial de Credits, sin descontar caché: es un
+ * estimado hacia arriba y no incluye lo gastado con la misma clave fuera de la app.
+ */
+@Serializable
+data class RespuestaPlanTokenMimo(
+    /** Inicio del periodo (AAAA-MM-DD, UTC, incluido). */
+    val desde: String,
+    /** Renovación del plan (AAAA-MM-DD, UTC): fin del periodo, no incluido. */
+    val hasta: String,
+    val creditosPlan: Long,
+    val creditosUsados: Long,
+    /** max(0, plan − usados). */
+    val creditosRestantes: Long,
+    /** Llamadas a MiMo del periodo (exitosas y fallidas). */
+    val llamadas: Int,
+    /** Usados ≥ plan: la próxima generación con un modelo MiMo responde 429 tope_generacion_ia_alcanzado. */
+    val estaAgotado: Boolean
+)
+
 @Serializable
 data class RespuestaCostosIa(
     /** Primer día incluido (UTC). */
@@ -69,5 +90,7 @@ data class RespuestaCostosIa(
     val porDia: List<RespuestaCostoIaDia>,
     /** De mayor a menor costo. */
     val porModelo: List<RespuestaCostoIaModelo>,
-    val topeGeneracionPreguntas: RespuestaTopeGeneracionIa
+    val topeGeneracionPreguntas: RespuestaTopeGeneracionIa,
+    /** null si el servidor no tiene Token Plan de MiMo (viaja siempre, también en null). */
+    val planTokenMimo: RespuestaPlanTokenMimo?
 )

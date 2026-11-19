@@ -2,6 +2,7 @@ package SERVICIOS
 
 import CONFIGURACION.GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO
 import ERRORES.ErrorDemasiadosIntentos
+import INTEGRACIONES.esModeloMimo
 import MODELOS.LectorUsosGeneracionIa
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
@@ -35,10 +36,14 @@ data class EstadoTopeGeneracionIa(val mes: YearMonth, val gastadoUsd: BigDecimal
  * ([verificar]) y entrega lo que el panel ve en Costos IA ([estado], D28). Suma las llamadas de todos los admins del mes
  * UTC, también las fallidas con su costo estimado (costoTotalUsd, como el resumen de costos). Sin caché: con varias
  * instancias dejaría de ser una sola fuente.
+ *
+ * Con Token Plan de MiMo ([creditosMimo] activo, D31) una generación con un modelo mimo-* no se frena por USD (el plan
+ * es de precio fijo) sino por los Credits del periodo; los demás modelos siguen con el tope en USD.
  */
 class ServicioTopeGeneracionIa(
     private val usos: LectorUsosGeneracionIa,
-    private val tope: TopeGastoGeneracionIa = TopeGastoGeneracionIa()
+    private val tope: TopeGastoGeneracionIa = TopeGastoGeneracionIa(),
+    private val creditosMimo: ServicioCreditosTokenPlan? = null
 ) {
     private val log = LoggerFactory.getLogger(ServicioTopeGeneracionIa::class.java)
 
@@ -51,9 +56,13 @@ class ServicioTopeGeneracionIa(
 
     /**
      * Con el gasto del mes en el tope (o el tope en 0) lanza 429 y no se llama al LLM. Si el gasto no se puede leer, el
-     * error sube y tampoco se llama (no se gasta a ciegas).
+     * error sube y tampoco se llama (no se gasta a ciegas). [modelo] mimo-* con Token Plan: manda el corte por Credits.
      */
-    suspend fun verificar() {
+    suspend fun verificar(modelo: String? = null) {
+        if (modelo != null && esModeloMimo(modelo) && creditosMimo?.activo == true) {
+            creditosMimo.verificar()
+            return
+        }
         val estado = estado()
         if (estado.estaDesactivado) {
             throw ErrorDemasiadosIntentos(
