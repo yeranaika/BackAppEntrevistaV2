@@ -27,6 +27,8 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `JSEARCH_API_HOST`, `JSEARCH_API_KEY` | No | API de empleo principal |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `MIMO_API_KEY` | No | IA (generación de preguntas y evaluación premium). Basta una; con varias, la evaluación usa OpenAI, luego Anthropic, luego MiMo (D30) |
 | `MIMO_BASE_URL` | No | Base de la API de MiMo (por defecto `https://api.xiaomimimo.com/v1`) |
+| `MIMO_TOKEN_PLAN_CREDITOS` | No | Credits por periodo del Token Plan de MiMo. Sin definir: 4.100.000.000 (plan Lite) si `MIMO_API_KEY` empieza con `tp-`; 0 lo apaga (D31) |
+| `MIMO_TOKEN_PLAN_DIA_RENOVACION` | No | Día del mes (1–28, UTC) en que se renueva el Token Plan; por defecto 1 (D31) |
 | `LIMITE_REGISTROS_POR_IP`, `LIMITE_RECUPERACIONES_POR_IP` | No (30 / 5) | Límites por IP (compartidos entre instancias en Redis) |
 | `LIMITE_EVALUACIONES_IA_MENSUAL` | No (30) | Reportes con IA por usuario premium y mes (UTC); al llegar al tope el reporte sale con el motor freemium; `0` = sin IA |
 | `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` | No (5) | Gasto estimado máximo (USD) en generar preguntas con IA por mes calendario UTC, sumando todos los admins y las llamadas fallidas; al llegar responde `429 tope_generacion_ia_alcanzado`. `0` = generación con IA desactivada; negativo o no numérico cuenta como `0` (D23) |

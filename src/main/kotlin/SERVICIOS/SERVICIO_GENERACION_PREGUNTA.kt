@@ -90,7 +90,7 @@ class ServicioGeneracionPregunta(
         val nombreSkill = pedido.skillId?.let { catalogo.nombreSkill(it) }
         val proveedor = proveedores[tipoProveedor(pedido.modelo)]
             ?: throw ErrorServicioExterno("provider_not_configured", "No hay proveedor para el modelo ${pedido.modelo}")
-        topeMensual.verificar()
+        topeMensual.verificar(pedido.modelo)
 
         // Después del tope: si no se va a generar, tampoco se gasta cuota de las APIs de empleo.
         val contextoMercado = when {

@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -69,10 +70,10 @@ class PruebaControladorCostosIa {
         )
     }
 
-    private fun generacion(fecha: String, costo: Double?, exitosa: Boolean, entrada: Int = 1_000, salida: Int = 500, en: SistemaPrueba = sistema) = transaction(en.db) {
+    private fun generacion(fecha: String, costo: Double?, exitosa: Boolean, entrada: Int = 1_000, salida: Int = 500, en: SistemaPrueba = sistema, modelo: String = "gpt-4o-mini") = transaction(en.db) {
         TablaGeneracionPreguntaIa.insert {
             it[generacionId] = UUID.randomUUID()
-            it[modeloLlm] = "gpt-4o-mini"
+            it[modeloLlm] = modelo
             it[promptEnviado] = "prompt"
             it[parseExitoso] = exitosa
             it[tokensInput] = entrada
@@ -185,6 +186,40 @@ class PruebaControladorCostosIa {
         assertTrue(tope["estaDesactivado"]!!.jsonPrimitive.boolean)
         assertFalse(tope["estaAgotado"]!!.jsonPrimitive.boolean)
         assertEquals(0.0, tope["restanteUsd"]!!.jsonPrimitive.double, 0.0)
+    }
+
+    @Test
+    fun `sin Token Plan de MiMo el plan viaja en null`() = testApplication {
+        application { sistema.montar(this) }
+        val cuerpo = pedir(token("admin@ejemplo.com", ROL_ADMIN)).json()
+        assertTrue("planTokenMimo" in cuerpo.keys, "la clave viaja aunque valga null")
+        assertEquals(JsonNull, cuerpo["planTokenMimo"])
+    }
+
+    @Test
+    fun `con Token Plan el admin ve los Credits del periodo frente al plan`() = testApplication {
+        val conPlan = SistemaPrueba(
+            relojTopeGeneracionIa = RelojAjustable(Instant.parse("2026-11-19T12:00:00Z")),
+            creditosTokenPlanMimo = 4_100_000_000,
+            diaRenovacionTokenPlanMimo = 18
+        )
+        application { conPlan.montar(this) }
+        generacion("2026-11-18T09:00:00Z", 0.001, exitosa = true, en = conPlan, modelo = "mimo-v2.6-pro") // 300 000 + 300 000
+        generacion("2026-11-19T09:00:00Z", null, exitosa = false, en = conPlan, modelo = "mimo-v2.6-flash") // 100 000 + 100 000
+        generacion("2026-11-17T23:59:59Z", 0.001, exitosa = true, en = conPlan, modelo = "mimo-v2.6-pro") // periodo anterior
+        generacion("2026-11-19T10:00:00Z", 0.001, exitosa = true, en = conPlan) // gpt: no gasta Credits
+        val admin = token("admin@ejemplo.com", ROL_ADMIN, en = conPlan)
+
+        val plan = pedir(admin).json()["planTokenMimo"]!!.jsonObject
+
+        assertEquals(setOf("desde", "hasta", "creditosPlan", "creditosUsados", "creditosRestantes", "llamadas", "estaAgotado"), plan.keys)
+        assertEquals("2026-11-18", plan["desde"]!!.jsonPrimitive.content)
+        assertEquals("2026-12-18", plan["hasta"]!!.jsonPrimitive.content)
+        assertEquals(4_100_000_000L, plan["creditosPlan"]!!.jsonPrimitive.long)
+        assertEquals(800_000L, plan["creditosUsados"]!!.jsonPrimitive.long)
+        assertEquals(4_099_200_000L, plan["creditosRestantes"]!!.jsonPrimitive.long)
+        assertEquals(2, plan["llamadas"]!!.jsonPrimitive.int)
+        assertFalse(plan["estaAgotado"]!!.jsonPrimitive.boolean)
     }
 
     @Test

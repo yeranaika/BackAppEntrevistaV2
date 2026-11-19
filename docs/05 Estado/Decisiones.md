@@ -346,3 +346,24 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   `refusal: null` de OpenAI. `PruebaServicioGeneracionPregunta` cubre el
   enrutamiento y el costo. Ninguna prueba llama a la API real.
 
+## D31 · Credits del Token Plan de MiMo en vez del tope en USD (2026-11)
+- **Contexto**: producción usa el Token Plan de MiMo (clave `tp-`, plan Lite: US$6 al mes por 4.100 millones de
+  Credits). Es de precio fijo, así que el tope en USD de D23 (que estima el costo como si se pagara por uso) no dice lo
+  que de verdad queda: el límite real son los Credits del plan. MiMo no tiene una API para leer el saldo; solo su
+  consola lo muestra.
+- **Decisión**:
+  - **Cálculo propio:** `ServicioCreditosTokenPlan` suma los tokens de cada llamada a un modelo `mimo-*` registrada por
+    el servidor (reportes de entrevista y generación de preguntas, también las fallidas) y los convierte con la tabla
+    oficial de Credits por token: flash 100 de entrada y 200 de salida, pro 300 y 600 (un `mimo-*` desconocido cuenta
+    como pro). La respuesta no dice qué parte de la entrada vino de caché, así que todo se cuenta sin caché: el gasto
+    queda estimado hacia arriba. Lo que se use con la misma clave fuera de la app no aparece.
+  - **Configuración:** `MIMO_TOKEN_PLAN_CREDITOS` (acepta separadores de miles; 0 lo apaga). Sin definir, se asume el
+    plan Lite si `MIMO_API_KEY` empieza con `tp-`, y nada si no. `MIMO_TOKEN_PLAN_DIA_RENOVACION` (1–28, por defecto 1)
+    es el día del mes en que se renueva el plan; el periodo va de ese día al mismo día del mes siguiente (UTC).
+  - **Tope:** con Token Plan activo, `generar-ia` con un modelo `mimo-*` se frena por Credits (`429
+    tope_generacion_ia_alcanzado`, el mismo código) y no por USD; los demás modelos siguen con el tope en USD (D23).
+  - **Panel:** `GET /api/v1/admin/costos-ia` trae `planTokenMimo` (7 claves, o `null` sin Token Plan). El panel lo
+    muestra en lugar del tope en pesos.
+- **Pruebas**: `PruebaServicioCreditosTokenPlan` (tabla, periodo con día de renovación, borde de agotado, enrutamiento
+  del tope por modelo, lectura de la variable) y `PruebaControladorCostosIa` (el JSON con y sin plan). Ninguna llama a
+  MiMo.

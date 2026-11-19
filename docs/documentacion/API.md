@@ -1529,7 +1529,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
 | 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
-| 429 | `tope_generacion_ia_alcanzado` | La generación de preguntas con IA está desactivada en el servidor (LIMITE_GASTO_GENERACION_IA_MENSUAL_USD = 0) |
+| 429 | `tope_generacion_ia_alcanzado` | Se acabaron los Credits del Token Plan de MiMo de este periodo; se renuevan el … (UTC) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |
 | 502 | `provider_invalid_output` | La IA devolvió preguntas que no cumplen las reglas de calidad |
 | 502 | `provider_refusal` | El modelo se negó a generar las preguntas |
