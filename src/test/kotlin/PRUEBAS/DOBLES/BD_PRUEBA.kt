@@ -211,7 +211,7 @@ class SistemaPrueba(
     val ofertas = INTEGRACIONES.OfertasEnCache(clienteMercado, cache)
     val contextoMercado = SERVICIOS.ServicioContextoMercado(ofertas, mercadoRepo)
     val generacion = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa, TipoProveedorIa.MIMO to proveedorIa), generaciones, catalogo,
         topeGeneracionIa,
         mercado = contextoMercado
     )
