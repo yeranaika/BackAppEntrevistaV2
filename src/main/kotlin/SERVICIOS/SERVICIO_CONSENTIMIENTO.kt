@@ -37,13 +37,17 @@ class ServicioConsentimiento(
 
     suspend fun versiones(): List<TextoConsentimiento> = textos.listar()
 
-    suspend fun publicar(version: String, titulo: String, cuerpo: String): TextoConsentimiento {
+    suspend fun publicar(version: String, titulo: String, cuerpo: String, alcances: List<String>? = null): TextoConsentimiento {
         val versionLimpia = version.trim()
         if (versionLimpia.isEmpty() || versionLimpia.length > LARGO_MAXIMO_VERSION) {
             throw ErrorValidacion("version_invalida", "La versión es obligatoria y de hasta $LARGO_MAXIMO_VERSION caracteres")
         }
         if (titulo.isBlank() || cuerpo.isBlank()) throw ErrorValidacion("missing_fields", "El título y el cuerpo son obligatorios")
-        return textos.publicar(versionLimpia, titulo.trim(), cuerpo)
+        val alcancesLimpios = alcances?.map { it.trim() }
+        if (alcancesLimpios != null && alcancesLimpios.any { it.isEmpty() || it.length > LARGO_MAXIMO_ALCANCE }) {
+            throw ErrorValidacion("alcance_invalido", "Hay alcances con nombre vacío o demasiado largo")
+        }
+        return textos.publicar(versionLimpia, titulo.trim(), cuerpo, alcancesLimpios?.distinct())
     }
 
     suspend fun otorgar(usuarioId: UUID, version: String, alcances: Map<String, Boolean>, ipOrigen: String?): Consentimiento {

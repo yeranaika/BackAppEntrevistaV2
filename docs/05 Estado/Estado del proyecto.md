@@ -39,6 +39,7 @@ actualizado: 2026-11-17
 | Credits del Token Plan de MiMo | `GET /api/v1/admin/costos-ia` trae `planTokenMimo` (Credits usados del periodo frente al plan, calculados con los tokens de cada llamada a MiMo); con Token Plan, `generar-ia` con `mimo-*` se frena por Credits y no por USD (D31) | `feature/creditos-token-plan` | (ver git log) | 437 pruebas · 2 mutaciones detectadas (2026-11-19) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
+| Consentimiento v1.1 y documentos legales | Texto `v1.1` sin video ni emociones (RNF09/RNF10), alcances `analytics`/`marketing` como los de la app, `alcances` opcional al publicar; Privacidad y Términos 1.1.0 (D32) | `feature/consentimiento-v1-1` | (ver git log) | 438 pruebas · semilla 7/7 |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
