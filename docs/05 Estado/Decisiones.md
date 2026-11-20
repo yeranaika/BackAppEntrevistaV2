@@ -387,7 +387,9 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   - Política de Privacidad y Términos pasan a `1.1.0` (`VERSION_DOCUMENTOS_ESTATICOS`); la semilla carga la `v1.1`.
   - En producción la `v1.1` se publica por la API (no por la semilla, que no pisa la `v1.0` existente): al publicarla,
     la app pide a cada usuario aceptar otra vez.
-- **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise; la app no tiene botón
-  para retirar el consentimiento (`POST /me/consent/revoke` existe), por eso el texto indica escribir a ese correo.
+- **App**: Perfil › Privacidad y consentimiento permite cambiar las opciones (vuelve a aceptar la misma versión con
+  los alcances nuevos) y retirar el consentimiento (`POST /me/consent/revoke`; la app lo pide de nuevo antes de
+  seguir). Rama `feature/gestionar-consentimiento` de la app: publicar la `v1.1` después de instalar esa versión.
+- **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise.
 - **Pruebas**: `PruebaServicioConsentimiento` (alcances guardados, conservados al republicar, mapa con los rechazados
   en `false`, alcance vacío rechazado). `PROBAR_SEMILLA.ps1` 7/7 y la `v1.1` cargada con saltos de línea y alcances.

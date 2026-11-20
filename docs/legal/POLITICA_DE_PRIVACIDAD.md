@@ -27,11 +27,11 @@ En EntrevistaApp protegemos tus datos personales conforme a la ley chilena de pr
 - No vendemos tus datos ni los usamos para publicidad.
 
 ### 4. ESTADÍSTICAS DE USO Y ERRORES (OPCIONAL)
-Si lo aceptas en el consentimiento, la app envía a Firebase (Google) estadísticas de uso (qué pantallas se usan y qué acciones se completan) e informes de errores para mejorarla. No incluyen tu nombre, tu correo, tu identificador de usuario ni el contenido de tus respuestas, y no usan el identificador de publicidad. Puedes cambiar esta opción cuando quieras.
+Si lo aceptas en el consentimiento, la app envía a Firebase (Google) estadísticas de uso (qué pantallas se usan y qué acciones se completan) e informes de errores para mejorarla. No incluyen tu nombre, tu correo, tu identificador de usuario ni el contenido de tus respuestas, y no usan el identificador de publicidad. Puedes cambiar esta opción cuando quieras en Perfil › Privacidad y consentimiento.
 
 ### 5. SEGURIDAD Y CONSERVACIÓN
 - Los datos viajan cifrados (HTTPS/TLS); las contraseñas se guardan con Argon2id y cada persona solo accede a su propio historial.
 - Conservamos tus datos mientras tengas tu cuenta. Al eliminarla (Perfil › Editar perfil › Eliminar cuenta) se borran tu cuenta y tus datos de práctica. Los registros de compras pueden conservarse el tiempo que exija la ley.
 
 ### 6. TUS DERECHOS
-En cualquier momento puedes pedir acceso, rectificación, supresión, oposición y portabilidad de tus datos, y retirar tu consentimiento. Para ejercerlos escribe a privacidad@entrevistaapp.com. Si retiras el consentimiento, no podrás seguir practicando hasta aceptarlo de nuevo.
+Puedes retirar tu consentimiento cuando quieras en Perfil › Privacidad y consentimiento; para seguir practicando tendrás que aceptarlo de nuevo. Para pedir acceso, rectificación, supresión, oposición o portabilidad de tus datos, escribe a privacidad@entrevistaapp.com.

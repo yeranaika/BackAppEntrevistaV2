@@ -11,7 +11,9 @@ Al publicar una versión nueva, la app le pide a cada usuario que la acepte otra
 
 Cambios frente a la v1.0: ya no habla de "grabaciones de video" ni del alcance `analisis_video_expresiones`, que
 contradecían RNF09 (el video no se graba y el dictado se hace en el teléfono) y RNF10 (feedback sin emociones); dice
-qué va al proveedor de IA y qué no; explica las dos opciones; y no promete una revocación desde un menú que no existe.
+qué va al proveedor de IA y qué no; explica las dos opciones; y lleva a Perfil › Privacidad y consentimiento, donde la app (rama
+`feature/gestionar-consentimiento`) permite cambiar las opciones y retirar el consentimiento. Publicar esta versión
+**después** de que esa versión de la app esté instalada.
 
 ---8<---
 Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus datos. Aquí te contamos cuáles, para qué y qué no hacemos con ellos.
@@ -36,12 +38,12 @@ Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus da
 4. Dos opciones que tú decides
 • Estadísticas de uso y errores: datos sobre qué partes de la app se usan y cuándo falla, para mejorarla. No incluyen tu nombre, tu correo ni lo que respondes.
 • Comunicaciones: novedades y consejos de la app.
-Si no las aceptas, la app funciona igual.
+Si no las aceptas, la app funciona igual. Puedes cambiarlas cuando quieras en Perfil › Privacidad y consentimiento.
 
 5. Seguridad y conservación
 • Tus datos viajan cifrados y solo tú puedes ver tu historial.
 • Los guardamos mientras tengas tu cuenta. Si la eliminas (Perfil › Editar perfil › Eliminar cuenta), se borran tu cuenta y tus prácticas.
 
 6. Tus derechos
-Puedes pedir acceso, corrección o eliminación de tus datos, oponerte a su uso o retirar este consentimiento en cualquier momento, según la ley chilena de protección de datos personales (Ley 19.628, modificada por la Ley 21.719). Para hacerlo, escribe a privacidad@entrevistaapp.com. Si retiras el consentimiento, no podrás seguir practicando hasta aceptarlo de nuevo.
+Puedes retirar este consentimiento cuando quieras en Perfil › Privacidad y consentimiento; para seguir practicando tendrás que aceptarlo de nuevo. También puedes pedir acceso, corrección o eliminación de tus datos, u oponerte a su uso, según la ley chilena de protección de datos personales (Ley 19.628, modificada por la Ley 21.719), escribiendo a privacidad@entrevistaapp.com.
 ---8<---
