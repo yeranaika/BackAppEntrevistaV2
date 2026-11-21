@@ -28,15 +28,14 @@ SET search_path TO app, public;
 -- S1: CONSENTIMIENTO LEGAL
 -- =============================================================================
 
+-- Texto fuente y cambios frente a la v1.0: docs/legal/CONSENTIMIENTO.md (la app lo muestra como texto plano).
 INSERT INTO consentimiento_texto (version, titulo, cuerpo, alcances_posibles, vigente)
 VALUES (
-    'v1.0',
-    'Consentimiento de uso de datos y análisis con IA',
-    'Al usar esta plataforma aceptas que tus datos de sesión, respuestas de texto '
-    'y grabaciones de video sean procesados por modelos de IA para generar tu '
-    'reporte de desempeño personalizado. Puedes revocar este consentimiento en '
-    'cualquier momento desde Configuración > Privacidad.',
-    '["uso_datos_sesion","analisis_respuestas_texto","analisis_video_expresiones","mejora_modelos_ia","comunicaciones_plataforma"]',
+    'v1.1',
+    'Consentimiento de uso de datos',
+    E'Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus datos. Aquí te contamos cuáles, para qué y qué no hacemos con ellos.\n\n1. Qué datos usamos\n• Tu cuenta: correo, nombre y lo que eliges al empezar (área, cargo objetivo y nivel de experiencia).\n• Tus prácticas: las respuestas que escribes o dictas, las opciones que marcas, tus puntajes y tu historial.\n• El dictado por voz se convierte en texto dentro de tu teléfono. No enviamos ni guardamos tu audio.\n\n2. La cámara en la simulación de entrevista\n• La cámara solo se usa en la simulación tipo videollamada y solo si le das permiso a tu teléfono.\n• No grabamos ni enviamos video ni fotos.\n• Cuando la app mide conductas, como si tus manos están a la vista o cuánto mueves la cabeza, lo calcula en tu teléfono y solo envía números resumidos.\n• No reconocemos tu rostro ni deducimos tus emociones.\n\n3. Para qué los usamos\n• Para evaluar tus respuestas y darte un reporte con tus fortalezas, lo que te falta reforzar y recomendaciones.\n• En el plan gratuito, tus respuestas se evalúan con reglas en nuestro servidor.\n• En el plan Premium, el texto de tus respuestas y las preguntas se envían a un proveedor de inteligencia artificial (hoy Xiaomi MiMo; también podríamos usar OpenAI o Google) para escribir tu reporte. Estos proveedores pueden procesar los datos fuera de Chile. No les enviamos tu nombre ni tu correo.\n• No usamos tus respuestas para entrenar modelos de inteligencia artificial.\n\n4. Dos opciones que tú decides\n• Estadísticas de uso y errores: datos sobre qué partes de la app se usan y cuándo falla, para mejorarla. No incluyen tu nombre, tu correo ni lo que respondes.\n• Comunicaciones: novedades y consejos de la app.\nSi no las aceptas, la app funciona igual. Puedes cambiarlas cuando quieras en Perfil › Privacidad y consentimiento.\n\n5. Seguridad y conservación\n• Tus datos viajan cifrados y solo tú puedes ver tu historial.\n• Los guardamos mientras tengas tu cuenta. Si la eliminas (Perfil › Editar perfil › Eliminar cuenta), se borran tu cuenta y tus prácticas.\n\n6. Tus derechos\nPuedes retirar este consentimiento cuando quieras en Perfil › Privacidad y consentimiento; para seguir practicando tendrás que aceptarlo de nuevo. También puedes pedir acceso, corrección o eliminación de tus datos, u oponerte a su uso, según la ley chilena de protección de datos personales (Ley 19.628, modificada por la Ley 21.719), escribiendo a privacidad@entrevistaapp.com.',
+
+    '["analytics","marketing"]',
     TRUE
 )
 ON CONFLICT (version) DO NOTHING;

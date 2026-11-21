@@ -367,3 +367,29 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaServicioCreditosTokenPlan` (tabla, periodo con día de renovación, borde de agotado, enrutamiento
   del tope por modelo, lectura de la variable) y `PruebaControladorCostosIa` (el JSON con y sin plan). Ninguna llama a
   MiMo.
+
+## D32 · Consentimiento v1.1 y documentos legales alineados con RNF09/RNF10 (2026-11)
+- **Contexto**: el consentimiento v1.0 de la semilla hablaba de "grabaciones de video" y del alcance
+  `analisis_video_expresiones`, y prometía revocar "desde Configuración > Privacidad", que no existe en la app. La
+  Política de Privacidad y los Términos (1.0.0) hablaban de "transcripciones de audio", "respuestas grabadas" y
+  "análisis multimodal", sin nombrar la cámara, el proveedor de IA ni Firebase. Todo eso contradice RNF09 (el video no se
+  graba y el dictado se hace en el teléfono) y RNF10 (feedback sin emociones). Además, `POST /api/v1/legal/admin/eula`
+  no permitía indicar los alcances, así que una versión publicada por la API quedaba sin `alcances_posibles` y el mapa
+  de `GET /me/consent/latest` no traía en `false` lo que el usuario rechazó.
+- **Decisión**:
+  - Texto nuevo `v1.1` en `docs/legal/CONSENTIMIENTO.md` (fuente única; la app lo muestra como texto plano), con los
+    alcances que ya envía la app: `["analytics", "marketing"]`. Dice qué datos se usan, que el audio y el video no salen
+    del teléfono, que no se reconoce el rostro ni se deducen emociones, qué va al proveedor de IA en Premium (sin
+    nombre ni correo, posiblemente fuera de Chile), que no se entrena IA con las respuestas, y los derechos según la Ley
+    19.628 modificada por la Ley 21.719.
+  - `SolicitudPublicarTexto` acepta `alcances` (opcional): en una versión nueva sin `alcances` queda la lista vacía; al
+    republicar una existente sin `alcances` se conservan los que tenía.
+  - Política de Privacidad y Términos pasan a `1.1.0` (`VERSION_DOCUMENTOS_ESTATICOS`); la semilla carga la `v1.1`.
+  - En producción la `v1.1` se publica por la API (no por la semilla, que no pisa la `v1.0` existente): al publicarla,
+    la app pide a cada usuario aceptar otra vez.
+- **App**: Perfil › Privacidad y consentimiento permite cambiar las opciones (vuelve a aceptar la misma versión con
+  los alcances nuevos) y retirar el consentimiento (`POST /me/consent/revoke`; la app lo pide de nuevo antes de
+  seguir). Rama `feature/gestionar-consentimiento` de la app: publicar la `v1.1` después de instalar esa versión.
+- **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise.
+- **Pruebas**: `PruebaServicioConsentimiento` (alcances guardados, conservados al republicar, mapa con los rechazados
+  en `false`, alcance vacío rechazado). `PROBAR_SEMILLA.ps1` 7/7 y la `v1.1` cargada con saltos de línea y alcances.

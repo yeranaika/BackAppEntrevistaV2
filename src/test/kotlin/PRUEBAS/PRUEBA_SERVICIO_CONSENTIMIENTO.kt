@@ -55,6 +55,21 @@ class PruebaServicioConsentimiento {
     }
 
     @Test
+    fun `publicar guarda los alcances posibles y volver a publicar sin ellos los conserva`() = runBlocking<Unit> {
+        servicio.publicar("1.1", "Consentimiento", "Texto", listOf(" analytics ", "marketing", "analytics"))
+        assertEquals(listOf("analytics", "marketing"), servicio.textoVigente().alcancesPosibles)
+
+        servicio.publicar("1.1", "Consentimiento", "Texto corregido")
+        assertEquals(listOf("analytics", "marketing"), servicio.textoVigente().alcancesPosibles)
+
+        // El mapa para la app marca en false lo que el usuario no aceptó, aunque no lo haya enviado.
+        val consentimiento = servicio.otorgar(ana, "1.1", mapOf("analytics" to true), "10.0.0.1")
+        assertEquals(mapOf("analytics" to true, "marketing" to false), servicio.alcancesComoMapa(consentimiento))
+
+        fallaCon<ErrorValidacion>("alcance_invalido") { servicio.publicar("1.2", "Consentimiento", "Texto", listOf(" ")) }
+    }
+
+    @Test
     fun `otorgar guarda los alcances aceptados y el permiso de entrenamiento en sus columnas reales`() = runBlocking<Unit> {
         val version = servicio.textoVigente().version
         servicio.otorgar(ana, version, mapOf("uso_datos" to true, "ia_entrenamiento" to true, "marketing" to false), "10.0.0.1")

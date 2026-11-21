@@ -37,8 +37,8 @@ interface RepositorioTextoConsentimiento {
     suspend fun buscar(version: String): TextoConsentimiento?
     suspend fun listar(): List<TextoConsentimiento>
 
-    /** Deja [version] como la única vigente (la crea o actualiza su contenido). */
-    suspend fun publicar(version: String, titulo: String, cuerpo: String): TextoConsentimiento
+    /** Deja [version] como la única vigente (la crea o actualiza su contenido). [alcances] null conserva los que tenía. */
+    suspend fun publicar(version: String, titulo: String, cuerpo: String, alcances: List<String>? = null): TextoConsentimiento
 }
 
 interface RepositorioConsentimiento {
@@ -66,12 +66,13 @@ class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
         TablaTextoConsentimiento.selectAll().orderBy(TablaTextoConsentimiento.fechaPublicacion to SortOrder.DESC).map { it.aTexto() }
     }
 
-    override suspend fun publicar(version: String, titulo: String, cuerpo: String): TextoConsentimiento = transaccion {
+    override suspend fun publicar(version: String, titulo: String, cuerpo: String, alcances: List<String>?): TextoConsentimiento = transaccion {
         val ahora = OffsetDateTime.now()
         TablaTextoConsentimiento.update({ TablaTextoConsentimiento.vigente eq true }) { it[vigente] = false }
         val actualizadas = TablaTextoConsentimiento.update({ TablaTextoConsentimiento.version eq version }) {
             it[TablaTextoConsentimiento.titulo] = titulo
             it[TablaTextoConsentimiento.cuerpo] = cuerpo
+            if (alcances != null) it[alcancesPosibles] = alcances
             it[vigente] = true
             it[fechaPublicacion] = ahora
         }
@@ -80,6 +81,7 @@ class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
                 it[TablaTextoConsentimiento.version] = version
                 it[TablaTextoConsentimiento.titulo] = titulo
                 it[TablaTextoConsentimiento.cuerpo] = cuerpo
+                it[alcancesPosibles] = alcances.orEmpty()
                 it[vigente] = true
                 it[fechaPublicacion] = ahora
             }

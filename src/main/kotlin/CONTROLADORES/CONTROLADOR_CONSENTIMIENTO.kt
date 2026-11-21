@@ -23,16 +23,16 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-private const val VERSION_DOCUMENTOS_ESTATICOS = "1.0.0"
+private const val VERSION_DOCUMENTOS_ESTATICOS = "1.1.0"
 
 /**
  * GET  /consent/current              texto legal vigente (Android)
- * POST /admin/consent/text           publicar versión (admin)
+ * POST /admin/consent/text           publicar versión (admin) { version, title, body, alcances? }
  * POST /me/consent                   aceptar { version, alcances: { nombre: bool } }
  * GET  /me/consent/latest            consentimiento vigente (204 si no hay)
  * POST /me/consent/revoke
  * GET  /api/v1/legal/eula | versions | terms | privacy
- * POST /api/v1/legal/admin/eula      publicar versión (admin)
+ * POST /api/v1/legal/admin/eula      publicar versión (admin) { version, title, body, alcances? }
  */
 fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos: FuenteDocumentosLegales) {
     get("/consent/current") {
@@ -44,7 +44,7 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
             post("/text") {
                 val solicitud = call.receive<SolicitudPublicarTexto>()
                 call.responderConMensaje(
-                    servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aRespuestaTexto(),
+                    servicio.publicar(solicitud.version, solicitud.title, solicitud.body, solicitud.alcances).aRespuestaTexto(),
                     "Texto legal publicado (versión ${solicitud.version})",
                     HttpStatusCode.Created
                 )
@@ -100,7 +100,7 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
                 post("/eula") {
                     val solicitud = call.receive<SolicitudPublicarTexto>()
                     call.responderConMensaje(
-                        servicio.publicar(solicitud.version, solicitud.title, solicitud.body).aDocumentoLegal(),
+                        servicio.publicar(solicitud.version, solicitud.title, solicitud.body, solicitud.alcances).aDocumentoLegal(),
                         "EULA publicada (versión ${solicitud.version})",
                         HttpStatusCode.Created
                     )
