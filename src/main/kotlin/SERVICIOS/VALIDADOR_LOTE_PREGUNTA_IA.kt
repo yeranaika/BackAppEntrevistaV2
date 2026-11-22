@@ -5,13 +5,16 @@ import ESQUEMAS.LoteLlm
 import ESQUEMAS.OPCIONES_POR_PREGUNTA_IA
 import ESQUEMAS.PALABRAS_CLAVE_MINIMAS
 import ESQUEMAS.PreguntaLlm
+import MODELOS.CategoriaHabilidad
 import MODELOS.TipoPregunta
 import kotlinx.serialization.json.Json
 
 private const val LARGO_MINIMO_RESPUESTA_IDEAL = 40
 private const val ORACIONES_MINIMAS_RESPUESTA = 3
+private const val ORACIONES_MINIMAS_RESPUESTA_TECNICA = 2
 private const val LARGO_MINIMO_ORACION = 12
-private const val LARGO_MINIMO_PALABRA_CLAVE = 3
+/** Admite términos cortos de tecnologías: "Go", "C#", "R" con 2 letras o símbolo ("C#" mide 2). */
+private const val LARGO_MINIMO_PALABRA_CLAVE = 2
 
 /** El lote del LLM no cumple las reglas; el motivo queda para el log, nunca para el cliente. */
 class LoteInvalidoException(motivo: String) : RuntimeException(motivo)
@@ -28,7 +31,15 @@ object ValidadorLotePreguntaIa {
     }
     private val componentesStar = listOf("situacion", "tarea", "accion", "resultado")
 
-    fun parsearYValidar(json: String, cantidadEsperada: Int, tipoEsperado: TipoPregunta): List<PreguntaLlm> {
+    /** Método de la rúbrica que se pide a la IA según la categoría: STAR solo para las de comportamiento. */
+    fun metodoDe(categoria: CategoriaHabilidad) = if (categoria == CategoriaHabilidad.BLANDA) "STAR" else "TECNICA"
+
+    fun parsearYValidar(
+        json: String,
+        cantidadEsperada: Int,
+        tipoEsperado: TipoPregunta,
+        categoria: CategoriaHabilidad = CategoriaHabilidad.BLANDA
+    ): List<PreguntaLlm> {
         val preguntas = try {
             jsonEstricto.decodeFromString<LoteLlm>(json).preguntas
         } catch (e: Exception) {
@@ -36,24 +47,31 @@ object ValidadorLotePreguntaIa {
         }
         exigir(preguntas.size == cantidadEsperada, "cantidad_incorrecta")
         exigir(preguntas.map { identidad(it.enunciado) }.toSet().size == preguntas.size, "enunciado_duplicado")
-        preguntas.forEach { validarPregunta(it, tipoEsperado) }
+        preguntas.forEach { validarPregunta(it, tipoEsperado, categoria) }
         return preguntas
     }
 
-    private fun validarPregunta(pregunta: PreguntaLlm, tipoEsperado: TipoPregunta) {
+    private fun validarPregunta(pregunta: PreguntaLlm, tipoEsperado: TipoPregunta, categoria: CategoriaHabilidad) {
+        val esDeComportamiento = categoria == CategoriaHabilidad.BLANDA
         exigir(pregunta.enunciado.isNotBlank(), "enunciado_vacio")
         exigir(pregunta.tipoPregunta == tipoEsperado.valorBd, "tipo_incorrecto")
         exigir(pregunta.respuestaIdeal.length >= LARGO_MINIMO_RESPUESTA_IDEAL, "respuesta_incompleta")
-        exigir(segmentosTipoOracion(pregunta.respuestaIdeal) >= ORACIONES_MINIMAS_RESPUESTA, "respuesta_sin_tres_oraciones")
 
         val rubrica = pregunta.rubrica
-        exigir(rubrica.metodo == "STAR", "metodo_incorrecto")
         exigir(rubrica.criterios.size >= CRITERIOS_MINIMOS_RUBRICA, "faltan_criterios")
-        val criterios = normalizar(rubrica.criterios.joinToString(" "))
-        val respuesta = normalizar(pregunta.respuestaIdeal)
-        componentesStar.forEach { componente ->
-            exigir(criterios.contains(componente), "rubrica_sin_$componente")
-            exigir(respuesta.contains(componente), "respuesta_sin_$componente")
+        if (esDeComportamiento) {
+            // Solo las de comportamiento se responden con STAR; una pregunta técnica forzada a ese formato sale rara.
+            exigir(pregunta.respuestaIdeal.let { segmentosTipoOracion(it) >= ORACIONES_MINIMAS_RESPUESTA }, "respuesta_sin_tres_oraciones")
+            exigir(rubrica.metodo == "STAR", "metodo_incorrecto")
+            val criterios = normalizar(rubrica.criterios.joinToString(" "))
+            val respuesta = normalizar(pregunta.respuestaIdeal)
+            componentesStar.forEach { componente ->
+                exigir(criterios.contains(componente), "rubrica_sin_$componente")
+                exigir(respuesta.contains(componente), "respuesta_sin_$componente")
+            }
+        } else {
+            exigir(segmentosTipoOracion(pregunta.respuestaIdeal) >= ORACIONES_MINIMAS_RESPUESTA_TECNICA, "respuesta_sin_dos_oraciones")
+            exigir(rubrica.metodo == metodoDe(categoria) || rubrica.metodo == "STAR", "metodo_incorrecto")
         }
         exigir(
             rubrica.palabrasClave.size >= PALABRAS_CLAVE_MINIMAS &&

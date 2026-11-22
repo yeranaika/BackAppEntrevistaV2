@@ -1,5 +1,6 @@
 package ESQUEMAS
 
+import MODELOS.CategoriaHabilidad
 import MODELOS.TipoPregunta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -52,7 +53,7 @@ data class OpcionLlm(
 
 /** JSON Schema que se envía al proveedor (structured outputs) para un lote de [cantidad] preguntas. */
 object EsquemaJsonLoteLlm {
-    fun construir(cantidad: Int, tipo: TipoPregunta): JsonObject = objeto(
+    fun construir(cantidad: Int, tipo: TipoPregunta, categoria: CategoriaHabilidad = CategoriaHabilidad.BLANDA): JsonObject = objeto(
         "type" to texto("object"),
         "additionalProperties" to logico(false),
         "required" to lista("preguntas"),
@@ -61,12 +62,12 @@ object EsquemaJsonLoteLlm {
                 "type" to texto("array"),
                 "minItems" to numero(cantidad),
                 "maxItems" to numero(cantidad),
-                "items" to pregunta(tipo)
+                "items" to pregunta(tipo, categoria)
             )
         )
     )
 
-    private fun pregunta(tipo: TipoPregunta): JsonObject = objeto(
+    private fun pregunta(tipo: TipoPregunta, categoria: CategoriaHabilidad): JsonObject = objeto(
         "type" to texto("object"),
         "additionalProperties" to logico(false),
         "required" to lista("enunciado", "tipo_pregunta", "respuesta_ideal", "rubrica_evaluacion", "opciones"),
@@ -74,17 +75,20 @@ object EsquemaJsonLoteLlm {
             "enunciado" to objeto("type" to texto("string"), "minLength" to numero(1)),
             "tipo_pregunta" to objeto("type" to texto("string"), "const" to texto(tipo.valorBd)),
             "respuesta_ideal" to objeto("type" to texto("string"), "minLength" to numero(1)),
-            "rubrica_evaluacion" to rubrica(),
+            "rubrica_evaluacion" to rubrica(categoria),
             "opciones" to opciones(tipo)
         )
     )
 
-    private fun rubrica(): JsonObject = objeto(
+    private fun rubrica(categoria: CategoriaHabilidad): JsonObject = objeto(
         "type" to texto("object"),
         "additionalProperties" to logico(false),
         "required" to lista("metodo", "criterios", "palabras_clave", "tiempo_esperado_seg"),
         "properties" to objeto(
-            "metodo" to objeto("type" to texto("string"), "const" to texto("STAR")),
+            "metodo" to objeto(
+                "type" to texto("string"),
+                "const" to texto(if (categoria == CategoriaHabilidad.BLANDA) "STAR" else "TECNICA")
+            ),
             "criterios" to objeto(
                 "type" to texto("array"),
                 "minItems" to numero(CRITERIOS_MINIMOS_RUBRICA),
@@ -93,7 +97,7 @@ object EsquemaJsonLoteLlm {
             "palabras_clave" to objeto(
                 "type" to texto("array"),
                 "minItems" to numero(PALABRAS_CLAVE_MINIMAS),
-                "items" to objeto("type" to texto("string"), "minLength" to numero(3))
+                "items" to objeto("type" to texto("string"), "minLength" to numero(2))
             ),
             "tiempo_esperado_seg" to objeto("type" to texto("integer"), "minimum" to numero(1)),
             "respuestas_alternativas" to objeto(

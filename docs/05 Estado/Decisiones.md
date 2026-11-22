@@ -403,3 +403,14 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   reales; arreglar la validación STAR obligatoria y las palabras clave de 2 letras del lote de IA (ver
   `Analisis feedback lento.md`).
 - **Pruebas**: `PruebaComparadorTextos` (11 casos nuevos en total con las de validación, reporte y esquema de IA).
+
+## D34 · STAR solo para preguntas de comportamiento y claves de 2 letras en la generación con IA (2026-11)
+- **Problema:** el validador del lote de IA exigía método STAR (y las palabras Situación/Tarea/Acción/Resultado en la
+  respuesta ideal) a todas las preguntas, también a las técnicas: la IA fallaba (llamada pagada perdida) o escribía
+  respuestas artificiales que luego se mostraban como "respuesta ideal". Además una palabra clave de menos de 3 letras
+  ("Go", "C#") invalidaba el lote completo.
+- **Decisión:** la categoría `blanda` mantiene STAR completo (3 oraciones, método `STAR`); la `tecnica` pide método
+  `TECNICA` (se acepta `STAR` por compatibilidad), 2 oraciones y 4 criterios. El esquema de `generar-ia` y el prompt
+  cambian según la categoría. Las palabras clave admiten 2 letras (`Go`, `C#`); una sola letra sigue siendo inválida.
+- **Pruebas**: `PruebaValidadorLotePreguntaIa` (5 casos). Sigue pendiente aceptar lo válido de un lote parcial y rechazar
+  preguntas abiertas manuales con rúbrica vacía.
