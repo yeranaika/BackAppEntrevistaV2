@@ -367,3 +367,22 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaServicioCreditosTokenPlan` (tabla, periodo con día de renovación, borde de agotado, enrutamiento
   del tope por modelo, lectura de la variable) y `PruebaControladorCostosIa` (el JSON con y sin plan). Ninguna llama a
   MiMo.
+
+## D32 · El feedback debe estar listo en menos de 5 min (2026-11)
+- **Pedido:** el reporte de feedback (con o sin IA) tiene que estar disponible a menos de 5 min de finalizar la entrevista.
+- **Decisión:**
+  - **Tope de la IA:** `TIEMPO_MAXIMO_EVALUACION_IA` = 45 s para toda la evaluación (reintentos del proveedor incluidos).
+    Pasado el tope sale el reporte con el motor freemium y **no** consume cupo (D17). Antes el peor caso era ~2,3 min
+    (70 s × 2 intentos) y el rescate dejaba un reporte atascado hasta ~15 min.
+  - **Rescate:** cada 1 min (antes 5) y un reporte en "generando" se da por abandonado a los 3 min
+    (`VIGENCIA_RESERVA_IA`, antes 10). Debe ser mayor que el tope de la IA (45 s).
+  - **Palabras clave del motor freemium:** `C#`, `C++`, `F#` y `.NET` se normalizan a letras (antes `C#` quedaba como
+    `c` y coincidía con casi cualquier texto); la coincidencia empieza en inicio de palabra, y las claves de 3 letras
+    o menos (`go`, `sql`) exigen la palabra completa.
+  - **Tiempos por reporte** en el log (`Reporte … listo en … ms (cálculo, guardado, modo)`) para medir p50/p95.
+- **Medido (2026-11-19, MiMo `mimo-v2.6-flash`, 5 respuestas abiertas):** freemium 60–120 ms; con IA 24 s. E2E fase 7
+  con `-ConIa` 25/25.
+- **Pendiente (P1):** feedback por niveles (freemium básico con respuesta ideal; premium detallado con "por qué
+  falló"), reporte en dos fases, evaluación en lotes paralelos. Ver `Analisis feedback lento.md`.
+- **Pruebas**: `PruebaEvaluadorRespuesta` (símbolos y palabras cortas) y `PruebaServicioReporte` (IA lenta → freemium
+  sin consumir cupo; tiempos del rescate).
