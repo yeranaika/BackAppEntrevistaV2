@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [estado, fases, ramas]
-actualizado: 2026-11-21
+actualizado: 2026-11-22
 ---
 
 # Estado del proyecto
@@ -39,6 +39,7 @@ actualizado: 2026-11-21
 | Credits del Token Plan de MiMo | `GET /api/v1/admin/costos-ia` trae `planTokenMimo` (Credits usados del periodo frente al plan, calculados con los tokens de cada llamada a MiMo); con Token Plan, `generar-ia` con `mimo-*` se frena por Credits y no por USD (D31) | `feature/creditos-token-plan` | (ver git log) | 437 pruebas · 2 mutaciones detectadas (2026-11-19) |
 | Feedback en menos de 5 min | Tope de 45 s para la IA (si se pasa, reporte freemium sin gastar cupo), rescate cada 1 min y reporte atascado a los 3 min, palabras clave con `C#`/`C++`/`.NET` corregidas y log de tiempos (D32). Medido con MiMo real: 24 s con IA, ~0,1 s freemium | `feature/feedback-menos-de-5-min` | (ver git log) | pruebas completas en verde · E2E fase 7 con `-ConIa` 25/25 (2026-11-19) |
 | Feedback freemium con comparador | `ComparadorTextos` (TF-IDF + cobertura + Jaccard + orden, varias referencias y sinónimos) sin IA; `respuestas_alternativas` y `sinonimos` en la rúbrica (manual y generada por IA); resumen freemium con nivel bueno/medio/bajo y aviso al premium (D33) | `feature/feedback-freemium-comparador` | (ver git log) | 451 pruebas (2026-11-21) |
+| Feedback genérico por pregunta | La IA escribe `feedback_generico` (correcto, medio, malo) en la rúbrica al generar; `GET/POST /api/v1/admin/preguntas/feedback-generico[/completar]` completa las preguntas existentes sin cambiar su estado; la corrección freemium usa el texto del nivel (D36) | `feature/feedback-generico-preguntas` | (ver git log) | 473 pruebas (2026-11-22) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
 

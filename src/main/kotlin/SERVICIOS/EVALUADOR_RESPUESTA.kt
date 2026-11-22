@@ -1,5 +1,7 @@
 package SERVICIOS
 
+import MODELOS.FeedbackGenerico
+import MODELOS.NivelFeedbackGenerico
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -21,14 +23,16 @@ data class EvaluacionTexto(
 interface EvaluadorRespuesta {
     /**
      * [alternativas]: otras formas correctas de responder (se compara con la mejor). [sinonimos]: grupos de términos
-     * equivalentes ("deadlock", "interbloqueo"), que cuentan como la misma palabra.
+     * equivalentes ("deadlock", "interbloqueo"), que cuentan como la misma palabra. [feedbackGenerico]: los textos propios
+     * de la pregunta para respuesta correcta, a medias y mala (D36); si falta el del nivel se usa el texto estándar.
      */
     fun evaluar(
         texto: String,
         respuestaIdeal: String,
         palabrasClave: List<String>,
         alternativas: List<String> = emptyList(),
-        sinonimos: List<List<String>> = emptyList()
+        sinonimos: List<List<String>> = emptyList(),
+        feedbackGenerico: FeedbackGenerico = FeedbackGenerico()
     ): EvaluacionTexto
 }
 
@@ -54,7 +58,8 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
         respuestaIdeal: String,
         palabrasClave: List<String>,
         alternativas: List<String>,
-        sinonimos: List<List<String>>
+        sinonimos: List<List<String>>,
+        feedbackGenerico: FeedbackGenerico
     ): EvaluacionTexto {
         if (texto.isBlank()) {
             return EvaluacionTexto(0.0, 0.0, 0.0, emptyList(), palabrasClave, "No se ingresó ninguna respuesta.")
@@ -81,12 +86,19 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
             similitud = redondear(similitud),
             palabrasEncontradas = encontradas,
             palabrasFaltantes = faltantes,
-            feedback = feedback(redondear(puntaje), faltantes)
+            feedback = feedback(redondear(puntaje), faltantes, feedbackGenerico)
         )
     }
 
-    private fun feedback(puntaje: Double, faltantes: List<String>): String {
+    /** El texto propio de la pregunta para su nivel (D36) y, si no es correcta, los conceptos que faltaron. */
+    private fun feedback(puntaje: Double, faltantes: List<String>, generico: FeedbackGenerico): String {
         val conceptos = faltantes.take(PALABRAS_CLAVE_EN_FEEDBACK).joinToString(", ")
+        val nivel = nivelFeedbackGenerico(puntaje)
+        val propio = generico.texto(nivel) ?: return feedbackEstandar(puntaje, faltantes, conceptos)
+        return if (nivel == NivelFeedbackGenerico.CORRECTO || faltantes.isEmpty()) propio else "$propio Repasa: $conceptos."
+    }
+
+    private fun feedbackEstandar(puntaje: Double, faltantes: List<String>, conceptos: String): String {
         return when {
             puntaje >= UMBRAL_EXCELENTE -> "Excelente respuesta. Cubres los conceptos fundamentales con claridad y precisión."
             puntaje >= UMBRAL_BUENA && faltantes.isNotEmpty() -> "Buena aproximación. Para completarla mejor, profundiza en: $conceptos."
@@ -135,6 +147,16 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
         val union = palabrasA.union(palabrasB).size
         return if (union == 0) 0.0 else palabrasA.intersect(palabrasB).size.toDouble() / union
     }
+}
+
+/**
+ * Nivel del feedback genérico (D36) según el puntaje de 0 a 100: correcto desde [UMBRAL_EXCELENTE], a medias desde
+ * [UMBRAL_BUENA] y malo por debajo; los mismos cortes que el texto estándar.
+ */
+fun nivelFeedbackGenerico(puntaje: Double): NivelFeedbackGenerico = when {
+    puntaje >= UMBRAL_EXCELENTE -> NivelFeedbackGenerico.CORRECTO
+    puntaje >= UMBRAL_BUENA -> NivelFeedbackGenerico.MEDIO
+    else -> NivelFeedbackGenerico.MALO
 }
 
 /** Verbos de los nombres de criterio que no son conceptos (ej: "menciona_inmutabilidad" → "inmutabilidad"). */

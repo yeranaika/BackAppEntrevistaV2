@@ -21,6 +21,7 @@ import MODELOS.LectorCatalogoExposed
 import MODELOS.RepositorioConsentimientoExposed
 import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioFeedbackGenericoExposed
 import MODELOS.RepositorioGeneracionPreguntaIaExposed
 import MODELOS.RepositorioMercadoExposed
 import MODELOS.LectorCoberturaPreguntasExposed
@@ -40,6 +41,7 @@ import MODELOS.RepositorioUsuarioExposed
 import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioFeedbackGenerico
 import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.PlanTokenMimo
 import SERVICIOS.ServicioCreditosTokenPlan
@@ -195,6 +197,9 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
         proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado
     )
+
+    /** Completa el feedback genérico (correcto, medio, malo) de las preguntas del banco (D36), con el mismo tope de gasto. */
+    val servicioFeedbackGenerico = ServicioFeedbackGenerico(proveedoresIa, RepositorioFeedbackGenericoExposed(), topeGeneracionIa)
 
     /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
     val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())

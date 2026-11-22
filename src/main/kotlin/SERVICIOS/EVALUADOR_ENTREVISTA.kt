@@ -8,6 +8,7 @@ import INTEGRACIONES.RespuestaProveedorIa
 import INTEGRACIONES.SolicitudProveedorIa
 import INTEGRACIONES.costoLlmUsd
 import MODELOS.CategoriaHabilidad
+import MODELOS.FeedbackGenerico
 import MODELOS.ModoEvaluacion
 import MODELOS.NivelExperiencia
 import MODELOS.UsoLlm
@@ -37,7 +38,9 @@ data class RespuestaAbiertaAEvaluar(
     val texto: String,
     /** Otras formas correctas de responder y grupos de sinónimos, de la rúbrica de la pregunta. */
     val alternativas: List<String> = emptyList(),
-    val sinonimos: List<List<String>> = emptyList()
+    val sinonimos: List<List<String>> = emptyList(),
+    /** Textos propios de la pregunta para respuesta correcta, a medias y mala (D36). */
+    val feedbackGenerico: FeedbackGenerico = FeedbackGenerico()
 )
 
 data class ContextoEvaluacionEntrevista(
@@ -80,7 +83,8 @@ class EvaluadorEntrevistaFreemium(private val evaluador: EvaluadorRespuesta) : E
     override suspend fun evaluar(contexto: ContextoEvaluacionEntrevista) = EvaluacionEntrevista(
         evaluaciones = contexto.respuestas.map { respuesta ->
             val evaluacion = evaluador.evaluar(
-                respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave, respuesta.alternativas, respuesta.sinonimos
+                respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave, respuesta.alternativas, respuesta.sinonimos,
+                respuesta.feedbackGenerico
             )
             EvaluacionAbierta(
                 preguntaSesionId = respuesta.preguntaSesionId,
