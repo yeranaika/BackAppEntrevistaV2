@@ -18,8 +18,18 @@ data class EvaluacionTexto(
 )
 
 /** Corrige respuestas abiertas. Hoy: motor determinista sin costo; en premium se puede cambiar por un LLM. */
-fun interface EvaluadorRespuesta {
-    fun evaluar(texto: String, respuestaIdeal: String, palabrasClave: List<String>): EvaluacionTexto
+interface EvaluadorRespuesta {
+    /**
+     * [alternativas]: otras formas correctas de responder (se compara con la mejor). [sinonimos]: grupos de términos
+     * equivalentes ("deadlock", "interbloqueo"), que cuentan como la misma palabra.
+     */
+    fun evaluar(
+        texto: String,
+        respuestaIdeal: String,
+        palabrasClave: List<String>,
+        alternativas: List<String> = emptyList(),
+        sinonimos: List<List<String>> = emptyList()
+    ): EvaluacionTexto
 }
 
 private const val PESO_SIMILITUD = 0.40
@@ -39,15 +49,25 @@ private const val LARGO_MAXIMO_CLAVE_EXACTA = 3
  */
 class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
 
-    override fun evaluar(texto: String, respuestaIdeal: String, palabrasClave: List<String>): EvaluacionTexto {
+    override fun evaluar(
+        texto: String,
+        respuestaIdeal: String,
+        palabrasClave: List<String>,
+        alternativas: List<String>,
+        sinonimos: List<List<String>>
+    ): EvaluacionTexto {
         if (texto.isBlank()) {
             return EvaluacionTexto(0.0, 0.0, 0.0, emptyList(), palabrasClave, "No se ingresó ninguna respuesta.")
         }
-        val usuario = limpiar(texto)
-        val encontradas = palabrasClave.filter { aparece(usuario, limpiar(it)) }
+        val usuario = ComparadorTextos.normalizar(texto)
+        val encontradas = palabrasClave.filter { clave -> formasDe(clave, sinonimos).any { aparece(usuario, it) } }
         val faltantes = palabrasClave - encontradas.toSet()
         val cobertura = if (palabrasClave.isEmpty()) 0.0 else encontradas.size * 100.0 / palabrasClave.size
-        val similitud = similitudCoseno(usuario, limpiar(respuestaIdeal)) * 100.0
+        // Se queda con la mejor medida: los trigramas (parecido de letras con la ideal) o el comparador (varias referencias y sinónimos).
+        val similitud = maxOf(
+            similitudCoseno(usuario, ComparadorTextos.normalizar(respuestaIdeal)),
+            ComparadorTextos.similitud(texto, listOf(respuestaIdeal) + alternativas, sinonimos)
+        ) * 100.0
         val largo = (contarPalabras(texto).toDouble() / contarPalabras(respuestaIdeal).coerceAtLeast(1)).coerceIn(0.0, 1.0) * 100.0
 
         val puntaje = if (palabrasClave.isEmpty()) {
@@ -81,18 +101,19 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
      * Las claves de [LARGO_MAXIMO_CLAVE_EXACTA] letras o menos (go, sql, r) deben coincidir con la palabra completa; las
      * más largas admiten plurales y conjugaciones ("proceso" aparece en "procesos").
      */
-    private fun aparece(texto: String, clave: String): Boolean {
+    private fun aparece(texto: String, forma: String): Boolean {
+        val clave = ComparadorTextos.normalizar(forma)
         if (clave.isEmpty()) return false
         val final = if (clave.length <= LARGO_MAXIMO_CLAVE_EXACTA) "(?= |$)" else ""
         return Regex("(?<=^| )" + Regex.escape(clave) + final).containsMatchIn(texto)
     }
 
-    /** Antes de quitar símbolos, los que cambian el significado se escriben con letras: "C#" no puede quedar como "c". */
-    private fun limpiar(texto: String) = texto.lowercase()
-        .replace("c#", " csharp ").replace("f#", " fsharp ").replace("c++", " cpp ").replace(".net", " dotnet ")
-        .replace(Regex("[^a-záéíóúüñ0-9\\s]"), " ")
-        .replace(Regex("\\s+"), " ")
-        .trim()
+    /** La palabra clave y sus sinónimos: basta con que aparezca cualquiera. */
+    private fun formasDe(clave: String, sinonimos: List<List<String>>): List<String> {
+        val buscada = ComparadorTextos.normalizar(clave)
+        val grupo = sinonimos.firstOrNull { g -> g.any { ComparadorTextos.normalizar(it) == buscada } }.orEmpty()
+        return listOf(clave) + grupo
+    }
 
     private fun contarPalabras(texto: String) = texto.trim().split(Regex("\\s+")).count { it.isNotBlank() }
 
@@ -136,6 +157,13 @@ fun palabrasClaveDe(rubrica: JsonObject?): List<String> {
         .filter { it.length >= LARGO_MINIMO_PALABRA_CLAVE && it !in PALABRAS_DE_CRITERIO }
         .distinct()
 }
+
+/** Otras formas correctas de responder la pregunta ("respuestas_alternativas" de la rúbrica). */
+fun alternativasDe(rubrica: JsonObject?): List<String> = textosDe(rubrica?.get("respuestas_alternativas"))
+
+/** Grupos de términos equivalentes ("sinonimos" de la rúbrica): [["deadlock", "interbloqueo"], ...]. Un grupo necesita 2 o más. */
+fun sinonimosDe(rubrica: JsonObject?): List<List<String>> =
+    (rubrica?.get("sinonimos") as? JsonArray).orEmpty().map { textosDe(it) }.filter { it.size >= 2 }
 
 private fun textosDe(elemento: Any?): List<String> =
     (elemento as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }

@@ -229,6 +229,8 @@ class ServicioGeneracionPregunta(
             - Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado.
             - La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado.
             - palabras_clave debe contener términos significativos.
+            - respuestas_alternativas: 2 formas distintas y correctas de responder, con otras palabras que la respuesta_ideal.
+            - sinonimos: grupos de términos equivalentes de la pregunta (por ejemplo ["deadlock", "interbloqueo"]); puede ir vacío.
             - Para opcion_multiple entrega exactamente cuatro opciones y una sola correcta.
             - Para tipos no opcion_multiple, opciones debe ser null.
         """.trimIndent()

@@ -215,6 +215,11 @@ class PruebaServicioReporte {
             reporte.resumen!!.startsWith("Obtuviste ${reporte.puntajeGlobal.toDouble().roundToInt()}/100"),
             "el resumen usa el mismo entero que muestra la app: ${reporte.puntajeGlobal} → ${reporte.resumen}"
         )
+        assertTrue(
+            listOf("Resultado bueno", "Resultado medio", "Resultado bajo").any { reporte.resumen!!.contains(it) },
+            "el resumen freemium dice el nivel general: ${reporte.resumen}"
+        )
+        assertTrue(reporte.resumen!!.contains("premium"), "el resumen freemium invita al premium: ${reporte.resumen}")
     }
 
     @Test

@@ -36,7 +36,11 @@ data class RubricaLlm(
     val metodo: String = "STAR",
     val criterios: List<String>,
     @SerialName("palabras_clave") val palabrasClave: List<String> = emptyList(),
-    @SerialName("tiempo_esperado_seg") val tiempoEsperadoSeg: Int = 120
+    @SerialName("tiempo_esperado_seg") val tiempoEsperadoSeg: Int = 120,
+    /** Otras formas correctas de responder con otras palabras: el feedback gratuito compara con la mejor. */
+    @SerialName("respuestas_alternativas") val respuestasAlternativas: List<String> = emptyList(),
+    /** Grupos de términos equivalentes, p. ej. ["deadlock", "interbloqueo"]: cuentan como la misma palabra. */
+    val sinonimos: List<List<String>> = emptyList()
 )
 
 @Serializable
@@ -91,7 +95,18 @@ object EsquemaJsonLoteLlm {
                 "minItems" to numero(PALABRAS_CLAVE_MINIMAS),
                 "items" to objeto("type" to texto("string"), "minLength" to numero(3))
             ),
-            "tiempo_esperado_seg" to objeto("type" to texto("integer"), "minimum" to numero(1))
+            "tiempo_esperado_seg" to objeto("type" to texto("integer"), "minimum" to numero(1)),
+            "respuestas_alternativas" to objeto(
+                "type" to texto("array"),
+                "items" to objeto("type" to texto("string"), "minLength" to numero(1))
+            ),
+            "sinonimos" to objeto(
+                "type" to texto("array"),
+                "items" to objeto(
+                    "type" to texto("array"),
+                    "items" to objeto("type" to texto("string"), "minLength" to numero(1))
+                )
+            )
         )
     )
 

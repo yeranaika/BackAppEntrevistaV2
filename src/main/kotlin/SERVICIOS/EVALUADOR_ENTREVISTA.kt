@@ -34,7 +34,10 @@ data class RespuestaAbiertaAEvaluar(
     val enunciado: String,
     val respuestaIdeal: String?,
     val palabrasClave: List<String>,
-    val texto: String
+    val texto: String,
+    /** Otras formas correctas de responder y grupos de sinónimos, de la rúbrica de la pregunta. */
+    val alternativas: List<String> = emptyList(),
+    val sinonimos: List<List<String>> = emptyList()
 )
 
 data class ContextoEvaluacionEntrevista(
@@ -76,12 +79,14 @@ class EvaluadorEntrevistaFreemium(private val evaluador: EvaluadorRespuesta) : E
 
     override suspend fun evaluar(contexto: ContextoEvaluacionEntrevista) = EvaluacionEntrevista(
         evaluaciones = contexto.respuestas.map { respuesta ->
-            val evaluacion = evaluador.evaluar(respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave)
+            val evaluacion = evaluador.evaluar(
+                respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave, respuesta.alternativas, respuesta.sinonimos
+            )
             EvaluacionAbierta(
                 preguntaSesionId = respuesta.preguntaSesionId,
                 puntaje = evaluacion.puntaje,
                 observacion = evaluacion.feedback,
-                mejoras = evaluacion.palabrasFaltantes.take(MEJORAS_MAXIMAS).map { "Incluye el concepto: $it" }
+                mejoras = evaluacion.palabrasFaltantes.take(MEJORAS_MAXIMAS).map { "$PREFIJO_CONCEPTO$it" }
             )
         },
         modo = ModoEvaluacion.FREEMIUM

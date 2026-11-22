@@ -18,12 +18,21 @@ import MODELOS.Pregunta
 import MODELOS.RepositorioPregunta
 import MODELOS.TipoPregunta
 import UTILIDADES.sinVacios
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
 
 private const val LARGO_MAXIMO_ENUNCIADO = 2000
 private const val LARGO_MAXIMO_MOTIVO_RECHAZO = 500
 private const val OPCIONES_MINIMAS = 2
 private const val OPCIONES_MAXIMAS = 6
+private const val ALTERNATIVAS_MAXIMAS = 5
+private const val LARGO_MAXIMO_ALTERNATIVA = 2000
+private const val GRUPOS_SINONIMOS_MAXIMOS = 20
+private const val TERMINOS_POR_GRUPO_MAXIMOS = 10
+private const val LARGO_MAXIMO_TERMINO = 100
 private const val TAMANO_PAGINA_POR_DEFECTO = 20
 private const val TAMANO_PAGINA_MAXIMO = 100
 private const val PREGUNTAS_USUARIO_POR_DEFECTO = 10
@@ -110,6 +119,7 @@ class ServicioPregunta(
         } else {
             validarPreguntaAbierta(solicitud, respuestaIdeal)
         }
+        validarRubrica(solicitud.rubrica)
         return ContenidoPregunta(
             skillId = skillId,
             cargoId = cargoId,
@@ -121,6 +131,41 @@ class ServicioPregunta(
             rubrica = solicitud.rubrica,
             opciones = opciones
         )
+    }
+
+    /**
+     * Lo opcional que mejora el feedback gratuito: "respuestas_alternativas" (otras formas correctas de responder) y
+     * "sinonimos" (grupos de términos equivalentes). Si vienen, deben tener la forma y el tamaño esperados.
+     */
+    private fun validarRubrica(rubrica: JsonObject?) {
+        rubrica?.get("respuestas_alternativas")?.let { elemento ->
+            val textos = textosValidos(elemento)
+            if (textos == null || textos.size > ALTERNATIVAS_MAXIMAS || textos.any { it.length > LARGO_MAXIMO_ALTERNATIVA }) {
+                throw ErrorValidacion(
+                    "alternativas_invalidas",
+                    "Las respuestas alternativas son hasta $ALTERNATIVAS_MAXIMAS textos de máximo $LARGO_MAXIMO_ALTERNATIVA caracteres"
+                )
+            }
+        }
+        rubrica?.get("sinonimos")?.let { elemento ->
+            val grupos = (elemento as? JsonArray)?.map { textosValidos(it) }
+            val valido = grupos != null && grupos.size <= GRUPOS_SINONIMOS_MAXIMOS && grupos.all { grupo ->
+                grupo != null && grupo.size in 2..TERMINOS_POR_GRUPO_MAXIMOS && grupo.all { it.length <= LARGO_MAXIMO_TERMINO }
+            }
+            if (!valido) {
+                throw ErrorValidacion(
+                    "sinonimos_invalidos",
+                    "Los sinónimos son hasta $GRUPOS_SINONIMOS_MAXIMOS grupos de 2 a $TERMINOS_POR_GRUPO_MAXIMOS términos de máximo $LARGO_MAXIMO_TERMINO caracteres"
+                )
+            }
+        }
+    }
+
+    /** Lista de textos no vacíos, o null si el elemento no es una lista de textos. */
+    private fun textosValidos(elemento: JsonElement): List<String>? {
+        val lista = elemento as? JsonArray ?: return null
+        val textos = lista.map { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.trim() ?: return null }
+        return textos.takeIf { t -> t.all { it.isNotEmpty() } }
     }
 
     private fun validarOpciones(opciones: List<SolicitudOpcion>): List<NuevaOpcion> {
