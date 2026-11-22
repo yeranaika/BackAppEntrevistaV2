@@ -368,7 +368,43 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   del tope por modelo, lectura de la variable) y `PruebaControladorCostosIa` (el JSON con y sin plan). Ninguna llama a
   MiMo.
 
-## D32 · Consentimiento v1.1 y documentos legales alineados con RNF09/RNF10 (2026-11)
+## D32 · El feedback debe estar listo en menos de 5 min (2026-11)
+- **Pedido:** el reporte de feedback (con o sin IA) tiene que estar disponible a menos de 5 min de finalizar la entrevista.
+- **Decisión:**
+  - **Tope de la IA:** `TIEMPO_MAXIMO_EVALUACION_IA` = 45 s para toda la evaluación (reintentos del proveedor incluidos).
+    Pasado el tope sale el reporte con el motor freemium y **no** consume cupo (D17). Antes el peor caso era ~2,3 min
+    (70 s × 2 intentos) y el rescate dejaba un reporte atascado hasta ~15 min.
+  - **Rescate:** cada 1 min (antes 5) y un reporte en "generando" se da por abandonado a los 3 min
+    (`VIGENCIA_RESERVA_IA`, antes 10). Debe ser mayor que el tope de la IA (45 s).
+  - **Palabras clave del motor freemium:** `C#`, `C++`, `F#` y `.NET` se normalizan a letras (antes `C#` quedaba como
+    `c` y coincidía con casi cualquier texto); la coincidencia empieza en inicio de palabra, y las claves de 3 letras
+    o menos (`go`, `sql`) exigen la palabra completa.
+  - **Tiempos por reporte** en el log (`Reporte … listo en … ms (cálculo, guardado, modo)`) para medir p50/p95.
+- **Medido (2026-11-19, MiMo `mimo-v2.6-flash`, 5 respuestas abiertas):** freemium 60–120 ms; con IA 24 s. E2E fase 7
+  con `-ConIa` 25/25.
+- **Pendiente (P1):** feedback por niveles (freemium básico con respuesta ideal; premium detallado con "por qué
+  falló"), reporte en dos fases, evaluación en lotes paralelos. Ver `Analisis feedback lento.md`.
+- **Pruebas**: `PruebaEvaluadorRespuesta` (símbolos y palabras cortas) y `PruebaServicioReporte` (IA lenta → freemium
+  sin consumir cupo; tiempos del rescate).
+
+## D33 · Feedback freemium con comparador de textos y feedback general por niveles (2026-11)
+- **Pedido:** el feedback gratuito no usa IA ni tokens; da un feedback general (malo / medio / bueno) que invita a premium
+  (esquema "tipos de feedback": freemium → general → malo, medio, bueno; fomento de uso → premium → IA → personalizado).
+- **Comparador (`ComparadorTextos`, sin IA):** mezcla coseno TF-IDF (40 %), cobertura (30 %), Jaccard (20 %) y parecido de
+  orden por Levenshtein (10 %); sin tildes, sin palabras vacías y con el plural quitado; se queda con la mejor referencia.
+  El motor freemium toma `max(trigramas con la ideal, comparador)` como similitud: nunca puntúa menos que antes.
+- **Rúbrica, campos opcionales:** `respuestas_alternativas` (hasta 5 textos: otras formas correctas de responder) y
+  `sinonimos` (hasta 20 grupos de 2 a 10 términos: "deadlock" = "interbloqueo" = "bloqueo mutuo"). Una palabra clave
+  cuenta si aparece cualquiera de sus sinónimos. Se validan al crear la pregunta (`alternativas_invalidas`,
+  `sinonimos_invalidos`); la IA los genera (esquema y prompt de `generar-ia`), pero un lote sin ellos sigue siendo válido.
+- **Resumen freemium del reporte:** nivel general (bueno ≥ 75, medio ≥ 60, bajo), skills a reforzar, hasta 4 conceptos
+  que más faltaron y un aviso de lo que suma el premium. El contrato JSON de Android no cambia (solo el texto de `resumen`).
+- **Pendiente:** la práctica (`CorrectorRespuestas`) aún no usa alternativas ni sinónimos; calibrar pesos con respuestas
+  reales; arreglar la validación STAR obligatoria y las palabras clave de 2 letras del lote de IA (ver
+  `Analisis feedback lento.md`).
+- **Pruebas**: `PruebaComparadorTextos` (11 casos nuevos en total con las de validación, reporte y esquema de IA).
+
+## D34 · Consentimiento v1.1 y documentos legales alineados con RNF09/RNF10 (2026-11)
 - **Contexto**: el consentimiento v1.0 de la semilla hablaba de "grabaciones de video" y del alcance
   `analisis_video_expresiones`, y prometía revocar "desde Configuración > Privacidad", que no existe en la app. La
   Política de Privacidad y los Términos (1.0.0) hablaban de "transcripciones de audio", "respuestas grabadas" y

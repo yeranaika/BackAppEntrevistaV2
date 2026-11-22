@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [estado, fases, ramas]
-actualizado: 2026-11-17
+actualizado: 2026-11-21
 ---
 
 # Estado del proyecto
@@ -37,9 +37,11 @@ actualizado: 2026-11-17
 | Gasto del mes frente al tope en Costos IA | `GET /api/v1/admin/costos-ia` trae `topeGeneracionPreguntas` (7 claves) del mes UTC en curso; `ServicioTopeGeneracionIa` es la única fuente del 429 y del panel (D28) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
 | Cupo de reportes con IA visible | `GET /billing/status` y el canje traen `reportes_ia_limite`, `reportes_ia_restantes` y `reportes_ia_renovacion` solo para premium con IA activa, con la misma condición SQL que la reserva (D29) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
 | Credits del Token Plan de MiMo | `GET /api/v1/admin/costos-ia` trae `planTokenMimo` (Credits usados del periodo frente al plan, calculados con los tokens de cada llamada a MiMo); con Token Plan, `generar-ia` con `mimo-*` se frena por Credits y no por USD (D31) | `feature/creditos-token-plan` | (ver git log) | 437 pruebas · 2 mutaciones detectadas (2026-11-19) |
+| Feedback en menos de 5 min | Tope de 45 s para la IA (si se pasa, reporte freemium sin gastar cupo), rescate cada 1 min y reporte atascado a los 3 min, palabras clave con `C#`/`C++`/`.NET` corregidas y log de tiempos (D32). Medido con MiMo real: 24 s con IA, ~0,1 s freemium | `feature/feedback-menos-de-5-min` | (ver git log) | pruebas completas en verde · E2E fase 7 con `-ConIa` 25/25 (2026-11-19) |
+| Feedback freemium con comparador | `ComparadorTextos` (TF-IDF + cobertura + Jaccard + orden, varias referencias y sinónimos) sin IA; `respuestas_alternativas` y `sinonimos` en la rúbrica (manual y generada por IA); resumen freemium con nivel bueno/medio/bajo y aviso al premium (D33) | `feature/feedback-freemium-comparador` | (ver git log) | 451 pruebas (2026-11-21) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
-| Consentimiento v1.1 y documentos legales | Texto `v1.1` sin video ni emociones (RNF09/RNF10), alcances `analytics`/`marketing` como los de la app, `alcances` opcional al publicar; Privacidad y Términos 1.1.0 (D32) | `feature/consentimiento-v1-1` | (ver git log) | 438 pruebas · semilla 7/7 |
+| Consentimiento v1.1 y documentos legales | Texto `v1.1` sin video ni emociones (RNF09/RNF10), alcances `analytics`/`marketing` como los de la app, `alcances` opcional al publicar; Privacidad y Términos 1.1.0 (D34) | `feature/consentimiento-v1-1` | (ver git log) | 438 pruebas · semilla 7/7 |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 

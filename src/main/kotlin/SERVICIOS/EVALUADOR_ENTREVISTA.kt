@@ -1,5 +1,6 @@
 package SERVICIOS
 
+import CONFIGURACION.TIEMPO_MAXIMO_EVALUACION_IA
 import ERRORES.ErrorAplicacion
 import ERRORES.ErrorRespuestaExterna
 import INTEGRACIONES.ProveedorPreguntasIa
@@ -10,6 +11,8 @@ import MODELOS.CategoriaHabilidad
 import MODELOS.ModoEvaluacion
 import MODELOS.NivelExperiencia
 import MODELOS.UsoLlm
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -21,6 +24,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
+import java.time.Duration
 import java.util.UUID
 
 /** Respuesta abierta de una entrevista, con lo necesario para evaluarla. */
@@ -30,7 +34,10 @@ data class RespuestaAbiertaAEvaluar(
     val enunciado: String,
     val respuestaIdeal: String?,
     val palabrasClave: List<String>,
-    val texto: String
+    val texto: String,
+    /** Otras formas correctas de responder y grupos de sinónimos, de la rúbrica de la pregunta. */
+    val alternativas: List<String> = emptyList(),
+    val sinonimos: List<List<String>> = emptyList()
 )
 
 data class ContextoEvaluacionEntrevista(
@@ -72,12 +79,14 @@ class EvaluadorEntrevistaFreemium(private val evaluador: EvaluadorRespuesta) : E
 
     override suspend fun evaluar(contexto: ContextoEvaluacionEntrevista) = EvaluacionEntrevista(
         evaluaciones = contexto.respuestas.map { respuesta ->
-            val evaluacion = evaluador.evaluar(respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave)
+            val evaluacion = evaluador.evaluar(
+                respuesta.texto, respuesta.respuestaIdeal.orEmpty(), respuesta.palabrasClave, respuesta.alternativas, respuesta.sinonimos
+            )
             EvaluacionAbierta(
                 preguntaSesionId = respuesta.preguntaSesionId,
                 puntaje = evaluacion.puntaje,
                 observacion = evaluacion.feedback,
-                mejoras = evaluacion.palabrasFaltantes.take(MEJORAS_MAXIMAS).map { "Incluye el concepto: $it" }
+                mejoras = evaluacion.palabrasFaltantes.take(MEJORAS_MAXIMAS).map { "$PREFIJO_CONCEPTO$it" }
             )
         },
         modo = ModoEvaluacion.FREEMIUM
@@ -115,7 +124,9 @@ private data class RespuestaEvaluacionLlm(
 class EvaluadorEntrevistaIa(
     private val proveedor: ProveedorPreguntasIa,
     private val modelo: String,
-    private val respaldo: EvaluadorEntrevista
+    private val respaldo: EvaluadorEntrevista,
+    /** Tope de toda la evaluación: si la IA no responde a tiempo, el reporte sale con el motor freemium. */
+    private val tiempoMaximo: Duration = TIEMPO_MAXIMO_EVALUACION_IA
 ) : EvaluadorEntrevista {
     private val log = LoggerFactory.getLogger(EvaluadorEntrevistaIa::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -125,15 +136,21 @@ class EvaluadorEntrevistaIa(
         if (contexto.respuestas.isEmpty()) return respaldo.evaluar(contexto)
         var pagada: RespuestaProveedorIa? = null
         return try {
-            val respuesta = proveedor.generar(
-                SolicitudProveedorIa(
-                    prompt = INSTRUCCIONES,
-                    modelo = modelo,
-                    esquemaJson = ESQUEMA,
-                    instruccionUsuario = datosParaEvaluar(contexto)
+            val respuesta = withTimeout(tiempoMaximo.toMillis()) {
+                proveedor.generar(
+                    SolicitudProveedorIa(
+                        prompt = INSTRUCCIONES,
+                        modelo = modelo,
+                        esquemaJson = ESQUEMA,
+                        instruccionUsuario = datosParaEvaluar(contexto)
+                    )
                 )
-            ).also { pagada = it }
+            }.also { pagada = it }
             interpretar(respuesta.contenido, contexto).copy(uso = usoDe(respuesta))
+        } catch (e: TimeoutCancellationException) {
+            // Solo el tope propio: un apagado o la cancelación del cliente llegan como CancellationException y siguen de largo.
+            log.warn("Evaluación con IA superó {} s; se usa el motor freemium", tiempoMaximo.seconds)
+            respaldo.evaluar(contexto)
         } catch (e: ErrorAplicacion) {
             log.warn("Evaluación con IA no disponible ({}); se usa el motor freemium", e.codigo)
             // Si el LLM alcanzó a responder (y cobrar) algo inválido, su uso se guarda igual para el control de costos;

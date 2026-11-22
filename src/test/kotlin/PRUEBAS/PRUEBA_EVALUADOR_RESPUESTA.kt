@@ -54,6 +54,28 @@ class PruebaEvaluadorRespuesta {
     }
 
     @Test
+    fun `una palabra clave con simbolos no coincide con cualquier letra`() {
+        val sinMencion = evaluador.evaluar("Uso corutinas para la concurrencia", idealDeadlock, listOf("C#", "C++", ".NET"))
+        assertEquals(listOf("C#", "C++", ".NET"), sinMencion.palabrasFaltantes)
+
+        val conMencion = evaluador.evaluar("Lo hago en C# sobre .NET con buenas practicas", idealDeadlock, listOf("C#", "C++", ".NET"))
+        assertEquals(listOf("C#", ".NET"), conMencion.palabrasEncontradas)
+        assertEquals(listOf("C++"), conMencion.palabrasFaltantes)
+    }
+
+    @Test
+    fun `una palabra clave corta debe ser una palabra completa y las largas admiten plurales`() {
+        val corta = evaluador.evaluar("Hay algo que no entiendo de esto", idealDeadlock, listOf("go", "sql"))
+        assertEquals(listOf("go", "sql"), corta.palabrasFaltantes)
+
+        val completa = evaluador.evaluar("Escribo servicios en Go con SQL", idealDeadlock, listOf("go", "sql"))
+        assertEquals(listOf("go", "sql"), completa.palabrasEncontradas)
+
+        val plural = evaluador.evaluar("Los procesos se bloquean", idealDeadlock, listOf("proceso"))
+        assertEquals(listOf("proceso"), plural.palabrasEncontradas)
+    }
+
+    @Test
     fun `las palabras clave salen de la rubrica o de sus criterios`() {
         val conPalabras = Json.parseToJsonElement("""{"criterios":["x"],"palabras_clave":["Coroutines","suspend"]}""").jsonObject
         assertEquals(listOf("Coroutines", "suspend"), palabrasClaveDe(conPalabras))

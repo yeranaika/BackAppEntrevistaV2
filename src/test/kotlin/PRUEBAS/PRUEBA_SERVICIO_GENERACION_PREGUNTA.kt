@@ -403,4 +403,15 @@ class PruebaServicioGeneracionPregunta {
         assertEquals(LoteLlmDePrueba.RESPUESTA_STAR, contenido.respuestaIdeal)
         assertEquals("\"STAR\"", contenido.rubrica!!["metodo"].toString())
     }
+
+    @Test
+    fun `el esquema de IA pide respuestas alternativas y sinonimos y la rubrica guardada los trae`() = runBlocking<Unit> {
+        val esquema = ESQUEMAS.EsquemaJsonLoteLlm.construir(1, TipoPregunta.ABIERTA_TEXTO).toString()
+        assertTrue(esquema.contains("\"respuestas_alternativas\"") && esquema.contains("\"sinonimos\""))
+
+        val repositorio = GeneracionEnMemoria()
+        servicio(ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto")), repositorio).generar(solicitud())
+        val rubrica = repositorio.lotes.single().second.single().contenido.rubrica!!
+        assertTrue("respuestas_alternativas" in rubrica && "sinonimos" in rubrica, "la rúbrica guarda los campos aunque el lote no los traiga")
+    }
 }

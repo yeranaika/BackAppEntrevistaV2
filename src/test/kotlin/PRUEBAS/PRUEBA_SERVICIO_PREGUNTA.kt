@@ -15,6 +15,8 @@ import PRUEBAS.DOBLES.ProveedorIaGrabador
 import PRUEBAS.DOBLES.SistemaPrueba
 import PRUEBAS.DOBLES.fallaCon
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -77,6 +79,21 @@ class PruebaServicioPregunta {
         fallaCon<ErrorValidacion>("opciones_no_permitidas") {
             servicio.crear(abierta().copy(opciones = listOf(SolicitudOpcion("A", true), SolicitudOpcion("B"))))
         }
+    }
+
+    @Test
+    fun `las respuestas alternativas y los sinonimos de la rubrica se validan al crear la pregunta`() = runBlocking<Unit> {
+        fun rubrica(json: String) = abierta().copy(rubrica = Json.parseToJsonElement(json).jsonObject)
+
+        val creada = servicio.crear(rubrica("""{"respuestas_alternativas":["Otra forma de decirlo"],"sinonimos":[["deadlock","interbloqueo"]]}"""))
+        assertEquals(EstadoPregunta.APROBADA, creada.estado)
+
+        fallaCon<ErrorValidacion>("alternativas_invalidas") { servicio.crear(rubrica("""{"respuestas_alternativas":"no es lista"}""")) }
+        fallaCon<ErrorValidacion>("alternativas_invalidas") { servicio.crear(rubrica("""{"respuestas_alternativas":["ok","  "]}""")) }
+        fallaCon<ErrorValidacion>("alternativas_invalidas") { servicio.crear(rubrica("""{"respuestas_alternativas":["1","2","3","4","5","6"]}""")) }
+        fallaCon<ErrorValidacion>("sinonimos_invalidos") { servicio.crear(rubrica("""{"sinonimos":[["solo uno"]]}""")) }
+        fallaCon<ErrorValidacion>("sinonimos_invalidos") { servicio.crear(rubrica("""{"sinonimos":["no es grupo"]}""")) }
+        fallaCon<ErrorValidacion>("sinonimos_invalidos") { servicio.crear(rubrica("""{"sinonimos":[["a",3]]}""")) }
     }
 
     @Test
