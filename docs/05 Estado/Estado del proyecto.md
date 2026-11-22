@@ -41,7 +41,7 @@ actualizado: 2026-11-21
 | Feedback freemium con comparador | `ComparadorTextos` (TF-IDF + cobertura + Jaccard + orden, varias referencias y sinónimos) sin IA; `respuestas_alternativas` y `sinonimos` en la rúbrica (manual y generada por IA); resumen freemium con nivel bueno/medio/bajo y aviso al premium (D33) | `feature/feedback-freemium-comparador` | (ver git log) | 451 pruebas (2026-11-21) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
-| Consentimiento v1.1 y documentos legales | Texto `v1.1` sin video ni emociones (RNF09/RNF10), alcances `analytics`/`marketing` como los de la app, `alcances` opcional al publicar; Privacidad y Términos 1.1.0 (D34) | `feature/consentimiento-v1-1` | (ver git log) | 438 pruebas · semilla 7/7 |
+| Consentimiento v1.1 y documentos legales | Texto `v1.1` sin video ni emociones (RNF09/RNF10), alcances `analytics`/`marketing` como los de la app, `alcances` opcional al publicar; Privacidad y Términos 1.1.0 (D35) | `feature/consentimiento-v1-1` | (ver git log) | 438 pruebas · semilla 7/7 |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 

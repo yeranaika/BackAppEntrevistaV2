@@ -109,7 +109,7 @@ class ServicioGeneracionPregunta(
             tokensSalida = respuesta.tokensSalida
         )
         val preguntasLlm = try {
-            ValidadorLotePreguntaIa.parsearYValidar(respuesta.contenido, pedido.cantidad, pedido.tipo)
+            ValidadorLotePreguntaIa.parsearYValidar(respuesta.contenido, pedido.cantidad, pedido.tipo, pedido.categoria)
         } catch (e: LoteInvalidoException) {
             log.warn("Lote de IA descartado: {}", e.message)
             registrarFalloSinOcultar(trazaConRespuesta)
@@ -147,7 +147,7 @@ class ServicioGeneracionPregunta(
             SolicitudProveedorIa(
                 prompt = prompt,
                 modelo = pedido.modelo,
-                esquemaJson = EsquemaJsonLoteLlm.construir(pedido.cantidad, pedido.tipo),
+                esquemaJson = EsquemaJsonLoteLlm.construir(pedido.cantidad, pedido.tipo, pedido.categoria),
                 instruccionUsuario = "Genera exactamente ${pedido.cantidad} preguntas ahora. Responde solo el objeto JSON solicitado."
             )
         )
@@ -221,13 +221,24 @@ class ServicioGeneracionPregunta(
             - Tipo: ${pedido.tipo.valorBd}
             - Categoría: ${pedido.categoria.valorBd}
         """.trimIndent()
+        // Solo las de comportamiento llevan STAR; forzarlo en una pregunta técnica da respuestas ideales artificiales.
+        val reglaRespuestaIdeal = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
+            "Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado."
+        } else {
+            "Cada respuesta_ideal debe ser completa y precisa: qué es, cómo funciona y cuándo se usa, sin forzar el formato STAR."
+        }
+        val reglaRubrica = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
+            "La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado."
+        } else {
+            "La rúbrica debe usar metodo TECNICA y al menos 4 criterios con los conceptos que una buena respuesta debe cubrir."
+        }
         val reglas = """
             Reglas obligatorias:
             - Devuelve únicamente un objeto JSON que cumpla el schema estricto entregado.
             - No uses markdown ni texto fuera del JSON.
             - Escribe todo en español, aunque las ofertas estén en otro idioma.
-            - Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado.
-            - La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado.
+            - $reglaRespuestaIdeal
+            - $reglaRubrica
             - palabras_clave debe contener términos significativos.
             - respuestas_alternativas: 2 formas distintas y correctas de responder, con otras palabras que la respuesta_ideal.
             - sinonimos: grupos de términos equivalentes de la pregunta (por ejemplo ["deadlock", "interbloqueo"]); puede ir vacío.
