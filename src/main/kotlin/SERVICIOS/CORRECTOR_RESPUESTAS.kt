@@ -3,11 +3,14 @@ package SERVICIOS
 import CONFIGURACION.LARGO_MAXIMO_RESPUESTA_ENTREVISTA
 import CONFIGURACION.UMBRAL_RESPUESTA_CORRECTA
 import ERRORES.ErrorValidacion
+import MODELOS.FeedbackGenerico
+import MODELOS.NivelFeedbackGenerico
 import MODELOS.OpcionSnapshot
 import MODELOS.Pregunta
 import MODELOS.PreguntaServida
 import MODELOS.RespuestaCorregida
 import MODELOS.TipoPregunta
+import MODELOS.feedbackGenericoDe
 import java.util.UUID
 
 private const val PUNTAJE_MAXIMO = 100.0
@@ -24,7 +27,8 @@ fun Pregunta.aServida(orden: Int) = PreguntaServida(
     skillId = skillId?.toString(),
     opciones = opciones.map { OpcionSnapshot(it.id.toString(), it.texto, it.esCorrecta, it.explicacion) },
     respuestaIdeal = respuestaIdeal,
-    palabrasClave = palabrasClaveDe(rubrica)
+    palabrasClave = palabrasClaveDe(rubrica),
+    feedbackGenerico = feedbackGenericoDe(rubrica).takeUnless { it.vacio }
 )
 
 /**
@@ -41,7 +45,7 @@ class CorrectorRespuestas(private val evaluador: EvaluadorRespuesta) {
                 opcionId = opcion.id,
                 correcta = opcion.esCorrecta,
                 puntaje = if (opcion.esCorrecta) PUNTAJE_MAXIMO else 0.0,
-                feedback = opcion.explicacion ?: pregunta.opcionCorrecta?.explicacion
+                feedback = feedbackOpcion(pregunta, opcion.esCorrecta, opcion.explicacion ?: pregunta.opcionCorrecta?.explicacion)
             )
         }
         val limpio = texto?.trim()?.takeIf { it.isNotEmpty() }
@@ -49,12 +53,23 @@ class CorrectorRespuestas(private val evaluador: EvaluadorRespuesta) {
         if (limpio.length > LARGO_MAXIMO_RESPUESTA_ENTREVISTA) {
             throw ErrorValidacion("respuesta_muy_larga", "La respuesta admite hasta $LARGO_MAXIMO_RESPUESTA_ENTREVISTA caracteres")
         }
-        val evaluacion = evaluador.evaluar(limpio, pregunta.respuestaIdeal.orEmpty(), pregunta.palabrasClave)
+        val evaluacion = evaluador.evaluar(
+            limpio, pregunta.respuestaIdeal.orEmpty(), pregunta.palabrasClave,
+            feedbackGenerico = pregunta.feedbackGenerico ?: FeedbackGenerico()
+        )
         return RespuestaCorregida(
             texto = limpio,
             correcta = evaluacion.puntaje >= UMBRAL_RESPUESTA_CORRECTA,
             puntaje = evaluacion.puntaje,
             feedback = evaluacion.feedback
         )
+    }
+
+    /** Opción múltiple: el texto propio de la pregunta (correcto o malo, D36) seguido de la explicación de la opción. */
+    private fun feedbackOpcion(pregunta: PreguntaServida, correcta: Boolean, explicacion: String?): String? {
+        val nivel = if (correcta) NivelFeedbackGenerico.CORRECTO else NivelFeedbackGenerico.MALO
+        return listOfNotNull(pregunta.feedbackGenerico?.texto(nivel), explicacion?.trim()?.takeIf { it.isNotEmpty() })
+            .joinToString(" ")
+            .ifEmpty { null }
     }
 }

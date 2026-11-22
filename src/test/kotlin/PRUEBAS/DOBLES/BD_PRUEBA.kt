@@ -223,6 +223,11 @@ class SistemaPrueba(
         mercado = contextoMercado
     )
     val cobertura = SERVICIOS.ServicioCoberturaPreguntas(mercadoRepo, MODELOS.LectorCoberturaPreguntasExposed())
+    val feedbackGenerico = SERVICIOS.ServicioFeedbackGenerico(
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa, TipoProveedorIa.MIMO to proveedorIa),
+        MODELOS.RepositorioFeedbackGenericoExposed(),
+        topeGeneracionIa
+    )
 
     val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, ofertas)
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
@@ -318,7 +323,7 @@ class SistemaPrueba(
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
-            controladorPregunta(pregunta, generacion, cobertura)
+            controladorPregunta(pregunta, generacion, cobertura, feedbackGenerico)
             controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)
