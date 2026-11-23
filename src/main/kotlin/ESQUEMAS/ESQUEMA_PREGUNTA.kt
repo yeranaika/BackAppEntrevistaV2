@@ -165,3 +165,38 @@ data class ConsultaPreguntas(
     val pagina: Int? = null,
     val tamano: Int? = null
 )
+
+// ---------- Feedback genérico de las preguntas del banco (D36) ----------
+
+/**
+ * Completar el feedback genérico (correcto, medio, malo) de preguntas que ya están en el banco. Sin [preguntaIds] toma
+ * las [limite] más antiguas a las que les falta algún nivel. Con [sobrescribir] reemplaza los textos que ya tienen.
+ */
+@Serializable
+data class SolicitudCompletarFeedbackGenerico(
+    val modelo: String = "gpt-4o-mini",
+    val limite: Int = 10,
+    @SerialName("pregunta_ids") val preguntaIds: List<String> = emptyList(),
+    val sobrescribir: Boolean = false
+)
+
+@Serializable
+data class RespuestaCompletarFeedbackGenerico(
+    /** Preguntas a las que se les guardó feedback en esta llamada. */
+    val actualizadas: Int,
+    /** Preguntas para las que la IA no devolvió los tres textos válidos: siguen pendientes. */
+    val omitidas: Int,
+    /** Preguntas del banco (no rechazadas) a las que todavía les falta algún nivel. */
+    val pendientes: Int,
+    @SerialName("llamadas_ia") val llamadasIa: Int,
+    @SerialName("costo_usd") val costoUsd: Double,
+    @SerialName("pregunta_ids") val preguntaIds: List<String>,
+    /** Código del error que cortó el proceso a mitad de camino (lo anterior quedó guardado); null si terminó. */
+    @SerialName("detenido_por") val detenidoPor: String? = null
+)
+
+@Serializable
+data class RespuestaEstadoFeedbackGenerico(
+    /** Preguntas del banco (no rechazadas) a las que les falta al menos uno de los tres textos. */
+    val pendientes: Int
+)

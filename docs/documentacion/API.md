@@ -621,6 +621,8 @@ Administración (solo admin) y lectura para usuarios.
 | `DELETE` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Borrar pregunta (admin) |
 | `PATCH` | `/api/v1/admin/preguntas/{{preguntaId}}/rechazar` | Admin | Rechazar pregunta (admin) |
 | `POST` | `/api/v1/admin/preguntas/generar-ia` | Admin | Generar preguntas con IA (admin) |
+| `GET` | `/api/v1/admin/preguntas/feedback-generico` | Admin | Preguntas sin feedback genérico completo (admin) |
+| `POST` | `/api/v1/admin/preguntas/feedback-generico/completar` | Admin | Completar feedback genérico con IA (admin) |
 | `GET` | `/api/v1/admin/preguntas/cobertura` | Admin | Cobertura del banco frente al mercado (admin) |
 | `GET` | `/api/v1/preguntas` | Usuario | Preguntas para usuarios |
 
@@ -789,6 +791,27 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
   "categoria": "tecnica",
   "modelo": "gpt-4o-mini",
   "usar_mercado": true
+}
+```
+
+### Preguntas sin feedback genérico completo (admin)
+
+`GET /api/v1/admin/preguntas/feedback-generico` · Admin · responde `200`
+
+`pendientes`: preguntas no rechazadas a las que les falta alguno de los tres textos de `rubrica.feedback_generico` (`correcto`, `medio`, `malo`, D36). No llama al LLM.
+
+### Completar feedback genérico con IA (admin)
+
+`POST /api/v1/admin/preguntas/feedback-generico/completar` · Admin · responde `200`
+
+⚠️ Llama al LLM (cuesta). La IA escribe el feedback correcto, medio y malo de las `limite` (1 a 50) preguntas más antiguas que no lo tienen completo, o de las de `pregunta_ids` (hasta 50). Manda 10 por llamada. Solo agrega los niveles que faltan; con `sobrescribir: true` reemplaza los tres. No cambia el estado de la pregunta. Usa el mismo tope mensual de gasto y límite por IP que `generar-ia`, y cada llamada queda en Costos IA. Respuesta: `actualizadas`, `omitidas` (la IA no devolvió los tres textos válidos: siguen pendientes), `pendientes`, `llamadas_ia`, `costo_usd`, `pregunta_ids` y `detenido_por` (código del error que cortó el proceso a mitad de camino; lo anterior quedó guardado). Para todo el banco, repetir hasta `pendientes: 0`. La rúbrica de crear/editar acepta el mismo objeto `feedback_generico` (`400 feedback_generico_invalido`).
+
+```json
+{
+  "modelo": "gpt-4o-mini",
+  "limite": 10,
+  "pregunta_ids": [],
+  "sobrescribir": false
 }
 ```
 
@@ -1394,12 +1417,13 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 141 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 144 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
 | 400 | `alcance_invalido` | Hay alcances con nombre vacío o demasiado largo |
 | 400 | `alcances_requeridos` | Indica qué alcances aceptas o rechazas |
+| 400 | `alternativas_invalidas` | Las respuestas alternativas son hasta … textos de máximo … caracteres |
 | 400 | `area_invalida` | El área es obligatoria y de hasta … caracteres |
 | 400 | `cantidad_invalida` | La entrevista debe tener entre … y … preguntas |
 | 400 | `cargo_id_invalido` | El id del cargo no es válido |
@@ -1424,6 +1448,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `estado_invalido` | Estado debe ser pendiente, aprobada o rechazada |
 | 400 | `etiqueta_invalida` | label no puede superar … caracteres |
 | 400 | `expiracion_invalida` | expires_at debe venir en ISO-8601 (ej: 2026-01-31T23:59:59Z) |
+| 400 | `feedback_generico_invalido` | El feedback genérico es un objeto con correcto, medio y malo: textos de hasta … caracteres |
 | 400 | `genero_invalido` | Género no válido |
 | 400 | `hora_invalida` | La hora debe tener formato HH:mm (00:00 a 23:59) |
 | 400 | `id_invalido` | Formato de UUID inválido |
@@ -1433,7 +1458,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `idioma_invalido` | Idioma no soportado |
 | 400 | `invalid_uuid` | Identificador con formato inválido |
 | 400 | `licencia_invalida` | licenseType debe ser PROM, INST o GOOG |
-| 400 | `limite_invalido` | El límite debe estar entre 1 y … |
+| 400 | `limite_invalido` | Se pueden completar hasta … preguntas por vez |
 | 400 | `lote_invalido` | Envía entre 1 y … métricas por solicitud |
 | 400 | `max_usos_invalido` | max_uses debe ser al menos 1 |
 | 400 | `metrica_fuera_de_rango` | Los puntajes de video van de 0 a 100 |
@@ -1476,6 +1501,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `rol_invalido` | El rol debe ser 'user' o 'admin' |
 | 400 | `sector_invalido` | El sector no puede superar … caracteres |
 | 400 | `sin_respuestas` | Responde al menos una pregunta |
+| 400 | `sinonimos_invalidos` | Los sinónimos son hasta … grupos de 2 a … términos de máximo … caracteres |
 | 400 | `skill_id_invalido` | El id de la skill no es válido |
 | 400 | `skill_no_encontrada` | La skill del intento … no existe |
 | 400 | `tamano_invalido` | El tamaño de página debe estar entre 1 y … |
@@ -1531,7 +1557,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
 | 429 | `tope_generacion_ia_alcanzado` | Se acabaron los Credits del Token Plan de MiMo de este periodo; se renuevan el … (UTC) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |
-| 502 | `provider_invalid_output` | La IA devolvió preguntas que no cumplen las reglas de calidad |
+| 502 | `provider_invalid_output` | La IA no devolvió feedback válido |
 | 502 | `provider_refusal` | El modelo se negó a generar las preguntas |
 | 502 | `provider_timeout` | El proveedor de IA tardó demasiado en responder |
 | 502 | `provider_truncated` | La respuesta del proveedor de IA quedó incompleta |

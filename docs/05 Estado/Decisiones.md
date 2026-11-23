@@ -440,3 +440,33 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise.
 - **Pruebas**: `PruebaServicioConsentimiento` (alcances guardados, conservados al republicar, mapa con los rechazados
   en `false`, alcance vacío rechazado). `PROBAR_SEMILLA.ps1` 7/7 y la `v1.1` cargada con saltos de línea y alcances.
+
+## D36 · Feedback genérico por pregunta: correcto, medio y malo (2026-11)
+- **Pedido:** que cada pregunta generada traiga 3 feedbacks genéricos (correcto, medio, malo) y un método para completar
+  las preguntas que ya están en el banco y no tienen alguno de los tres.
+- **Dónde vive:** en la rúbrica, `rubrica_evaluacion.feedback_generico = {"correcto": "...", "medio": "...", "malo": "..."}`
+  (textos de hasta 500 caracteres). Sin migración: la rúbrica ya es JSONB. Puede estar incompleto (falta un nivel).
+- **Generación (`generar-ia`):** el esquema estricto y el prompt piden los tres textos (específicos de la pregunta, en
+  segunda persona, sin revelar la respuesta). Un texto vacío o de más de 500 caracteres no invalida el lote (la llamada
+  ya se pagó): se guarda lo que sirve y queda pendiente lo demás. Un lote sin feedback sigue siendo válido.
+- **Admin (crear/editar):** `feedback_generico` es opcional; si viene, debe ser un objeto con solo esas claves y textos no
+  vacíos de hasta 500 caracteres (`feedback_generico_invalido`).
+- **Completar las existentes:** `GET /api/v1/admin/preguntas/feedback-generico` (cuántas no rechazadas tienen algún nivel
+  faltante) y `POST /api/v1/admin/preguntas/feedback-generico/completar` con `{modelo, limite (1..50), pregunta_ids,
+  sobrescribir}`. Toma las más antiguas que faltan (o las de `pregunta_ids`), manda 10 por llamada al LLM, **solo agrega
+  los niveles que faltan** (con `sobrescribir` reemplaza los tres) y **no cambia el estado** de la pregunta (una
+  aprobada sigue aprobada). Cada llamada pasa por el tope mensual (D23), queda en `pregunta_generacion_ia` sin
+  `pregunta_id` (por eso cuenta en Costos IA) y comparte el límite por IP de `generar-ia`. Lo que la IA devuelve mal
+  (número repetido o fuera de rango, texto vacío o largo) se omite y queda pendiente; si falla una llamada a mitad de
+  camino se responde lo ya guardado con `detenido_por`. Para todo el banco: llamar varias veces hasta `pendientes = 0`.
+- **Uso al corregir (freemium, sin IA):** nivel según el puntaje con los cortes del texto estándar (correcto ≥ 80, medio
+  ≥ 60, malo < 60). La respuesta abierta muestra el texto propio del nivel y, si no es correcta, "Repasa: <conceptos que
+  faltaron>". La opción múltiple antepone el texto correcto o malo a la explicación de la opción. Sin texto para ese
+  nivel se usa el feedback estándar de antes. La entrevista lo toma de la copia de la rúbrica (`rubrica_snap`, D24):
+  completar el banco no cambia entrevistas ya servidas. La práctica lo guarda en la pregunta servida (`feedback_generico`).
+- **Contrato Android:** sin cambios de forma; solo cambia el texto de `feedback`/`observacion`.
+- **Pendiente:** mandar `feedback_generico` en la descarga del banco para el ciclo sin conexión de la app; que el panel
+  web muestre y edite los tres textos y tenga un botón para completar.
+- **Pruebas**: `PruebaFeedbackGenerico` (17 casos: modelo, esquema y prompt de IA, validación del admin, corrección
+  abierta y de opción múltiple, completar por lote o por id, omitidos, fallo a mitad de camino, límites y permisos).
+

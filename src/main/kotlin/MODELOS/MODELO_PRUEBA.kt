@@ -50,7 +50,9 @@ data class PreguntaServida(
     @SerialName("skill_id") val skillId: String? = null,
     val opciones: List<OpcionSnapshot> = emptyList(),
     @SerialName("respuesta_ideal") val respuestaIdeal: String? = null,
-    @SerialName("palabras_clave") val palabrasClave: List<String> = emptyList()
+    @SerialName("palabras_clave") val palabrasClave: List<String> = emptyList(),
+    /** Textos propios de la pregunta para respuesta correcta, a medias y mala (D36); null en pruebas anteriores. */
+    @SerialName("feedback_generico") val feedbackGenerico: FeedbackGenerico? = null
 ) {
     val tipoPregunta: TipoPregunta get() = TipoPregunta.desdeBd(tipo) ?: TipoPregunta.ABIERTA_TEXTO
     val categoriaHabilidad: CategoriaHabilidad get() = CategoriaHabilidad.desdeBd(categoria) ?: CategoriaHabilidad.TECNICA

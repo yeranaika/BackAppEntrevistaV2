@@ -2467,6 +2467,96 @@
           ]
         },
         {
+          "name": "Preguntas sin feedback genérico completo (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/feedback-generico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "feedback-generico"
+              ]
+            },
+            "description": "`pendientes`: preguntas no rechazadas a las que les falta alguno de los tres textos de `rubrica.feedback_generico` (`correcto`, `medio`, `malo`, D36). No llama al LLM.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Completar feedback genérico con IA (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/feedback-generico/completar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "feedback-generico",
+                "completar"
+              ]
+            },
+            "description": "⚠️ Llama al LLM (cuesta). La IA escribe el feedback correcto, medio y malo de las `limite` (1 a 50) preguntas más antiguas que no lo tienen completo, o de las de `pregunta_ids` (hasta 50). Manda 10 por llamada. Solo agrega los niveles que faltan; con `sobrescribir: true` reemplaza los tres. No cambia el estado de la pregunta. Usa el mismo tope mensual de gasto y límite por IP que `generar-ia`, y cada llamada queda en Costos IA. Respuesta: `actualizadas`, `omitidas` (la IA no devolvió los tres textos válidos: siguen pendientes), `pendientes`, `llamadas_ia`, `costo_usd`, `pregunta_ids` y `detenido_por` (código del error que cortó el proceso a mitad de camino; lo anterior quedó guardado). Para todo el banco, repetir hasta `pendientes: 0`. La rúbrica de crear/editar acepta el mismo objeto `feedback_generico` (`400 feedback_generico_invalido`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelo\": \"gpt-4o-mini\",\n  \"limite\": 10,\n  \"pregunta_ids\": [],\n  \"sobrescribir\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Cobertura del banco frente al mercado (admin)",
           "request": {
             "method": "GET",

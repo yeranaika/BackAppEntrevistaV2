@@ -45,7 +45,7 @@ con **tests de nivelación**, **práctica guiada** y **feedback** automático (m
 
 ### 03 · Tecnologías
 - [[Kotlin y Ktor]] · [[PostgreSQL y Exposed]] · [[Redis]] · [[Autenticacion JWT y Google]]
-- [[LLM OpenAI y Anthropic]] · [[APIs de empleo]] · [[Google Play Billing]] · [[Correo SMTP]]
+- [[LLM OpenAI y Anthropic]] · [[APIs de empleo]] · [[Google Play Billing]] · [[Correo SMTP]] · [[TTS voz del entrevistador]]
 - [[Docker]] · [[Pruebas]] · [[Postman y documentacion de la API]]
 
 ### 04 · Guías

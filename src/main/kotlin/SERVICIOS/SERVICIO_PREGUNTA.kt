@@ -6,12 +6,15 @@ import ERRORES.ErrorValidacion
 import ESQUEMAS.ConsultaPreguntas
 import ESQUEMAS.SolicitudOpcion
 import ESQUEMAS.SolicitudPregunta
+import MODELOS.CLAVE_FEEDBACK_GENERICO
 import MODELOS.CategoriaHabilidad
 import MODELOS.ContenidoPregunta
 import MODELOS.EstadoPregunta
 import MODELOS.FiltroPreguntas
+import MODELOS.LARGO_MAXIMO_FEEDBACK_GENERICO
 import MODELOS.LectorCatalogo
 import MODELOS.NivelExperiencia
+import MODELOS.NivelFeedbackGenerico
 import MODELOS.NuevaOpcion
 import MODELOS.PaginaPreguntas
 import MODELOS.Pregunta
@@ -120,6 +123,7 @@ class ServicioPregunta(
             validarPreguntaAbierta(solicitud, respuestaIdeal)
         }
         validarRubrica(solicitud.rubrica)
+        validarFeedbackGenerico(solicitud.rubrica)
         return ContenidoPregunta(
             skillId = skillId,
             cargoId = cargoId,
@@ -158,6 +162,26 @@ class ServicioPregunta(
                     "Los sinónimos son hasta $GRUPOS_SINONIMOS_MAXIMOS grupos de 2 a $TERMINOS_POR_GRUPO_MAXIMOS términos de máximo $LARGO_MAXIMO_TERMINO caracteres"
                 )
             }
+        }
+    }
+
+    /**
+     * "feedback_generico" (D36): objeto con "correcto", "medio" y "malo", textos no vacíos de hasta
+     * $LARGO_MAXIMO_FEEDBACK_GENERICO caracteres. Puede traer solo algunos: el método de completar rellena el resto.
+     */
+    private fun validarFeedbackGenerico(rubrica: JsonObject?) {
+        val elemento = rubrica?.get(CLAVE_FEEDBACK_GENERICO) ?: return
+        val claves = NivelFeedbackGenerico.entries.map { it.clave }.toSet()
+        val objeto = elemento as? JsonObject
+        val valido = objeto != null && objeto.keys.all { it in claves } && objeto.values.all { valor ->
+            val texto = (valor as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()
+            texto != null && texto.isNotEmpty() && texto.length <= LARGO_MAXIMO_FEEDBACK_GENERICO
+        }
+        if (!valido) {
+            throw ErrorValidacion(
+                "feedback_generico_invalido",
+                "El feedback genérico es un objeto con correcto, medio y malo: textos de hasta $LARGO_MAXIMO_FEEDBACK_GENERICO caracteres"
+            )
         }
     }
 

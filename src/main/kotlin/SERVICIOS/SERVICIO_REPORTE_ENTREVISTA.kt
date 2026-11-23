@@ -39,6 +39,7 @@ import MODELOS.ResumenMetricasVideo
 import MODELOS.ResumenReporte
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
+import MODELOS.feedbackGenericoDe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -309,7 +310,7 @@ class ServicioReporteEntrevista(
         val rubrica = pregunta.rubrica ?: pregunta.preguntaId?.let { preguntas.buscarPorId(it)?.rubrica }
         return RespuestaAbiertaAEvaluar(
             pregunta.id, pregunta.categoria, pregunta.enunciado, pregunta.respuestaIdeal, palabrasClaveDe(rubrica), pregunta.transcripcion!!,
-            alternativasDe(rubrica), sinonimosDe(rubrica)
+            alternativasDe(rubrica), sinonimosDe(rubrica), feedbackGenericoDe(rubrica)
         )
     }
 
