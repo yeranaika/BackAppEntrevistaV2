@@ -1,0 +1,90 @@
+{
+  "id_modelo": "divlara-e14-mlp",
+  "fuente": "E:\\entrenamienrto-IA\\DivLara\\models\\registry\\model_mlp_20261010_124830 (DivLara ModelRegistry, activo desde 2026-10-10)",
+  "arquitectura": "Multi-Task MLP (20 cabezas)",
+  "input": {
+    "tipo": "ventana_landmarks",
+    "ventana_seg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "n_features": 343,
+    "requiere_archivos": [
+      "model.pt",
+      "scaler.joblib",
+      "meta.json"
+    ],
+    "pipeline_features": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "output": {
+    "variables": [
+      "posture_stability",
+      "torso_lean",
+      "body_rigidity",
+      "shoulder_symmetry",
+      "upper_body_openness",
+      "arm_crossing",
+      "table_rest",
+      "gesture_activity",
+      "movement_level",
+      "head_nodding",
+      "camera_orientation",
+      "framing_quality",
+      "fidgeting_index",
+      "gaze_alignment",
+      "gaze_direction",
+      "hand_to_face_adaptors",
+      "head_tilt_forward",
+      "shoulder_elevation_sustained",
+      "torso_movement_index",
+      "trunk_openness_dynamics"
+    ],
+    "n_variables": 20,
+    "escala": "0-8",
+    "umbrales": "sin definir (modelo guia)",
+    "nota_targets": "El artefacto real (model.pt/modelo.onnx) tiene 20 salidas verificadas en T3.1 (n_targets=20); meta.json solo detalla los loss_weights de las 12 originales."
+  },
+  "estado": "modelo guia preliminar; pendiente re-entrenamiento R-2 con clips nuevos",
+  "version": "divlara-e14-mlp",
+  "constanteBackend": "CONFIGURACION.VERSION_MODELO_DIVLARA",
+  "artefacto": {
+    "archivo": "modelo.onnx",
+    "archivosOrigenE14": [
+      "model.pt",
+      "scaler.joblib",
+      "meta.json"
+    ],
+    "nota": "T3.1 COMPLETADO: modelo.onnx exportado y verificado (PyTorch-vs-ONNX max_diff 1.431e-06; JVM onnxruntime 1.20.0 vs Python 1.31.1), scaler.json extraido (manual vs sklearn 9.77e-04), golden.json generado (n_targets=20). Suite 48/443/0/0."
+  },
+  "entrada": {
+    "tipo": "ventana_landmarks",
+    "ventanaSeg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "nFeatures": 343,
+    "privacidad": "Procesamiento efímero en RAM (0 días de retención). MediaPipe corre en Android y envía solo landmarks de la ventana (P-1)."
+  },
+  "normalizacion": {
+    "metodo": "scaler_joblib",
+    "archivo": "scaler.joblib",
+    "pipeline": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "salidas": {
+    "versionModelo": "divlara-e14-mlp",
+    "sinEmociones": true,
+    "reglaPrivacidad": "RNF10 / D22: prohibido inferir o persistir emociones; solo conductas observables acotadas.",
+    "gestos": {
+      "clavesPermitidas": [
+        "toca_cara",
+        "manos_visibles",
+        "gesticula_manos",
+        "movimiento_cabeza",
+        "cabeza_inclinada",
+        "mirada_fuera",
+        "rostro_visible"
+      ],
+      "nota": "Mapeo desde las variables de E14 (escala 0-8) a conductas observables del backend (GESTOS_OBSERVABLES) se define en T3.1b/umbrales."
+    }
+  }
+}

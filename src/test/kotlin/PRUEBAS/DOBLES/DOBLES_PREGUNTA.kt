@@ -12,6 +12,7 @@ import MODELOS.LectorCatalogo
 import MODELOS.PreguntaGenerada
 import MODELOS.RepositorioGeneracionPreguntaIa
 import MODELOS.TrazaGeneracion
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -71,6 +72,22 @@ object LoteLlmDePrueba {
     const val RESPUESTA_STAR =
         "Situación: existía un problema relevante. Tarea: debía resolverlo. Acción: apliqué una estrategia concreta. Resultado: logré una mejora medible."
 
+    /** Feedback genérico completo (D36) que trae cada pregunta del lote si no se indica otro. */
+    val FEEDBACK_DE_PRUEBA = MODELOS.FeedbackGenerico(
+        correcto = "Muy bien: explicaste la situación y el resultado con claridad.",
+        medio = "Vas bien, pero te faltó contar el resultado que lograste.",
+        malo = "Repasa cómo contar una experiencia con situación, tarea, acción y resultado."
+    )
+
+    /** Respuesta del LLM al completar feedback: un objeto por número; [numeros] permite repetir o saltar números. */
+    fun feedbackJson(numeros: List<Int>, texto: (Int) -> String = { "Texto $it de feedback para la pregunta." }): String {
+        val items = numeros.joinToString(",") { n ->
+            val t = Json.encodeToString(String.serializer(), texto(n))
+            """{"numero":$n,"correcto":$t,"medio":$t,"malo":$t}"""
+        }
+        return """{"feedbacks":[$items]}"""
+    }
+
     fun json(
         cantidad: Int,
         tipo: String,
@@ -78,14 +95,17 @@ object LoteLlmDePrueba {
         opcionesCorrectas: Int = 1,
         respuestaIdeal: String = RESPUESTA_STAR,
         enunciado: (Int) -> String = { "Pregunta $it con contexto suficiente para evaluar desempeño profesional" },
-        opcionesDuplicadas: Boolean = false
+        opcionesDuplicadas: Boolean = false,
+        feedbackGenerico: (Int) -> MODELOS.FeedbackGenerico? = { FEEDBACK_DE_PRUEBA }
     ): String {
         val preguntas = (1..cantidad).map { i ->
             PreguntaLlm(
                 enunciado = enunciado(i),
                 tipoPregunta = tipo,
                 respuestaIdeal = respuestaIdeal,
-                rubrica = RubricaLlm("STAR", criterios, listOf("estrategia", "métrica", "colaboración"), 120),
+                rubrica = RubricaLlm(
+                    "STAR", criterios, listOf("estrategia", "métrica", "colaboración"), 120, feedbackGenerico = feedbackGenerico(i)
+                ),
                 opciones = if (tipo != "opcion_multiple") null else (1..4).map { o ->
                     OpcionLlm(
                         texto = if (opcionesDuplicadas) "Opción repetida" else "Opción $o con contenido significativo",

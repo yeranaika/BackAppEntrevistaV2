@@ -1,7 +1,15 @@
 package PRUEBAS
 
+import CONFIGURACION.VERSION_MODELO_DIVLARA
 import ESQUEMAS.SolicitudRegistro
 import MODELOS.CategoriaHabilidad
+import MODELOS.TablaMetricaVideo
+import MODELOS.TablaReporteEntrevista
+import MODELOS.TablaSesionEntrevista
+import MODELOS.TablaSesionPreguntaRespuesta
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import PRUEBAS.DOBLES.SistemaPrueba
 import PRUEBAS.DOBLES.sembrarBancoGeneral
 import io.ktor.client.request.HttpRequestBuilder
@@ -99,10 +107,16 @@ class PruebaControladorEntrevista {
         assertEquals(HttpStatusCode.NoContent, enviar("GET", "$base/$id/siguiente", token = ana).status)
 
         val metricas = """{"metricas":[{"timestampMs":0,"contactoVisual":80.5,"postura":70,"confianza":65,"expresion":"Seguro"},
-                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral"}]}""" // expresion se ignora (D22)
+                           {"timestampMs":500,"gestos":{"toca_cara":true},"expresion":"neutral","versionModelo":"falso-cliente-v99"}]}""" // expresion y versionModelo del cliente se ignoran (D22, RNF08)
         val lote = enviar("POST", "$base/$id/metricas", metricas, ana)
         assertEquals(HttpStatusCode.Created, lote.status)
-        assertEquals("2", lote.objeto().texto("insertadas"))
+        val cuerpoLote = lote.objeto()
+        assertEquals("2", cuerpoLote.texto("insertadas"))
+        assertEquals(VERSION_MODELO_DIVLARA, cuerpoLote.texto("versionModelo"))
+        val versionesGuardadas = transaction {
+            TablaMetricaVideo.selectAll().orderBy(TablaMetricaVideo.timestampMs).map { it[TablaMetricaVideo.versionModelo] }
+        }
+        assertEquals(listOf(VERSION_MODELO_DIVLARA, VERSION_MODELO_DIVLARA), versionesGuardadas)
 
         val finalizada = enviar("POST", "$base/$id/finalizar", token = ana).objeto()
         assertEquals("finalizada", finalizada.texto("estado"))
@@ -128,6 +142,62 @@ class PruebaControladorEntrevista {
         assertEquals("cancelada", enviar("POST", "$base/$id/cancelar", token = ana).objeto().texto("estado"))
         assertEquals(HttpStatusCode.Conflict, enviar("POST", "$base/$id/cancelar", token = ana).status)
         assertEquals("cantidad_invalida", enviar("POST", base, """{"cargo":"QA","cantidadPreguntas":50}""", ana).objeto().texto("error"))
+    }
+
+    @Test
+    fun `borrar elimina clips, transcripciones y metricas pero conserva la sesion y el costo del reporte`() = testApplication {
+        val sistema = sistemaConBanco()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        val beto = tokenDe(sistema, "beto@ejemplo.com")
+        val id = enviar("POST", base, """{"cargo":"Backend Developer","nivel":"jr","cantidadPreguntas":3}""", ana).objeto().texto("sesionId")!!
+
+        repeat(3) {
+            val pregunta = enviar("GET", "$base/$id/siguiente", token = ana).objeto()
+            val cuerpo = if (pregunta.texto("tipo") == "opcion_multiple") {
+                """{"preguntaSesionId":"${pregunta.texto("preguntaSesionId")}","opcionId":"${pregunta["opciones"]!!.jsonArray[0].jsonObject.texto("opcionId")}"}"""
+            } else {
+                """{"preguntaSesionId":"${pregunta.texto("preguntaSesionId")}","texto":"Mi respuesta","videoClipUrl":"https://almacen.ejemplo.com/clip.mp4"}"""
+            }
+            assertEquals(HttpStatusCode.OK, enviar("POST", "$base/$id/respuestas", cuerpo, ana).status)
+        }
+        enviar("POST", "$base/$id/metricas", """{"metricas":[{"timestampMs":0,"postura":70},{"timestampMs":500,"postura":60}]}""", ana)
+        assertEquals(HttpStatusCode.Unauthorized, enviar("POST", "$base/$id/borrar").status)
+        assertEquals("entrevista_en_curso", enviar("POST", "$base/$id/borrar", token = ana).objeto().texto("error"))
+
+        enviar("POST", "$base/$id/finalizar", token = ana)
+        val sesionId = java.util.UUID.fromString(id)
+        transaction {
+            TablaReporteEntrevista.insert {
+                it[reporteId] = java.util.UUID.randomUUID(); it[TablaReporteEntrevista.sesionId] = sesionId
+                it[resumen] = "Habló de su empleo anterior"; it[fortalezas] = listOf("Buena estructura")
+                it[modeloLlm] = "modelo-x"; it[costoUsd] = java.math.BigDecimal("0.012300"); it[fechaGeneracion] = java.time.Instant.now()
+            }
+        }
+
+        assertEquals("entrevista_no_encontrada", enviar("POST", "$base/$id/borrar", token = beto).objeto().texto("error"))
+        val borrado = enviar("POST", "$base/$id/borrar", token = ana)
+        assertEquals(HttpStatusCode.OK, borrado.status, borrado.bodyAsText())
+        val cuerpo = borrado.objeto()
+        assertNotNull(cuerpo.texto("mensaje"))
+        assertEquals("2", cuerpo.texto("metricasBorradas"))
+        assertTrue((cuerpo.texto("clipsBorrados")!!.toInt()) >= 0 && cuerpo.texto("transcripcionesBorradas") != null)
+
+        transaction {
+            val respuestas = TablaSesionPreguntaRespuesta.selectAll().where { TablaSesionPreguntaRespuesta.sesionId eq sesionId }.toList()
+            assertEquals(3, respuestas.size, "las preguntas y sus puntajes se conservan")
+            assertTrue(respuestas.all { it[TablaSesionPreguntaRespuesta.videoClipUrl] == null && it[TablaSesionPreguntaRespuesta.transcripcion] == null })
+            assertEquals(0, TablaMetricaVideo.selectAll().where { TablaMetricaVideo.sesionId eq sesionId }.count().toInt())
+            assertEquals(1, TablaSesionEntrevista.selectAll().where { TablaSesionEntrevista.sesionId eq sesionId }.count().toInt())
+            val reporte = TablaReporteEntrevista.selectAll().where { TablaReporteEntrevista.sesionId eq sesionId }.single()
+            assertNull(reporte[TablaReporteEntrevista.resumen])
+            assertTrue(reporte[TablaReporteEntrevista.fortalezas].isEmpty())
+            assertEquals(java.math.BigDecimal("0.012300"), reporte[TablaReporteEntrevista.costoUsd], "el costo de IA sigue contando para el tope")
+        }
+
+        val repetido = enviar("POST", "$base/$id/borrar", token = ana)
+        assertEquals(HttpStatusCode.OK, repetido.status, "repetirlo es inocuo")
+        assertEquals("0", repetido.objeto().texto("metricasBorradas"))
     }
 
     // ---------- Contrato de la app Android ----------

@@ -39,6 +39,7 @@ import MODELOS.ResumenMetricasVideo
 import MODELOS.ResumenReporte
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
+import MODELOS.feedbackGenericoDe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -76,6 +77,10 @@ data class ProgresoSkill(
 private const val NOMBRE_TECNICAS_GENERALES = "Conocimientos técnicos generales"
 private const val NOMBRE_BLANDAS_GENERALES = "Habilidades blandas"
 private const val ITEMS_MAXIMOS_REPORTE = 6
+private const val CONCEPTOS_EN_RESUMEN = 4
+internal const val PREFIJO_CONCEPTO = "Incluye el concepto: "
+private const val AVISO_PREMIUM =
+    " Con la evaluación con IA (premium) ves por qué fallaste en cada respuesta y recibes un plan de estudio personalizado."
 
 /**
  * Reporte de feedback de la entrevista (Fase 7). Se genera en segundo plano al finalizar:
@@ -159,13 +164,20 @@ class ServicioReporteEntrevista(
      */
     private suspend fun generar(sesionId: UUID, intento: UUID) {
         try {
+            val inicio = System.nanoTime()
             val sesion = sesiones.buscar(sesionId) ?: return
             val resultado = calcular(sesion)
+            val tiempoCalculo = milisDesde(inicio)
             if (!reportes.guardarResultado(sesionId, resultado, intento)) {
                 log.warn("El reporte de la entrevista {} ya no estaba en generación (se dio por interrumpido): no se guarda", sesionId)
                 return
             }
             acumularNiveles(sesion, resultado.detalles)
+            // Tiempos por etapa para vigilar que el feedback salga en menos de 5 min (p95 objetivo: IA < 40 s, freemium < 2 s).
+            log.info(
+                "Reporte {} listo en {} ms (cálculo {} ms, guardado {} ms, modo {})",
+                sesionId, milisDesde(inicio), tiempoCalculo, milisDesde(inicio) - tiempoCalculo, resultado.modo.valorBd
+            )
         } catch (e: Exception) {
             // Apagado del servidor (no un timeout interno, que llega con la corrutina todavía activa): queda reintentable.
             if (e is CancellationException && !currentCoroutineContext().isActive) {
@@ -217,7 +229,9 @@ class ServicioReporteEntrevista(
         // Primero lo barato; la reserva del cupo (que bloquea al usuario en la BD) va al final.
         val reservaIa = if (evaluadorIa != null && abiertas.isNotEmpty() && premium.esPremium(sesion.usuarioId)) reservarCupoIa(sesion) else null
         val evaluador = if (reservaIa != null) evaluadorIa!! else evaluadorGratis
+        val inicioEvaluacion = System.nanoTime()
         val evaluacion = evaluador.evaluar(ContextoEvaluacionEntrevista(sesion.cargoObjetivo, sesion.nivel, abiertas.map { aEvaluar(it) }))
+        log.info("Evaluación de la entrevista {}: {} respuestas abiertas, modo {}, {} ms", sesion.id, abiertas.size, evaluacion.modo.valorBd, milisDesde(inicioEvaluacion))
         val porPregunta = evaluacion.evaluaciones.associateBy { it.preguntaSesionId }
 
         // Puntaje de cada pregunta. Las no respondidas cuentan 0; un clip sin transcripción no se puede evaluar y no cuenta.
@@ -245,7 +259,7 @@ class ServicioReporteEntrevista(
             fortalezas = fortalezas(evaluacion, detalles, blando, corporal),
             areasMejora = areasMejora(evaluacion, sesion, detalles, corporal, sinTranscripcion.size),
             recomendaciones = recomendaciones,
-            resumen = evaluacion.resumen ?: resumen(sesion, global(tecnico, blando, corporal), detalles),
+            resumen = evaluacion.resumen ?: resumenFreemium(sesion, global(tecnico, blando, corporal), detalles, conceptosPorRepasar(evaluacion)),
             modo = evaluacion.modo,
             uso = evaluacion.uso,
             detalles = detalles,
@@ -295,7 +309,8 @@ class ServicioReporteEntrevista(
         // se evalúa sin palabras clave.
         val rubrica = pregunta.rubrica ?: pregunta.preguntaId?.let { preguntas.buscarPorId(it)?.rubrica }
         return RespuestaAbiertaAEvaluar(
-            pregunta.id, pregunta.categoria, pregunta.enunciado, pregunta.respuestaIdeal, palabrasClaveDe(rubrica), pregunta.transcripcion!!
+            pregunta.id, pregunta.categoria, pregunta.enunciado, pregunta.respuestaIdeal, palabrasClaveDe(rubrica), pregunta.transcripcion!!,
+            alternativasDe(rubrica), sinonimosDe(rubrica), feedbackGenericoDe(rubrica)
         )
     }
 
@@ -367,13 +382,31 @@ class ServicioReporteEntrevista(
         return (evaluacion.areasMejora.ifEmpty { porReglas } + siempre).distinct().take(ITEMS_MAXIMOS_REPORTE)
     }
 
-    private fun resumen(sesion: SesionEntrevista, global: Double, detalles: List<DetalleSkillReporte>): String {
+    /**
+     * Feedback general del motor freemium (sin IA, sin tokens): el nivel de la entrevista (bueno, medio o malo), en qué skills
+     * reforzar, qué conceptos faltaron en las respuestas abiertas y un aviso de lo que suma el premium.
+     */
+    private fun resumenFreemium(sesion: SesionEntrevista, global: Double, detalles: List<DetalleSkillReporte>, conceptos: List<String>): String {
         val base = "Obtuviste ${puntajeEnteroVisible(global)}/100 en tu entrevista para ${sesion.cargoObjetivo} (nivel ${nombreNivel(sesion.nivel)})."
+        val nivel = when {
+            global >= UMBRAL_FORTALEZA -> " Resultado bueno: dominas lo esencial."
+            global >= UMBRAL_NIVEL_LOGRADO -> " Resultado medio: vas bien, pero te faltan detalles."
+            else -> " Resultado bajo: conviene reforzar los fundamentos."
+        }
         val mejor = detalles.firstOrNull()?.takeIf { it.puntaje.toDouble() >= UMBRAL_NIVEL_LOGRADO }?.let { " Tu mejor resultado fue en ${it.nombre}." }.orEmpty()
         val reforzar = detalles.filter { it.puntaje.toDouble() < UMBRAL_NIVEL_LOGRADO }.takeIf { it.isNotEmpty() }
             ?.let { lista -> " Conviene reforzar ${lista.take(3).joinToString(", ") { it.nombre }}." }.orEmpty()
-        return base + mejor + reforzar
+        val repasar = conceptos.takeIf { it.isNotEmpty() }?.let { " Conceptos para repasar: ${it.joinToString(", ")}." }.orEmpty()
+        return base + nivel + mejor + reforzar + repasar + AVISO_PREMIUM
     }
+
+    /** Los conceptos que más faltaron en las respuestas abiertas (el motor freemium los deja como "Incluye el concepto: X"). */
+    private fun conceptosPorRepasar(evaluacion: EvaluacionEntrevista): List<String> = evaluacion.evaluaciones
+        .flatMap { it.mejoras }
+        .mapNotNull { it.removePrefix(PREFIJO_CONCEPTO).takeIf { concepto -> concepto != it && concepto.isNotBlank() } }
+        .groupingBy { it }.eachCount()
+        .entries.sortedByDescending { it.value }
+        .take(CONCEPTOS_EN_RESUMEN).map { it.key }
 
     // ---------- Cálculos ----------
 
@@ -387,6 +420,8 @@ class ServicioReporteEntrevista(
         val pesos = partes.sumOf { it.second }
         return if (pesos == 0.0) 0.0 else partes.sumOf { (puntaje, peso) -> puntaje * peso } / pesos
     }
+
+    private fun milisDesde(inicioNanos: Long) = (System.nanoTime() - inicioNanos) / 1_000_000
 
     private fun promedio(valores: Collection<Double>): Double? = valores.takeIf { it.isNotEmpty() }?.average()
 

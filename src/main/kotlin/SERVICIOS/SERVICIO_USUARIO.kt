@@ -107,7 +107,10 @@ class ServicioUsuario(
         perfiles.guardar(usuarioId, cambios)
     }
 
-    /** Derecho al olvido: el usuario debe escribir "eliminar"; la BD borra en cascada sus datos. */
+    /**
+     * Derecho al olvido: el usuario debe escribir "eliminar". Se borran todos sus datos; solo se conserva el registro
+     * de su consentimiento (con su correo como identidad), prueba de que aceptó los términos.
+     */
     suspend fun eliminarCuenta(usuarioId: UUID, confirmacion: String) {
         if (confirmacion.trim().lowercase() != PALABRA_CONFIRMACION_BORRADO) {
             throw ErrorValidacion("must_type_eliminar", "Escribe \"$PALABRA_CONFIRMACION_BORRADO\" para confirmar")

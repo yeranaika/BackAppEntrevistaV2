@@ -292,6 +292,56 @@ class PruebaControladorPrueba {
         val evaluada = enviar("POST", "/api/v1/practice/evaluate-freemium", evaluacion, ana).objeto()
         assertEquals(listOf("recursos"), evaluada["missingKeywords"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
+
+    /**
+     * Ciclo completo de la práctica sin conexión de la app (SQLDelight, tabla pregunta_guardada): la app descarga
+     * GET /api/v1/preguntas (id, tipo, enunciado y opciones SIN la correcta), responde sin red y al volver manda
+     * /api/v1/sync/attempts con preguntas del banco. El servidor corrige alternativas y abiertas por su cuenta.
+     */
+    @Test
+    fun `practica offline con preguntas del banco descargadas - el servidor corrige alternativas y abiertas`() = testApplication {
+        val sistema = sistemaConBanco()
+        application { sistema.montar(this) }
+        val ana = tokenDe(sistema, "ana@ejemplo.com")
+        val skill = runBlocking { sistema.mercadoRepo.listarSkillsActivas().first { it.nombre == "Kotlin" }.id }
+
+        // Descarga: lo mismo que pide DescargadorPreguntas (una llamada por skill y tipo).
+        val alternativas = enviar("GET", "/api/v1/preguntas?skillId=$skill&tipo=opcion_multiple&cantidad=20", token = ana)
+            .let { json.parseToJsonElement(runBlocking { it.bodyAsText() }).jsonArray.map { e -> e.jsonObject } }
+        val abiertas = enviar("GET", "/api/v1/preguntas?skillId=$skill&tipo=abierta_texto&cantidad=20", token = ana)
+            .let { json.parseToJsonElement(runBlocking { it.bodyAsText() }).jsonArray.map { e -> e.jsonObject } }
+        assertTrue(alternativas.isNotEmpty() && abiertas.isNotEmpty())
+        assertTrue(alternativas.all { it.texto("tipo") == "opcion_multiple" && it["opciones"]!!.jsonArray.size >= 2 })
+        assertTrue(abiertas.all { it.texto("tipo") == "abierta_texto" && it["opciones"]!!.jsonArray.isEmpty() }, "la abierta se guarda sin opciones")
+        assertTrue(alternativas.all { it["opciones"]!!.jsonArray.none { o -> o.jsonObject.containsKey("esCorrecta") || o.jsonObject.containsKey("es_correcta") } })
+
+        // Sin red: una alternativa por su opción (la correcta se ubica por texto, solo para armar la respuesta de la prueba),
+        // otra con una opción que ya no existe, y una abierta con la respuesta ideal.
+        val correctaOffline = alternativas[0]
+        val idCorrecta = correctaOffline["opciones"]!!.jsonArray.map { it.jsonObject }.single { it.texto("texto") == "Correcta" }.texto("id")!!
+        val opcionBorrada = UUID.randomUUID().toString()
+        val abierta = abiertas[0]
+        val lote = """{"attempts":[{"localAttemptId":"loc-banco","skillId":"$skill","modo":"mixto","categoria":"tecnica","nivelPreguntas":"jr",
+            "fechaCreacionIso":"2025-12-01T10:00:00Z","respuestas":[
+            {"preguntaId":"${correctaOffline.texto("id")}","enunciado":"${correctaOffline.texto("enunciado")}","opcionElegidaId":"$idCorrecta","orden":1},
+            {"preguntaId":"${alternativas.getOrNull(1)?.texto("id") ?: alternativas[0].texto("id")}","enunciado":"x","opcionElegidaId":"$opcionBorrada","orden":2},
+            {"preguntaId":"${abierta.texto("id")}","enunciado":"${abierta.texto("enunciado")}","respuestaTexto":"Respuesta ideal","orden":3}]}]}"""
+        val sincronizado = enviar("POST", "/api/v1/sync/attempts", lote, ana)
+        assertEquals(HttpStatusCode.OK, sincronizado.status, sincronizado.bodyAsText())
+        val idServidor = sincronizado.objeto()["mappings"]!!.jsonArray.single().jsonObject.texto("serverAttemptId")
+
+        val detalle = enviar("GET", "/api/v1/practicas/$idServidor", token = ana).objeto()
+        assertEquals("finalizada", detalle.texto("estado"))
+        val correcciones = detalle["preguntas"]!!.jsonArray.map { it.jsonObject }.associateBy { it.texto("orden")!!.toInt() }
+        assertEquals("true", correcciones.getValue(1)["correccion"]!!.jsonObject.texto("correcta"), "alternativa correcta")
+        assertEquals("false", correcciones.getValue(2)["correccion"]!!.jsonObject.texto("correcta"), "opción que ya no existe cuenta como incorrecta")
+        assertEquals("true", correcciones.getValue(3)["correccion"]!!.jsonObject.texto("correcta"), "abierta igual a la ideal")
+        assertEquals("Respuesta ideal", correcciones.getValue(3)["correccion"]!!.jsonObject.texto("texto"))
+
+        // Reenviar el mismo lote (la app reintenta tras un corte) no duplica la práctica.
+        val reenviado = enviar("POST", "/api/v1/sync/attempts", lote, ana).objeto()
+        assertEquals(idServidor, reenviado["mappings"]!!.jsonArray.single().jsonObject.texto("serverAttemptId"))
+    }
 }
 
 // Copias de los DTO de la app Android (data/remote/tests y testsNivelacion) con sus mismos valores por defecto.

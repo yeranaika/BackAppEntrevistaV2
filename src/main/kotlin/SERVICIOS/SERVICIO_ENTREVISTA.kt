@@ -11,6 +11,7 @@ import CONFIGURACION.PUNTAJE_MAXIMO_RESPUESTA
 import CONFIGURACION.SESIONES_SIN_REPETIR_PREGUNTAS
 import CONFIGURACION.TAMANO_PAGINA_ENTREVISTAS_MAXIMO
 import CONFIGURACION.TAMANO_PAGINA_ENTREVISTAS_POR_DEFECTO
+import CONFIGURACION.VERSION_MODELO_DIVLARA
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
@@ -24,6 +25,7 @@ import MODELOS.PreguntaSesion
 import MODELOS.RepositorioMetricaVideo
 import MODELOS.RepositorioSesionEntrevista
 import MODELOS.RespuestaRegistrada
+import MODELOS.ResumenPurgaBiometrica
 import MODELOS.ResultadoRegistroRespuestas
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
@@ -155,7 +157,13 @@ class ServicioEntrevista(
         }
         lote.forEach(::validarMetrica)
         activa(usuarioId, sesionId)
-        return metricas.insertarLote(sesionId, lote.map { it.copy(gestos = soloGestosObservables(it.gestos)) })
+        val sanitizadas = lote.map {
+            it.copy(
+                gestos = soloGestosObservables(it.gestos),
+                versionModelo = VERSION_MODELO_DIVLARA
+            )
+        }
+        return metricas.insertarLote(sesionId, sanitizadas)
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */
@@ -186,6 +194,20 @@ class ServicioEntrevista(
         activa(usuarioId, sesionId)
         if (!sesiones.cerrar(sesionId, EstadoSesionEntrevista.CANCELADA, reloj.instant())) throw entrevistaNoActiva()
         return obtener(usuarioId, sesionId)
+    }
+
+    /**
+     * Derecho de supresión (Art. 17 RGPD): borra lo que salió del video de la entrevista. Solo las propias y ya cerradas:
+     * una en curso sigue recibiendo clips y métricas, así que primero hay que finalizarla o cancelarla.
+     */
+    suspend fun borrarDatosBiometricos(usuarioId: UUID, sesionId: UUID): ResumenPurgaBiometrica {
+        val sesion = obtener(usuarioId, sesionId)
+        if (sesion.estado == EstadoSesionEntrevista.EN_PROGRESO) {
+            throw ErrorConflicto("entrevista_en_curso", "Finaliza o cancela la entrevista antes de borrar sus datos de video")
+        }
+        val resumen = sesiones.purgarDatosBiometricos(sesionId)
+        log.info("Datos de video de la entrevista {} borrados a pedido de su dueño: {}", sesionId, resumen)
+        return resumen
     }
 
     suspend fun historial(usuarioId: UUID, pagina: Int?, tamano: Int?): PaginaSesionesEntrevista {

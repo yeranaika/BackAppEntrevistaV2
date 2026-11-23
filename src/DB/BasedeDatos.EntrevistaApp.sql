@@ -123,7 +123,10 @@ CREATE TABLE IF NOT EXISTS consentimiento_texto (
 
 CREATE TABLE IF NOT EXISTS consentimiento (
     consentimiento_id UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    usuario_id        UUID        NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+    -- NULL tras borrar la cuenta: el consentimiento se conserva como prueba de aceptación (migración 024)
+    usuario_id        UUID        REFERENCES usuario(usuario_id) ON DELETE SET NULL,
+    -- Correo del usuario copiado al borrar la cuenta: quién aceptó aunque ya no exista su fila
+    identidad_ref     VARCHAR(320),
     version           VARCHAR(20) NOT NULL REFERENCES consentimiento_texto(version),
     -- Alcances que el usuario ACEPTÓ específicamente: ["uso_datos", "video_analisis"]
     alcances_aceptados JSONB      NOT NULL DEFAULT '[]',
@@ -705,7 +708,9 @@ CREATE TABLE IF NOT EXISTS metrica_video (
     -- 'seguro' | 'nervioso' | 'distraido' | 'neutral' | 'confuso'
     expresion_dominante VARCHAR(20),
     -- Versión del modelo que generó esta métrica
-    modelo_vision_id    UUID       -- FK añadida en bloque 12
+    modelo_vision_id    UUID,      -- FK añadida en bloque 12
+    -- Etiqueta de versión del modelo de visión que produjo esta métrica (RNF08, migración 023)
+    version_modelo      VARCHAR(50)
 );
 -- Una métrica por instante de la sesión: un lote reenviado no se duplica (D21, migración 020).
 CREATE UNIQUE INDEX IF NOT EXISTS uq_metrica_video_sesion_ms
@@ -984,6 +989,59 @@ CREATE TABLE IF NOT EXISTS prediccion_vision (
 -- Solo insertar muestra aleatoria (ej: 10% de frames) para no inflar la tabla
 CREATE INDEX IF NOT EXISTS idx_prediccion_sesion
     ON prediccion_vision(sesion_id, modelo_id);
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- Predicciones de la simulación por instante (T3.10): base del reporte tabulado
+-- GET /api/v1/vision/reporte/{sesion}. ts = ms desde el inicio. Ver migrations/025.
+
+CREATE TABLE IF NOT EXISTS prediccion_simulacion (
+    id         UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+    sesion_id  UUID             NOT NULL REFERENCES sesion_entrevista(sesion_id) ON DELETE CASCADE,
+    ts         BIGINT           NOT NULL CHECK (ts >= 0),
+    variable   VARCHAR(60)      NOT NULL,
+    valor      DOUBLE PRECISION NOT NULL,
+    nivel      SMALLINT         NOT NULL CHECK (nivel BETWEEN 0 AND 8),
+    CONSTRAINT prediccion_simulacion_unica UNIQUE (sesion_id, ts, variable)
+);
+CREATE INDEX IF NOT EXISTS idx_prediccion_simulacion_sesion_ts
+    ON prediccion_simulacion(sesion_id, ts);
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- Respuestas de texto libre revisadas sin conexión (T3.13). El servidor repite la revisión léxica (sin IA). Ver migrations/026.
+
+CREATE TABLE IF NOT EXISTS revision_texto_local (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id        UUID         NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+    id_local          VARCHAR(64)  NOT NULL,
+    pregunta_id       UUID         REFERENCES pregunta(pregunta_id) ON DELETE SET NULL,
+    texto             TEXT         NOT NULL,
+    score_dispositivo NUMERIC(5,2),
+    banda_dispositivo VARCHAR(10),
+    score_servidor    NUMERIC(5,2) NOT NULL CHECK (score_servidor BETWEEN 0 AND 100),
+    banda_servidor    VARCHAR(10)  NOT NULL CHECK (banda_servidor IN ('APROBADA', 'CERCANA', 'REVISAR')),
+    version_revisor   SMALLINT     NOT NULL DEFAULT 1,
+    revisado_en       TIMESTAMPTZ,
+    recibido_en       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT revision_texto_local_unica UNIQUE (usuario_id, id_local)
+);
+CREATE INDEX IF NOT EXISTS idx_revision_texto_local_usuario ON revision_texto_local(usuario_id, recibido_en DESC);
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- Historial de llamadas en vivo (T3.15): fecha, duración, nº de preguntas y resumen del reporte tabulado. Ver migrations/027.
+
+CREATE TABLE IF NOT EXISTS llamada (
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id    UUID         NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+    id_local      VARCHAR(64)  NOT NULL,
+    sesion_id     UUID         REFERENCES sesion_entrevista(sesion_id) ON DELETE SET NULL,
+    fecha_inicio  TIMESTAMPTZ  NOT NULL,
+    duracion_seg  INTEGER      NOT NULL CHECK (duracion_seg >= 0),
+    preguntas_cnt INTEGER      NOT NULL DEFAULT 0 CHECK (preguntas_cnt >= 0),
+    resumen       JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    recibida_en   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT llamada_unica UNIQUE (usuario_id, id_local)
+);
+CREATE INDEX IF NOT EXISTS idx_llamada_usuario_fecha ON llamada(usuario_id, fecha_inicio DESC);
 
 -- =============================================================================
 -- FIN DEL ESQUEMA DDL v3.0

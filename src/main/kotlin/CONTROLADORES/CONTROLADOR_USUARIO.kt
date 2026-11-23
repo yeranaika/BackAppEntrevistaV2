@@ -70,7 +70,7 @@ fun Route.controladorUsuario(servicio: ServicioUsuario) {
             val solicitud = call.receive<SolicitudEliminarCuenta>()
             servicio.eliminarCuenta(call.usuarioIdDesdeJwt(), solicitud.confirmar)
             call.respond(
-                RespuestaMensaje("Cuenta eliminada exitosamente. Todos tus datos han sido borrados de forma permanente.")
+                RespuestaMensaje("Cuenta eliminada exitosamente. Todos tus datos han sido borrados; solo se conserva el registro de tu consentimiento.")
             )
         }
     }

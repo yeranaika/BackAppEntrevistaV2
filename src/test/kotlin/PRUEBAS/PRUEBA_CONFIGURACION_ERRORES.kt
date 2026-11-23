@@ -7,6 +7,9 @@ import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorProhibido
 import ERRORES.ErrorServicioExterno
 import ERRORES.ErrorValidacion
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -27,9 +30,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PruebaConfiguracionErrores {
 
@@ -99,5 +104,27 @@ class PruebaConfiguracionErrores {
         val cuerpo = respuesta.bodyAsText()
         assertEquals("server_error", campo(cuerpo, "error"))
         assertFalse(cuerpo.contains("sensible"))
+    }
+
+    @Test
+    fun `error inesperado registra solo la ruta sin query string ni payload malformado`() = testApplication {
+        val logger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+        val appender = ListAppender<ILoggingEvent>().apply { start() }
+        logger.addAppender(appender)
+        try {
+            montarApp()
+            client.get("/inesperado?code=oauth_secreto_123")
+            client.post("/json") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"transcripcion_secreta": "mi respuesta privada" """)
+            }
+
+            val mensajes = appender.list.map { it.formattedMessage }
+            assertTrue(mensajes.any { it.contains("Error no controlado en /inesperado") })
+            assertFalse(mensajes.any { it.contains("oauth_secreto_123") })
+            assertFalse(mensajes.any { it.contains("transcripcion_secreta") || it.contains("mi respuesta privada") })
+        } finally {
+            logger.detachAppender(appender)
+        }
     }
 }

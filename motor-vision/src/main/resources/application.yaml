@@ -1,0 +1,7 @@
+ktor:
+  application:
+    modules:
+      - MotorKt.moduloMotor
+  deployment:
+    # El backend apunta aquí con MOTOR_ENDPOINT=http://localhost:8094/predict. Otro puerto: -P:ktor.deployment.port=NNNN
+    port: 8094

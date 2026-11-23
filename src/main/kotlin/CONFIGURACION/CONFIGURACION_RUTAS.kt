@@ -12,18 +12,22 @@ import CONTROLADORES.controladorNivelacion
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorLlamada
+import CONTROLADORES.controladorRevisionLocal
 import CONTROLADORES.controladorPruebaPractica
+import CONTROLADORES.controladorPruebaVideo
 import CONTROLADORES.controladorRecordatorio
 import CONTROLADORES.controladorSalud
 import CONTROLADORES.controladorSuscripcion
 import CONTROLADORES.controladorUsuario
+import CONTROLADORES.controladorVision
 import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
 
 /** Monta todas las rutas con las dependencias ya construidas en el contenedor. */
 fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: EstadoFreemiumReadiness) {
     routing {
-        controladorSalud(disponibilidad)
+        controladorSalud(disponibilidad, d.clienteMotorVision)
 
         // Cuentas y sesión
         controladorLogin(d.servicioLogin)
@@ -36,7 +40,7 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
         controladorSuscripcion(d.servicioSuscripcion)
 
         // Banco de preguntas e IA
-        controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta, d.servicioCoberturaPreguntas)
+        controladorPregunta(d.servicioPregunta, d.servicioGeneracionPregunta, d.servicioCoberturaPreguntas, d.servicioFeedbackGenerico)
         controladorCostosIa(d.servicioCostosIa)
 
         // Mercado laboral: cargos, skills y tendencias
@@ -44,9 +48,13 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
 
         // Pruebas: entrevista, práctica y nivelación (API /api/v1 y contrato de la app Android)
         controladorEntrevista(d.servicioEntrevista)
+        controladorVision(d.clienteMotorVision, d.servicioSimulacion)
+        controladorLlamada(d.servicioLlamada)
         controladorFeedback(d.servicioReporte)
         controladorPractica(d.servicioPractica, d.servicioPruebasApp, d.evaluadorRespuesta)
+        controladorRevisionLocal(d.servicioRevisionLocal)
         controladorNivelacion(d.servicioNivelacion, d.servicioTestNivelacion)
         controladorPruebaPractica(d.servicioPruebasApp)
+        controladorPruebaVideo()
     }
 }

@@ -1,5 +1,6 @@
 package PRUEBAS
 
+import CONFIGURACION.VERSION_MODELO_DIVLARA
 import kotlinx.serialization.json.jsonObject
 import ERRORES.ErrorConflicto
 import ERRORES.ErrorNoEncontrado
@@ -419,6 +420,22 @@ class PruebaServicioEntrevista {
         assertEquals(setOf("toca_cara", "mirada_fuera"), guardados[0]!!.keys)
         assertNull(guardados[1], "sin gestos observables queda null")
         assertTrue(transaction { TablaMetricaVideo.selectAll().all { it[TablaMetricaVideo.expresionDominante] == null } })
+    }
+
+    @Test
+    fun `cada metrica persiste siempre la version del modelo del backend (RNF08)`() = runBlocking<Unit> {
+        sistema.sembrarBancoGeneral()
+        val sesion = iniciar()
+        val lote = listOf(
+            metrica(0),
+            metrica(500).copy(versionModelo = "cliente-inventado-v99")
+        )
+        assertEquals(2, servicio.registrarMetricas(ana, sesion.id, lote))
+
+        val versiones = transaction {
+            TablaMetricaVideo.selectAll().orderBy(TablaMetricaVideo.timestampMs).map { it[TablaMetricaVideo.versionModelo] }
+        }
+        assertEquals(listOf(VERSION_MODELO_DIVLARA, VERSION_MODELO_DIVLARA), versiones)
     }
 
     @Test

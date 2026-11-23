@@ -63,7 +63,14 @@ const val GASTO_GENERACION_IA_MENSUAL_USD_POR_DEFECTO = 5.0
  * También es el umbral desde el cual un reporte en "generando" se considera abandonado y se rescata (D20): debe ser
  * mayor que la generación más larga posible (~2 × 70 s).
  */
-val VIGENCIA_RESERVA_IA: Duration = Duration.ofMinutes(10)
+val VIGENCIA_RESERVA_IA: Duration = Duration.ofMinutes(3)
+
+/**
+ * Tiempo máximo de toda la evaluación con IA de un reporte (reintentos del proveedor incluidos). Pasado este tiempo se
+ * entrega el reporte con el motor freemium: el feedback debe estar listo en menos de 5 min. Debe ser bastante menor que
+ * [VIGENCIA_RESERVA_IA] y que [ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO].
+ */
+val TIEMPO_MAXIMO_EVALUACION_IA: Duration = Duration.ofSeconds(45)
 
 /** Espera máxima a reportes y correos en curso al apagar (D20). Un reporte con IA tarda hasta ~2 × 70 s. */
 const val ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO = 150
@@ -72,7 +79,7 @@ const val ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO = 150
 const val CODIGO_GENERACION_INTERRUMPIDA = "generacion_interrumpida"
 
 /** Cada cuánto se buscan reportes interrumpidos (también al arrancar). */
-val INTERVALO_RESCATE_REPORTES: Duration = Duration.ofMinutes(5)
+val INTERVALO_RESCATE_REPORTES: Duration = Duration.ofMinutes(1)
 
 /** Solo se rescatan entrevistas finalizadas sin reporte dentro de esta ventana (no datos anteriores a la Fase 7). */
 val VENTANA_RESCATE_SESIONES: Duration = Duration.ofHours(24)
