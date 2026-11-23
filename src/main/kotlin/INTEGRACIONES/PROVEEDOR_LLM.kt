@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -36,20 +37,55 @@ private const val MAXIMO_TOKENS_ANTHROPIC = 8192
 private const val VERSION_API_ANTHROPIC = "2023-06-01"
 private const val URL_OPENAI = "https://api.openai.com/v1/chat/completions"
 private const val URL_ANTHROPIC = "https://api.anthropic.com/v1/messages"
+/** API de pago por uso de Xiaomi MiMo, compatible con Chat Completions de OpenAI (D30). */
+const val URL_MIMO_POR_DEFECTO = "https://api.xiaomimimo.com/v1/chat/completions"
+/** MiMo no limita la salida por esquema: se le da margen para que un lote de 10 preguntas no quede cortado. */
+private const val MAXIMO_TOKENS_MIMO = 8192
 
 private val jsonEstricto = Json { ignoreUnknownKeys = false; isLenient = false }
 
-enum class TipoProveedorIa { OPENAI, ANTHROPIC }
+enum class TipoProveedorIa { OPENAI, ANTHROPIC, MIMO }
 
 /** Modelo barato de cada proveedor, el que se usa por defecto. */
 const val MODELO_OPENAI_POR_DEFECTO = "gpt-4o-mini"
 const val MODELO_ANTHROPIC_POR_DEFECTO = "claude-haiku-4-5"
+const val MODELO_MIMO_POR_DEFECTO = "mimo-v2.6-flash"
+const val MODELO_MIMO_PRO = "mimo-v2.6-pro"
 
-/** USD por token (entrada, salida). */
+/**
+ * USD por token (entrada, salida). MiMo: precio en USD de la API de pago por uso, tiempo real y entrada sin caché
+ * (mimo.mi.com, precios de noviembre de 2026). Con caché la entrada sale más barata, así que el costo queda estimado
+ * hacia arriba, que es el lado seguro para el tope de gasto (D23).
+ */
 private val COSTO_POR_TOKEN = mapOf(
     MODELO_OPENAI_POR_DEFECTO to (0.00000015 to 0.00000060),
-    MODELO_ANTHROPIC_POR_DEFECTO to (0.000001 to 0.000005)
+    MODELO_ANTHROPIC_POR_DEFECTO to (0.000001 to 0.000005),
+    MODELO_MIMO_POR_DEFECTO to (0.00000014 to 0.00000028),
+    MODELO_MIMO_PRO to (0.000000435 to 0.00000087)
 )
+
+/**
+ * Token Plan de MiMo (D31): Credits por token (entrada sin caché, salida), según la tabla oficial de
+ * mimo.mi.com (Token Plan → Subscription, noviembre de 2026). La entrada con caché cuesta mucho menos (2,5 y 2), pero
+ * la respuesta no dice qué parte vino de caché: se cuenta todo sin caché, así lo gastado queda estimado hacia arriba.
+ * Un modelo mimo-* que no esté en la tabla se cuenta con la tarifa del más caro (pro).
+ */
+private val CREDITOS_POR_TOKEN_MIMO = mapOf(
+    MODELO_MIMO_POR_DEFECTO to (100L to 200L),
+    MODELO_MIMO_PRO to (300L to 600L)
+)
+
+/** Credits del plan Lite (US$6/mes): se asume si la clave es de Token Plan (tp-) y no se definió MIMO_TOKEN_PLAN_CREDITOS. */
+const val CREDITOS_TOKEN_PLAN_LITE = 4_100_000_000L
+
+fun esModeloMimo(modelo: String): Boolean = modelo.startsWith("mimo")
+
+/** Credits del Token Plan que consumió una llamada; 0 si no es un modelo de MiMo. */
+fun creditosTokenPlanMimo(modelo: String, tokensEntrada: Int?, tokensSalida: Int?): Long {
+    if (!esModeloMimo(modelo)) return 0
+    val (porEntrada, porSalida) = CREDITOS_POR_TOKEN_MIMO[modelo] ?: CREDITOS_POR_TOKEN_MIMO.getValue(MODELO_MIMO_PRO)
+    return (tokensEntrada ?: 0).coerceAtLeast(0) * porEntrada + (tokensSalida ?: 0).coerceAtLeast(0) * porSalida
+}
 
 /** Costo de una llamada; 0 si el modelo no tiene precio cargado. */
 fun costoLlmUsd(modelo: String, tokensEntrada: Int?, tokensSalida: Int?): Double {
@@ -124,8 +160,9 @@ class ProveedorOpenAi(
             val eleccion = sobre["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
             if (eleccion["finish_reason"]?.jsonPrimitive?.content == "length") throw respuestaTruncada(tokens)
             val mensaje = eleccion["message"]?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
-            if (!mensaje["refusal"]?.jsonPrimitive?.content.isNullOrBlank()) throw rechazoDelModelo(tokens)
-            mensaje["content"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            // contentOrNull: OpenAI manda "refusal": null en toda respuesta normal, y JsonNull.content es el texto "null".
+            if (!mensaje["refusal"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) throw rechazoDelModelo(tokens)
+            mensaje["content"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: throw respuestaInvalida("provider_missing_content", tokens)
         }
         return RespuestaProveedorIa(contenido = contenido, tokensEntrada = tokens.entrada, tokensSalida = tokens.salida)
@@ -199,6 +236,82 @@ class ProveedorAnthropic(
             })
         })
     }
+}
+
+/**
+ * Xiaomi MiMo por su API compatible con OpenAI (D30). Diferencias con [ProveedorOpenAi]:
+ * - La clave va en la cabecera `api-key` (la forma de la documentación oficial).
+ * - No acepta `json_schema`: se pide `json_object` (JSON válido garantizado) y el esquema va escrito en el prompt.
+ *   Lo que devuelva se valida igual que con los demás proveedores; si no cumple, es provider_invalid_response.
+ * - El razonamiento («thinking») viene encendido en la serie v2.6: se apaga, porque cobra tokens y suma latencia sin
+ *   aportar a preguntas que ya traen su rúbrica.
+ * [url] se puede cambiar con MIMO_BASE_URL (por ejemplo, el endpoint del plan de tokens).
+ */
+class ProveedorMimo(
+    private val apiKey: String,
+    private val cliente: HttpClient,
+    private val url: String = URL_MIMO_POR_DEFECTO
+) : ProveedorPreguntasIa {
+
+    override suspend fun generar(solicitud: SolicitudProveedorIa): RespuestaProveedorIa {
+        if (apiKey.isBlank()) throw proveedorNoConfigurado()
+
+        val respuesta = enviar {
+            cliente.post(url) {
+                header("api-key", apiKey)
+                contentType(ContentType.Application.Json)
+                setBody(cuerpo(solicitud))
+            }
+        }
+        val sobre = leerSobre(respuesta)
+        // Los tokens se leen antes: un rechazo o un corte también se cobran y se auditan con su costo.
+        val tokens = leerTokens(sobre, "prompt_tokens", "completion_tokens")
+        val contenido = extraer(tokens) {
+            val eleccion = sobre["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
+            when (eleccion["finish_reason"]?.jsonPrimitive?.contentOrNull) {
+                null, "stop" -> Unit
+                "content_filter" -> throw rechazoDelModelo(tokens)
+                else -> throw respuestaTruncada(tokens) // length, repetition_truncation u otro corte
+            }
+            val mensaje = eleccion["message"]?.jsonObject ?: throw respuestaInvalida(tokens = tokens)
+            val texto = mensaje["content"]?.jsonPrimitive?.contentOrNull?.let(::sinCercoDeCodigo)?.takeIf { it.isNotBlank() }
+                ?: throw respuestaInvalida("provider_missing_content", tokens)
+            texto
+        }
+        return RespuestaProveedorIa(contenido = contenido, tokensEntrada = tokens.entrada, tokensSalida = tokens.salida)
+    }
+
+    private fun cuerpo(solicitud: SolicitudProveedorIa) = buildJsonObject {
+        put("model", solicitud.modelo)
+        put("temperature", TEMPERATURA_OPENAI)
+        put("max_completion_tokens", MAXIMO_TOKENS_MIMO)
+        put("thinking", buildJsonObject { put("type", "disabled") })
+        put("response_format", buildJsonObject { put("type", "json_object") })
+        put("messages", buildJsonArray {
+            add(buildJsonObject { put("role", "system"); put("content", promptConEsquema(solicitud)) })
+            add(buildJsonObject { put("role", "user"); put("content", solicitud.instruccionUsuario) })
+        })
+    }
+}
+
+/** El prompt de MiMo lleva el esquema escrito: json_object solo garantiza JSON válido, no sus campos. */
+internal fun promptConEsquema(solicitud: SolicitudProveedorIa): String = buildString {
+    append(solicitud.prompt)
+    append("\n\nResponde SOLO con un objeto JSON válido, sin texto antes ni después y sin bloques de código. ")
+    append("Debe cumplir exactamente este JSON Schema (mismos nombres de campos, tipos y cantidades):\n")
+    append(solicitud.esquemaJson.toString())
+}
+
+/**
+ * Por si el modelo igual envuelve el JSON en un cerco (```json, ``` Json…) o le suma texto antes o después: se deja
+ * desde la primera llave hasta la última, porque el esquema siempre pide un objeto. Sin llaves vuelve el texto
+ * recortado, y el validador lo rechaza como siempre.
+ */
+internal fun sinCercoDeCodigo(texto: String): String {
+    val limpio = texto.trim()
+    val inicio = limpio.indexOf('{')
+    val fin = limpio.lastIndexOf('}')
+    return if (inicio >= 0 && fin > inicio) limpio.substring(inicio, fin + 1) else limpio
 }
 
 // ---------- Apoyo común: nunca se filtran mensajes internos del proveedor ----------

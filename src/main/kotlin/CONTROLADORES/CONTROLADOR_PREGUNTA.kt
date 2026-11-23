@@ -2,13 +2,18 @@ package CONTROLADORES
 
 import CONFIGURACION.LIMITE_GENERACION_IA
 import ESQUEMAS.ConsultaPreguntas
+import ESQUEMAS.RespuestaCompletarFeedbackGenerico
+import ESQUEMAS.RespuestaEstadoFeedbackGenerico
 import ESQUEMAS.RespuestaGenerarPreguntas
 import ESQUEMAS.RespuestaOk
+import ESQUEMAS.SolicitudCompletarFeedbackGenerico
 import ESQUEMAS.SolicitudGenerarPreguntas
 import ESQUEMAS.SolicitudPregunta
 import ESQUEMAS.SolicitudRechazo
 import MIDDLEWARES.soloAdmin
+import SERVICIOS.ResultadoFeedbackGenerico
 import SERVICIOS.ServicioCoberturaPreguntas
+import SERVICIOS.ServicioFeedbackGenerico
 import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioPregunta
 import UTILIDADES.booleanoDeConsulta
@@ -42,6 +47,12 @@ import io.ktor.server.routing.*
  *                                                  si se llegó al gasto del mes (D23) o demasiadas_solicitudes por IP.
  *                                                  Con cargo o skill usa lo que piden las ofertas de empleo (D26)
  * POST   /api/v1/admin/questions/generate-ai      ruta antigua del panel, mismo comportamiento (comparte el límite)
+ * GET    /api/v1/admin/preguntas/feedback-generico   cuántas preguntas (no rechazadas) no tienen los 3 feedbacks (D36)
+ * POST   /api/v1/admin/preguntas/feedback-generico/completar
+ *                                                  la IA escribe el feedback correcto/medio/malo que falta: las
+ *                                                  `limite` (1..50) más antiguas, o las de `pregunta_ids`; con
+ *                                                  `sobrescribir` reemplaza los textos existentes. No cambia el estado
+ *                                                  de la pregunta. Usa el tope de gasto (D23) y el límite de generar-ia
  * GET    /api/v1/admin/preguntas/cobertura        skills que pide el mercado por cargo y cuántas preguntas tienen
  *                                                  (?cargoId=&minimo=1..50, por defecto 5 aprobadas por nivel) (D26)
  *
@@ -51,7 +62,8 @@ import io.ktor.server.routing.*
 fun Route.controladorPregunta(
     servicio: ServicioPregunta,
     generacion: ServicioGeneracionPregunta,
-    cobertura: ServicioCoberturaPreguntas
+    cobertura: ServicioCoberturaPreguntas,
+    feedbackGenerico: ServicioFeedbackGenerico
 ) {
     route("/api/v1/admin/preguntas") {
         soloAdmin {
@@ -66,7 +78,18 @@ fun Route.controladorPregunta(
 
             rateLimit(LIMITE_GENERACION_IA) { post("/generar-ia") { generarConIa(generacion) } }
 
-            // Ruta fija: Ktor la prefiere a /{id}, así "cobertura" nunca se lee como un id.
+            // Rutas fijas: Ktor las prefiere a /{id}, así "feedback-generico" o "cobertura" nunca se leen como un id.
+            get("/feedback-generico") {
+                call.respond(RespuestaEstadoFeedbackGenerico(feedbackGenerico.pendientes()))
+            }
+
+            rateLimit(LIMITE_GENERACION_IA) {
+                post("/feedback-generico/completar") {
+                    val resultado = feedbackGenerico.completar(call.receive<SolicitudCompletarFeedbackGenerico>())
+                    call.responderConMensaje(resultado.aRespuesta(), mensajeFeedbackGenerico(resultado))
+                }
+            }
+
             get("/cobertura") {
                 call.respond(cobertura.cobertura(call.uuidDeConsulta("cargoId"), call.enteroDeConsulta("minimo")).aRespuesta())
             }
@@ -143,3 +166,20 @@ private fun ApplicationCall.consultaPreguntas() = ConsultaPreguntas(
     pagina = enteroDeConsulta("pagina"),
     tamano = enteroDeConsulta("tamano")
 )
+
+private fun ResultadoFeedbackGenerico.aRespuesta() = RespuestaCompletarFeedbackGenerico(
+    actualizadas = actualizadas.size,
+    omitidas = omitidas,
+    pendientes = pendientes,
+    llamadasIa = llamadasIa,
+    costoUsd = costoUsd,
+    preguntaIds = actualizadas.map { it.toString() },
+    detenidoPor = detenidoPor
+)
+
+private fun mensajeFeedbackGenerico(resultado: ResultadoFeedbackGenerico): String = buildString {
+    append(if (resultado.actualizadas.size == 1) "Se completó 1 pregunta" else "Se completaron ${resultado.actualizadas.size} preguntas")
+    if (resultado.omitidas > 0) append("; ${resultado.omitidas} quedaron sin feedback válido")
+    if (resultado.detenidoPor != null) append("; se detuvo por ${resultado.detenidoPor}")
+    append(". Pendientes: ${resultado.pendientes}.")
+}

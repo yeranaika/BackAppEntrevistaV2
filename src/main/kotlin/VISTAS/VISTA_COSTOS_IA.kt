@@ -4,7 +4,9 @@ import ESQUEMAS.RespuestaCostoIaDia
 import ESQUEMAS.RespuestaCostoIaModelo
 import ESQUEMAS.RespuestaCostosIa
 import ESQUEMAS.RespuestaGastoIa
+import ESQUEMAS.RespuestaPlanTokenMimo
 import ESQUEMAS.RespuestaTopeGeneracionIa
+import SERVICIOS.EstadoCreditosTokenPlan
 import SERVICIOS.EstadoTopeGeneracionIa
 import SERVICIOS.GastoIa
 import SERVICIOS.ResumenCostosIa
@@ -31,7 +33,18 @@ fun ResumenCostosIa.aRespuesta() = RespuestaCostosIa(
     generacionPreguntas = generacionPreguntas.aRespuesta(),
     porDia = porDia.map { RespuestaCostoIaDia(it.fecha.toString(), it.reportes.aRespuesta(), it.generacionPreguntas.aRespuesta(), (it.reportes + it.generacionPreguntas).costoUsd.usd()) },
     porModelo = porModelo.map { (modelo, gasto) -> RespuestaCostoIaModelo(modelo, gasto.aRespuesta()) },
-    topeGeneracionPreguntas = topeGeneracionPreguntas.aRespuesta()
+    topeGeneracionPreguntas = topeGeneracionPreguntas.aRespuesta(),
+    planTokenMimo = planTokenMimo?.aRespuesta()
+)
+
+fun EstadoCreditosTokenPlan.aRespuesta() = RespuestaPlanTokenMimo(
+    desde = desde.toString(),
+    hasta = hasta.toString(),
+    creditosPlan = creditosPlan,
+    creditosUsados = creditosUsados,
+    creditosRestantes = creditosRestantes,
+    llamadas = llamadas,
+    estaAgotado = estaAgotado
 )
 
 /** Los montos gastado y restante se redondean para mostrar; el tope va tal cual se configuró. */

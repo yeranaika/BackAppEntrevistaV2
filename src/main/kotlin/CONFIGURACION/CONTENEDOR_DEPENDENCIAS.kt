@@ -11,6 +11,7 @@ import INTEGRACIONES.ContadorIntentosCache
 import INTEGRACIONES.EnviadorCorreo
 import INTEGRACIONES.FuenteDocumentosLegalesArchivo
 import INTEGRACIONES.ProveedorAnthropic
+import INTEGRACIONES.ProveedorPreguntasIa
 import INTEGRACIONES.ProveedorConResiliencia
 import INTEGRACIONES.ProveedorOpenAi
 import INTEGRACIONES.TipoProveedorIa
@@ -21,6 +22,7 @@ import MODELOS.LectorCatalogoExposed
 import MODELOS.RepositorioConsentimientoExposed
 import MODELOS.RepositorioCuentaOAuth
 import MODELOS.RepositorioCuentaOAuthExposed
+import MODELOS.RepositorioFeedbackGenericoExposed
 import MODELOS.RepositorioGeneracionPreguntaIaExposed
 import MODELOS.RepositorioMercadoExposed
 import MODELOS.LectorCoberturaPreguntasExposed
@@ -40,7 +42,10 @@ import MODELOS.RepositorioUsuarioExposed
 import SERVICIOS.ServicioAdminUsuario
 import SERVICIOS.ServicioConsentimiento
 import SERVICIOS.ServicioContrasena
+import SERVICIOS.ServicioFeedbackGenerico
 import SERVICIOS.ServicioGeneracionPregunta
+import SERVICIOS.PlanTokenMimo
+import SERVICIOS.ServicioCreditosTokenPlan
 import SERVICIOS.ServicioTopeGeneracionIa
 import SERVICIOS.TopeGastoGeneracionIa
 import SERVICIOS.ServicioLogin
@@ -77,6 +82,8 @@ import SERVICIOS.VerificadorPremium
 import MODELOS.RepositorioReporteExposed
 import INTEGRACIONES.MODELO_ANTHROPIC_POR_DEFECTO
 import INTEGRACIONES.MODELO_OPENAI_POR_DEFECTO
+import INTEGRACIONES.MODELO_MIMO_POR_DEFECTO
+import INTEGRACIONES.ProveedorMimo
 import SERVICIOS.ServicioNivelacion
 import SERVICIOS.ServicioPractica
 import SERVICIOS.ServicioPruebasApp
@@ -133,11 +140,20 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     private val clienteHttpLlm = crearClienteHttpLlm()
 
-    // Siempre montados: sin API key responden 503 provider_not_configured.
-    val proveedoresIa = mapOf(
-        TipoProveedorIa.OPENAI to ProveedorConResiliencia(ProveedorOpenAi(configuracion.llm.openAiApiKey, clienteHttpLlm), "openai"),
-        TipoProveedorIa.ANTHROPIC to ProveedorConResiliencia(ProveedorAnthropic(configuracion.llm.anthropicApiKey, clienteHttpLlm), "anthropic")
-    )
+    // Solo los que tienen API key: sin la clave del modelo pedido, generate-ai responde 503 provider_not_configured
+    // antes del tope y antes de gastar cuota de las APIs de empleo.
+    val proveedoresIa: Map<TipoProveedorIa, ProveedorPreguntasIa> = buildMap {
+        val llm = configuracion.llm
+        if (llm.openAiApiKey.isNotBlank()) {
+            put(TipoProveedorIa.OPENAI, ProveedorConResiliencia(ProveedorOpenAi(llm.openAiApiKey, clienteHttpLlm), "openai"))
+        }
+        if (llm.anthropicApiKey.isNotBlank()) {
+            put(TipoProveedorIa.ANTHROPIC, ProveedorConResiliencia(ProveedorAnthropic(llm.anthropicApiKey, clienteHttpLlm), "anthropic"))
+        }
+        if (llm.mimoApiKey.isNotBlank()) {
+            put(TipoProveedorIa.MIMO, ProveedorConResiliencia(ProveedorMimo(llm.mimoApiKey, clienteHttpLlm, llm.mimoUrl), "mimo"))
+        }
+    }
 
     // ---------- Servicios de negocio ----------
     val servicioToken = ServicioToken(
@@ -175,19 +191,29 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
     val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
 
+    /** Credits del Token Plan de MiMo (D31): los mismos para el 429 de generar-ia y para Costos IA. */
+    private val creditosTokenPlanMimo = ServicioCreditosTokenPlan(
+        LectorCostosIaExposed(),
+        PlanTokenMimo(configuracion.llm.mimoTokenPlanCreditos, configuracion.llm.mimoTokenPlanDiaRenovacion)
+    )
+
     /** Tope de gasto de la generación con IA (D23): una sola instancia para el 429 y para Costos IA (D28). */
     private val topeGeneracionIa = ServicioTopeGeneracionIa(
-        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd)
+        repositorioGeneracionPregunta, TopeGastoGeneracionIa(usdMensual = configuracion.llm.gastoGeneracionIaMensualUsd),
+        creditosTokenPlanMimo
     )
 
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
         proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado
     )
 
+    /** Completa el feedback genérico (correcto, medio, malo) de las preguntas del banco (D36), con el mismo tope de gasto. */
+    val servicioFeedbackGenerico = ServicioFeedbackGenerico(proveedoresIa, RepositorioFeedbackGenericoExposed(), topeGeneracionIa)
+
     /** Skills que pide el mercado por cargo frente a las preguntas del banco (D26). */
     val servicioCoberturaPreguntas = ServicioCoberturaPreguntas(repositorioMercado, LectorCoberturaPreguntasExposed())
     /** Gasto en IA para el admin (reportes con IA y generación de preguntas) y gasto del mes frente al tope (D28). */
-    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa)
+    val servicioCostosIa = ServicioCostosIa(LectorCostosIaExposed(), topeGeneracionIa, creditosMimo = creditosTokenPlanMimo)
 
     val servicioRequisitosCargo = ServicioRequisitosCargo(repositorioMercado, repositorioMercado, ofertasEnCache)
 
@@ -229,6 +255,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
             EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), MODELO_OPENAI_POR_DEFECTO, evaluadorEntrevistaGratis)
         configuracion.llm.anthropicApiKey.isNotBlank() ->
             EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), MODELO_ANTHROPIC_POR_DEFECTO, evaluadorEntrevistaGratis)
+        configuracion.llm.mimoApiKey.isNotBlank() ->
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.MIMO), MODELO_MIMO_POR_DEFECTO, evaluadorEntrevistaGratis)
         else -> null
     }
     private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()

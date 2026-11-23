@@ -228,6 +228,19 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             "de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta "
             "trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` "
             "y `mensaje` si no se usaron)."),
+        req("Preguntas sin feedback genérico completo (admin)", "GET", "/api/v1/admin/preguntas/feedback-generico", ADMIN,
+            desc="`pendientes`: preguntas no rechazadas a las que les falta alguno de los tres textos de "
+            "`rubrica.feedback_generico` (`correcto`, `medio`, `malo`, D36). No llama al LLM."),
+        req("Completar feedback genérico con IA (admin)", "POST", "/api/v1/admin/preguntas/feedback-generico/completar", ADMIN,
+            body={"modelo": "gpt-4o-mini", "limite": 10, "pregunta_ids": [], "sobrescribir": False},
+            omitir_en_prueba=True, desc="⚠️ Llama al LLM (cuesta). La IA escribe el feedback correcto, medio y malo de las `limite` "
+            "(1 a 50) preguntas más antiguas que no lo tienen completo, o de las de `pregunta_ids` (hasta 50). Manda 10 por llamada. "
+            "Solo agrega los niveles que faltan; con `sobrescribir: true` reemplaza los tres. No cambia el estado de la pregunta. "
+            "Usa el mismo tope mensual de gasto y límite por IP que `generar-ia`, y cada llamada queda en Costos IA. Respuesta: "
+            "`actualizadas`, `omitidas` (la IA no devolvió los tres textos válidos: siguen pendientes), `pendientes`, `llamadas_ia`, "
+            "`costo_usd`, `pregunta_ids` y `detenido_por` (código del error que cortó el proceso a mitad de camino; lo anterior "
+            "quedó guardado). Para todo el banco, repetir hasta `pendientes: 0`. La rúbrica de crear/editar acepta el mismo objeto "
+            "`feedback_generico` (`400 feedback_generico_invalido`)."),
         req("Cobertura del banco frente al mercado (admin)", "GET", "/api/v1/admin/preguntas/cobertura", ADMIN,
             consulta=[("cargoId", "{{cargoId}}"), ("minimo", "5")],
             desc="Por cada cargo activo (o solo `cargoId`), las skills que pide el mercado con las preguntas aprobadas y "

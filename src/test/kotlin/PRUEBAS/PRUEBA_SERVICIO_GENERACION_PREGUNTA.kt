@@ -45,7 +45,7 @@ class PruebaServicioGeneracionPregunta {
         tope: SERVICIOS.TopeGastoGeneracionIa = SERVICIOS.TopeGastoGeneracionIa(reloj = PRUEBAS.DOBLES.RelojAjustable(java.time.Instant.parse("2026-11-15T12:00:00Z")))
     ) =
         ServicioGeneracionPregunta(
-            mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor),
+            mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor, TipoProveedorIa.MIMO to proveedor),
             repositorio,
             catalogo,
             SERVICIOS.ServicioTopeGeneracionIa(repositorio, tope)
@@ -160,6 +160,29 @@ class PruebaServicioGeneracionPregunta {
     }
 
     // ---------- Flujo correcto ----------
+
+    @Test
+    fun `un modelo MiMo va al proveedor MiMo y su costo sale de la tabla de MiMo`() = runBlocking<Unit> {
+        val repositorio = GeneracionEnMemoria()
+        val otro = ProveedorIaGrabador(LoteLlmDePrueba.json(2, "abierta_texto"))
+        val mimo = ProveedorIaGrabador(LoteLlmDePrueba.json(2, "abierta_texto"), tokensEntrada = 1_000, tokensSalida = 2_000)
+        val servicio = ServicioGeneracionPregunta(
+            mapOf(TipoProveedorIa.OPENAI to otro, TipoProveedorIa.ANTHROPIC to otro, TipoProveedorIa.MIMO to mimo),
+            repositorio,
+            catalogo,
+            SERVICIOS.ServicioTopeGeneracionIa(repositorio, topeEn(5.0))
+        )
+
+        val creadas = servicio.generar(solicitud(2, modelo = "mimo-v2.6-flash"))
+
+        assertEquals(2, creadas.size)
+        assertTrue(otro.solicitudes.isEmpty())
+        assertEquals("mimo-v2.6-flash", mimo.solicitudes.single().modelo)
+        val (traza, preguntas) = repositorio.lotes.single()
+        assertEquals("mimo-v2.6-flash", traza.modelo)
+        // 1.000 × 0,14 US$/M + 2.000 × 0,28 US$/M = 0,0007 US$
+        assertTrue(abs(0.0007 - preguntas.sumOf { it.costoUsd ?: 0.0 }) < 1e-12)
+    }
 
     @Test
     fun `alias antiguo de Claude genera el lote, reparte tokens y calcula el costo`() = runBlocking<Unit> {
@@ -296,7 +319,7 @@ class PruebaServicioGeneracionPregunta {
         repositorio: GeneracionEnMemoria = GeneracionEnMemoria(),
         tope: SERVICIOS.TopeGastoGeneracionIa = topeEn(5.0)
     ) = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor), repositorio, catalogo,
+        mapOf(TipoProveedorIa.OPENAI to proveedor, TipoProveedorIa.ANTHROPIC to proveedor, TipoProveedorIa.MIMO to proveedor), repositorio, catalogo,
         SERVICIOS.ServicioTopeGeneracionIa(repositorio, tope), fuente
     )
 
@@ -379,5 +402,16 @@ class PruebaServicioGeneracionPregunta {
         assertEquals(TipoPregunta.ABIERTA_TEXTO, contenido.tipo)
         assertEquals(LoteLlmDePrueba.RESPUESTA_STAR, contenido.respuestaIdeal)
         assertEquals("\"STAR\"", contenido.rubrica!!["metodo"].toString())
+    }
+
+    @Test
+    fun `el esquema de IA pide respuestas alternativas y sinonimos y la rubrica guardada los trae`() = runBlocking<Unit> {
+        val esquema = ESQUEMAS.EsquemaJsonLoteLlm.construir(1, TipoPregunta.ABIERTA_TEXTO).toString()
+        assertTrue(esquema.contains("\"respuestas_alternativas\"") && esquema.contains("\"sinonimos\""))
+
+        val repositorio = GeneracionEnMemoria()
+        servicio(ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto")), repositorio).generar(solicitud())
+        val rubrica = repositorio.lotes.single().second.single().contenido.rubrica!!
+        assertTrue("respuestas_alternativas" in rubrica && "sinonimos" in rubrica, "la rúbrica guarda los campos aunque el lote no los traiga")
     }
 }

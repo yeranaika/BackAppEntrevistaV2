@@ -6,12 +6,13 @@ import ERRORES.ErrorServicioExterno
 import ERRORES.ErrorValidacion
 import ESQUEMAS.EsquemaJsonLoteLlm
 import ESQUEMAS.PreguntaLlm
+import ESQUEMAS.RubricaLlm
 import ESQUEMAS.SolicitudGenerarPreguntas
-import INTEGRACIONES.costoLlmUsd
 import INTEGRACIONES.ProveedorPreguntasIa
 import INTEGRACIONES.RespuestaProveedorIa
 import INTEGRACIONES.SolicitudProveedorIa
 import INTEGRACIONES.TipoProveedorIa
+import INTEGRACIONES.costoLlmUsd
 import MODELOS.CategoriaHabilidad
 import MODELOS.ContenidoPregunta
 import MODELOS.IdsGenerados
@@ -31,11 +32,20 @@ import java.util.UUID
 private const val CANTIDAD_MAXIMA_POR_LOTE = 10
 
 /** Modelos permitidos → modelo real que se llama (alias antiguos incluidos). */
-private val MODELOS_PERMITIDOS = mapOf(
+internal val MODELOS_PERMITIDOS = mapOf(
     "gpt-4o-mini" to "gpt-4o-mini",
     "claude-haiku-4-5" to "claude-haiku-4-5",
-    "claude-3-5-haiku" to "claude-haiku-4-5"
+    "claude-3-5-haiku" to "claude-haiku-4-5",
+    "mimo-v2.6-flash" to "mimo-v2.6-flash",
+    "mimo-v2.6-pro" to "mimo-v2.6-pro"
 )
+
+/** Proveedor que atiende cada modelo permitido. */
+internal fun tipoProveedorDe(modelo: String) = when {
+    modelo.startsWith("gpt") -> TipoProveedorIa.OPENAI
+    modelo.startsWith("mimo") -> TipoProveedorIa.MIMO
+    else -> TipoProveedorIa.ANTHROPIC
+}
 
 data class PreguntaCreadaPorIa(
     val ids: IdsGenerados,
@@ -67,7 +77,8 @@ class ServicioGeneracionPregunta(
     private val mercado: FuenteContextoMercado? = null
 ) {
     private val log = LoggerFactory.getLogger(ServicioGeneracionPregunta::class.java)
-    private val jsonRubrica = Json { encodeDefaults = true }
+    // Sin nulos: una pregunta sin feedback genérico no guarda "feedback_generico": null en la rúbrica.
+    private val jsonRubrica = Json { encodeDefaults = true; explicitNulls = false }
 
     private data class PedidoValidado(
         val cargoId: UUID?,
@@ -86,9 +97,9 @@ class ServicioGeneracionPregunta(
         // Se valida el catálogo antes de llamar al LLM: un id inexistente no debe costar una llamada.
         val nombreCargo = pedido.cargoId?.let { catalogo.nombreCargo(it) }
         val nombreSkill = pedido.skillId?.let { catalogo.nombreSkill(it) }
-        val proveedor = proveedores[tipoProveedor(pedido.modelo)]
+        val proveedor = proveedores[tipoProveedorDe(pedido.modelo)]
             ?: throw ErrorServicioExterno("provider_not_configured", "No hay proveedor para el modelo ${pedido.modelo}")
-        topeMensual.verificar()
+        topeMensual.verificar(pedido.modelo)
 
         // Después del tope: si no se va a generar, tampoco se gasta cuota de las APIs de empleo.
         val contextoMercado = when {
@@ -107,7 +118,7 @@ class ServicioGeneracionPregunta(
             tokensSalida = respuesta.tokensSalida
         )
         val preguntasLlm = try {
-            ValidadorLotePreguntaIa.parsearYValidar(respuesta.contenido, pedido.cantidad, pedido.tipo)
+            ValidadorLotePreguntaIa.parsearYValidar(respuesta.contenido, pedido.cantidad, pedido.tipo, pedido.categoria)
         } catch (e: LoteInvalidoException) {
             log.warn("Lote de IA descartado: {}", e.message)
             registrarFalloSinOcultar(trazaConRespuesta)
@@ -145,7 +156,7 @@ class ServicioGeneracionPregunta(
             SolicitudProveedorIa(
                 prompt = prompt,
                 modelo = pedido.modelo,
-                esquemaJson = EsquemaJsonLoteLlm.construir(pedido.cantidad, pedido.tipo),
+                esquemaJson = EsquemaJsonLoteLlm.construir(pedido.cantidad, pedido.tipo, pedido.categoria),
                 instruccionUsuario = "Genera exactamente ${pedido.cantidad} preguntas ahora. Responde solo el objeto JSON solicitado."
             )
         )
@@ -172,9 +183,16 @@ class ServicioGeneracionPregunta(
         nivel = pedido.nivel,
         enunciado = pregunta.enunciado.trim(),
         respuestaIdeal = pregunta.respuestaIdeal.trim(),
-        rubrica = jsonRubrica.encodeToJsonElement(pregunta.rubrica).jsonObject,
+        rubrica = jsonRubrica.encodeToJsonElement(pregunta.rubrica.conFeedbackUtil()).jsonObject,
         opciones = pregunta.opciones.orEmpty().map { NuevaOpcion(it.texto.trim(), it.esCorrecta, it.explicacion.trim()) }
     )
+
+    /**
+     * Un feedback genérico incompleto o con textos muy largos no invalida el lote (la llamada ya se pagó): se guarda lo
+     * que sirve y el método de completar rellena lo que falte (D36).
+     */
+    private fun RubricaLlm.conFeedbackUtil() =
+        copy(feedbackGenerico = feedbackGenerico?.sinTextosLargos()?.takeUnless { it.vacio })
 
     /** Reparte los tokens de la llamada entre las preguntas para conocer el costo de cada una. */
     private fun conCostos(contenidos: List<ContenidoPregunta>, modelo: String, respuesta: RespuestaProveedorIa): List<PreguntaGenerada> {
@@ -197,8 +215,6 @@ class ServicioGeneracionPregunta(
         return List(partes) { i -> base + if (i < resto) 1 else 0 }
     }
 
-    private fun tipoProveedor(modelo: String) = if (modelo.startsWith("gpt")) TipoProveedorIa.OPENAI else TipoProveedorIa.ANTHROPIC
-
     private fun construirPrompt(pedido: PedidoValidado, nombreCargo: String?, nombreSkill: String?, mercado: ContextoMercado?): String {
         val contexto = buildString {
             if (nombreCargo != null) append("Cargo objetivo: $nombreCargo. ")
@@ -215,14 +231,30 @@ class ServicioGeneracionPregunta(
             - Tipo: ${pedido.tipo.valorBd}
             - Categoría: ${pedido.categoria.valorBd}
         """.trimIndent()
+        // Solo las de comportamiento llevan STAR; forzarlo en una pregunta técnica da respuestas ideales artificiales.
+        val reglaRespuestaIdeal = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
+            "Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado."
+        } else {
+            "Cada respuesta_ideal debe ser completa y precisa: qué es, cómo funciona y cuándo se usa, sin forzar el formato STAR."
+        }
+        val reglaRubrica = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
+            "La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado."
+        } else {
+            "La rúbrica debe usar metodo TECNICA y al menos 4 criterios con los conceptos que una buena respuesta debe cubrir."
+        }
         val reglas = """
             Reglas obligatorias:
             - Devuelve únicamente un objeto JSON que cumpla el schema estricto entregado.
             - No uses markdown ni texto fuera del JSON.
             - Escribe todo en español, aunque las ofertas estén en otro idioma.
-            - Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado.
-            - La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado.
+            - $reglaRespuestaIdeal
+            - $reglaRubrica
             - palabras_clave debe contener términos significativos.
+            - respuestas_alternativas: 2 formas distintas y correctas de responder, con otras palabras que la respuesta_ideal.
+            - sinonimos: grupos de términos equivalentes de la pregunta (por ejemplo ["deadlock", "interbloqueo"]); puede ir vacío.
+            - feedback_generico: tres mensajes cortos (1 o 2 oraciones) para quien respondió esta pregunta: "correcto"
+              felicita y dice qué hizo bien, "medio" reconoce lo logrado y dice qué le faltó, "malo" orienta sin desanimar
+              y dice qué repasar. Deben ser específicos de esta pregunta, en segunda persona y sin revelar la respuesta.
             - Para opcion_multiple entrega exactamente cuatro opciones y una sola correcta.
             - Para tipos no opcion_multiple, opciones debe ser null.
         """.trimIndent()

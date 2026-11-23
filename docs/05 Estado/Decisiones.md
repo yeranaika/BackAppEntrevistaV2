@@ -313,3 +313,134 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   La app lo muestra en Perfil › Mi suscripción con la fecha formateada en UTC (en la hora de Chile mostraría el día
   anterior) y, si faltan los campos, no muestra nada (`textoCupoReportesIa`, prueba `CupoReportesIaTest`; rama
   `feature/offline-automatico-y-reportes-ia` de la app, sin integrar). Sin migración.
+
+## D30 · Xiaomi MiMo como tercer proveedor de IA (2026-11)
+- **Contexto**: el equipo decidió usar Xiaomi MiMo para generar preguntas. Su API de pago por uso es compatible con
+  Chat Completions de OpenAI, pero no acepta `response_format: json_schema` (solo `json_object`). Además, la serie
+  v2.6 trae el razonamiento encendido por defecto.
+- **Decisión**:
+  - **Proveedor:** `ProveedorMimo` llama a `https://api.xiaomimimo.com/v1/chat/completions`, que se puede cambiar
+    con `MIMO_BASE_URL` (solo https). La clave va en la cabecera `api-key`, como en la documentación oficial.
+  - **Cuerpo del pedido:**
+    - `response_format: {type: json_object}`;
+    - `thinking: {type: disabled}`, porque el razonamiento cobra y no aporta;
+    - `max_completion_tokens: 8192`;
+    - el JSON Schema del lote escrito en el prompt de sistema.
+  - **Validación:** la respuesta se valida igual que la de los otros proveedores. Si no cumple, es
+    `provider_invalid_response` y queda auditada con sus tokens. Si el modelo envuelve el JSON en un cerco de código
+    o le suma texto, se recorta de la primera a la última llave. `content: null` es `provider_missing_content`;
+    `finish_reason` `content_filter` es `provider_refusal`, y `length` u otro corte, `provider_truncated`.
+  - **Modelos y precios:** `mimo-v2.6-flash` (por defecto, 0,14/0,28 US$ por millón de tokens de entrada/salida) y
+    `mimo-v2.6-pro` (0,435/0,87). Son los precios de tiempo real sin caché de noviembre de 2026; con caché la
+    entrada es más barata, así que el gasto queda estimado hacia arriba (lado seguro del tope D23).
+  - **Enrutamiento:** el modelo elige el proveedor: `gpt-*` va a OpenAI, `mimo-*` a MiMo y el resto a Anthropic.
+    Solo se monta el proveedor que tiene clave: sin ella, la respuesta es `503 provider_not_configured` antes del tope
+    y de consultar las APIs de empleo, sin costo.
+  - **Evaluación premium (D17):** usa el primer proveedor con clave, en el orden OpenAI, Anthropic y MiMo.
+  - **Panel:** muestra MiMo V2.6 Flash como primer modelo del selector. Orden de despliegue: primero el backend con
+    `MIMO_API_KEY` cargada y después el panel; si no, el modelo por defecto del panel daría `400 modelo_invalido` o `503`.
+  - **Arreglo de paso (OpenAI):** Chat Completions manda `"refusal": null` en toda respuesta normal y se leía como el
+    texto `"null"`, o sea como rechazo. Ahora se lee con `contentOrNull`, igual que `content`.
+- **Pruebas**: `PruebaProveedorLlm` cubre el cuerpo enviado, la cabecera, la URL, el cerco, el corte con tokens, la
+  falta de clave sin red, el error HTTP, la URL configurable, `content: null`, `content_filter`, otros cortes y el
+  `refusal: null` de OpenAI. `PruebaServicioGeneracionPregunta` cubre el
+  enrutamiento y el costo. Ninguna prueba llama a la API real.
+
+## D31 · Credits del Token Plan de MiMo en vez del tope en USD (2026-11)
+- **Contexto**: producción usa el Token Plan de MiMo (clave `tp-`, plan Lite: US$6 al mes por 4.100 millones de
+  Credits). Es de precio fijo, así que el tope en USD de D23 (que estima el costo como si se pagara por uso) no dice lo
+  que de verdad queda: el límite real son los Credits del plan. MiMo no tiene una API para leer el saldo; solo su
+  consola lo muestra.
+- **Decisión**:
+  - **Cálculo propio:** `ServicioCreditosTokenPlan` suma los tokens de cada llamada a un modelo `mimo-*` registrada por
+    el servidor (reportes de entrevista y generación de preguntas, también las fallidas) y los convierte con la tabla
+    oficial de Credits por token: flash 100 de entrada y 200 de salida, pro 300 y 600 (un `mimo-*` desconocido cuenta
+    como pro). La respuesta no dice qué parte de la entrada vino de caché, así que todo se cuenta sin caché: el gasto
+    queda estimado hacia arriba. Lo que se use con la misma clave fuera de la app no aparece.
+  - **Configuración:** `MIMO_TOKEN_PLAN_CREDITOS` (acepta separadores de miles; 0 lo apaga). Sin definir, se asume el
+    plan Lite si `MIMO_API_KEY` empieza con `tp-`, y nada si no. `MIMO_TOKEN_PLAN_DIA_RENOVACION` (1–28, por defecto 1)
+    es el día del mes en que se renueva el plan; el periodo va de ese día al mismo día del mes siguiente (UTC).
+  - **Tope:** con Token Plan activo, `generar-ia` con un modelo `mimo-*` se frena por Credits (`429
+    tope_generacion_ia_alcanzado`, el mismo código) y no por USD; los demás modelos siguen con el tope en USD (D23).
+  - **Panel:** `GET /api/v1/admin/costos-ia` trae `planTokenMimo` (7 claves, o `null` sin Token Plan). El panel lo
+    muestra en lugar del tope en pesos.
+- **Pruebas**: `PruebaServicioCreditosTokenPlan` (tabla, periodo con día de renovación, borde de agotado, enrutamiento
+  del tope por modelo, lectura de la variable) y `PruebaControladorCostosIa` (el JSON con y sin plan). Ninguna llama a
+  MiMo.
+
+## D32 · El feedback debe estar listo en menos de 5 min (2026-11)
+- **Pedido:** el reporte de feedback (con o sin IA) tiene que estar disponible a menos de 5 min de finalizar la entrevista.
+- **Decisión:**
+  - **Tope de la IA:** `TIEMPO_MAXIMO_EVALUACION_IA` = 45 s para toda la evaluación (reintentos del proveedor incluidos).
+    Pasado el tope sale el reporte con el motor freemium y **no** consume cupo (D17). Antes el peor caso era ~2,3 min
+    (70 s × 2 intentos) y el rescate dejaba un reporte atascado hasta ~15 min.
+  - **Rescate:** cada 1 min (antes 5) y un reporte en "generando" se da por abandonado a los 3 min
+    (`VIGENCIA_RESERVA_IA`, antes 10). Debe ser mayor que el tope de la IA (45 s).
+  - **Palabras clave del motor freemium:** `C#`, `C++`, `F#` y `.NET` se normalizan a letras (antes `C#` quedaba como
+    `c` y coincidía con casi cualquier texto); la coincidencia empieza en inicio de palabra, y las claves de 3 letras
+    o menos (`go`, `sql`) exigen la palabra completa.
+  - **Tiempos por reporte** en el log (`Reporte … listo en … ms (cálculo, guardado, modo)`) para medir p50/p95.
+- **Medido (2026-11-19, MiMo `mimo-v2.6-flash`, 5 respuestas abiertas):** freemium 60–120 ms; con IA 24 s. E2E fase 7
+  con `-ConIa` 25/25.
+- **Pendiente (P1):** feedback por niveles (freemium básico con respuesta ideal; premium detallado con "por qué
+  falló"), reporte en dos fases, evaluación en lotes paralelos. Ver `Analisis feedback lento.md`.
+- **Pruebas**: `PruebaEvaluadorRespuesta` (símbolos y palabras cortas) y `PruebaServicioReporte` (IA lenta → freemium
+  sin consumir cupo; tiempos del rescate).
+
+## D33 · Feedback freemium con comparador de textos y feedback general por niveles (2026-11)
+- **Pedido:** el feedback gratuito no usa IA ni tokens; da un feedback general (malo / medio / bueno) que invita a premium
+  (esquema "tipos de feedback": freemium → general → malo, medio, bueno; fomento de uso → premium → IA → personalizado).
+- **Comparador (`ComparadorTextos`, sin IA):** mezcla coseno TF-IDF (40 %), cobertura (30 %), Jaccard (20 %) y parecido de
+  orden por Levenshtein (10 %); sin tildes, sin palabras vacías y con el plural quitado; se queda con la mejor referencia.
+  El motor freemium toma `max(trigramas con la ideal, comparador)` como similitud: nunca puntúa menos que antes.
+- **Rúbrica, campos opcionales:** `respuestas_alternativas` (hasta 5 textos: otras formas correctas de responder) y
+  `sinonimos` (hasta 20 grupos de 2 a 10 términos: "deadlock" = "interbloqueo" = "bloqueo mutuo"). Una palabra clave
+  cuenta si aparece cualquiera de sus sinónimos. Se validan al crear la pregunta (`alternativas_invalidas`,
+  `sinonimos_invalidos`); la IA los genera (esquema y prompt de `generar-ia`), pero un lote sin ellos sigue siendo válido.
+- **Resumen freemium del reporte:** nivel general (bueno ≥ 75, medio ≥ 60, bajo), skills a reforzar, hasta 4 conceptos
+  que más faltaron y un aviso de lo que suma el premium. El contrato JSON de Android no cambia (solo el texto de `resumen`).
+- **Pendiente:** la práctica (`CorrectorRespuestas`) aún no usa alternativas ni sinónimos; calibrar pesos con respuestas
+  reales; arreglar la validación STAR obligatoria y las palabras clave de 2 letras del lote de IA (ver
+  `Analisis feedback lento.md`).
+- **Pruebas**: `PruebaComparadorTextos` (11 casos nuevos en total con las de validación, reporte y esquema de IA).
+
+## D34 · STAR solo para preguntas de comportamiento y claves de 2 letras en la generación con IA (2026-11)
+- **Problema:** el validador del lote de IA exigía método STAR (y las palabras Situación/Tarea/Acción/Resultado en la
+  respuesta ideal) a todas las preguntas, también a las técnicas: la IA fallaba (llamada pagada perdida) o escribía
+  respuestas artificiales que luego se mostraban como "respuesta ideal". Además una palabra clave de menos de 3 letras
+  ("Go", "C#") invalidaba el lote completo.
+- **Decisión:** la categoría `blanda` mantiene STAR completo (3 oraciones, método `STAR`); la `tecnica` pide método
+  `TECNICA` (se acepta `STAR` por compatibilidad), 2 oraciones y 4 criterios. El esquema de `generar-ia` y el prompt
+  cambian según la categoría. Las palabras clave admiten 2 letras (`Go`, `C#`); una sola letra sigue siendo inválida.
+- **Pruebas**: `PruebaValidadorLotePreguntaIa` (5 casos). Sigue pendiente aceptar lo válido de un lote parcial y rechazar
+  preguntas abiertas manuales con rúbrica vacía.
+
+## D36 · Feedback genérico por pregunta: correcto, medio y malo (2026-11)
+- **Pedido:** que cada pregunta generada traiga 3 feedbacks genéricos (correcto, medio, malo) y un método para completar
+  las preguntas que ya están en el banco y no tienen alguno de los tres.
+- **Dónde vive:** en la rúbrica, `rubrica_evaluacion.feedback_generico = {"correcto": "...", "medio": "...", "malo": "..."}`
+  (textos de hasta 500 caracteres). Sin migración: la rúbrica ya es JSONB. Puede estar incompleto (falta un nivel).
+- **Generación (`generar-ia`):** el esquema estricto y el prompt piden los tres textos (específicos de la pregunta, en
+  segunda persona, sin revelar la respuesta). Un texto vacío o de más de 500 caracteres no invalida el lote (la llamada
+  ya se pagó): se guarda lo que sirve y queda pendiente lo demás. Un lote sin feedback sigue siendo válido.
+- **Admin (crear/editar):** `feedback_generico` es opcional; si viene, debe ser un objeto con solo esas claves y textos no
+  vacíos de hasta 500 caracteres (`feedback_generico_invalido`).
+- **Completar las existentes:** `GET /api/v1/admin/preguntas/feedback-generico` (cuántas no rechazadas tienen algún nivel
+  faltante) y `POST /api/v1/admin/preguntas/feedback-generico/completar` con `{modelo, limite (1..50), pregunta_ids,
+  sobrescribir}`. Toma las más antiguas que faltan (o las de `pregunta_ids`), manda 10 por llamada al LLM, **solo agrega
+  los niveles que faltan** (con `sobrescribir` reemplaza los tres) y **no cambia el estado** de la pregunta (una
+  aprobada sigue aprobada). Cada llamada pasa por el tope mensual (D23), queda en `pregunta_generacion_ia` sin
+  `pregunta_id` (por eso cuenta en Costos IA) y comparte el límite por IP de `generar-ia`. Lo que la IA devuelve mal
+  (número repetido o fuera de rango, texto vacío o largo) se omite y queda pendiente; si falla una llamada a mitad de
+  camino se responde lo ya guardado con `detenido_por`. Para todo el banco: llamar varias veces hasta `pendientes = 0`.
+- **Uso al corregir (freemium, sin IA):** nivel según el puntaje con los cortes del texto estándar (correcto ≥ 80, medio
+  ≥ 60, malo < 60). La respuesta abierta muestra el texto propio del nivel y, si no es correcta, "Repasa: <conceptos que
+  faltaron>". La opción múltiple antepone el texto correcto o malo a la explicación de la opción. Sin texto para ese
+  nivel se usa el feedback estándar de antes. La entrevista lo toma de la copia de la rúbrica (`rubrica_snap`, D24):
+  completar el banco no cambia entrevistas ya servidas. La práctica lo guarda en la pregunta servida (`feedback_generico`).
+- **Contrato Android:** sin cambios de forma; solo cambia el texto de `feedback`/`observacion`.
+- **Pendiente:** mandar `feedback_generico` en la descarga del banco para el ciclo sin conexión de la app; que el panel
+  web muestre y edite los tres textos y tenga un botón para completar.
+- **Pruebas**: `PruebaFeedbackGenerico` (17 casos: modelo, esquema y prompt de IA, validación del admin, corrección
+  abierta y de opción múltiple, completar por lote o por id, omitidos, fallo a mitad de camino, límites y permisos).
+

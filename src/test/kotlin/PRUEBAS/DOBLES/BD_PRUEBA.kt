@@ -201,7 +201,10 @@ class SistemaPrueba(
      * Cómo llega la solicitud de visión al motor. null = el servicio de visión en proceso sobre [motorVision] (sin red);
      * una prueba de la cadena real pasa un `ClienteMotorVision` contra un motor levantado de verdad.
      */
-    predictorVision: SERVICIOS.PredictorVision? = null
+    predictorVision: SERVICIOS.PredictorVision? = null,
+    /** Token Plan de MiMo (D31); 0 = sin Token Plan, como por defecto. Usa [relojTopeGeneracionIa]. */
+    creditosTokenPlanMimo: Long = 0,
+    diaRenovacionTokenPlanMimo: Int = 1
 ) {
     val db = BdPrueba.conectar()
     val usuarios = RepositorioUsuarioExposed()
@@ -226,21 +229,30 @@ class SistemaPrueba(
     val preguntas = RepositorioPreguntaExposed()
     val generaciones = RepositorioGeneracionPreguntaIaExposed()
     /** Como en producción, una sola instancia del tope para el 429 de generar-ia y para Costos IA (D28). */
-    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
-        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa)
+    val creditosMimo = SERVICIOS.ServicioCreditosTokenPlan(
+        MODELOS.LectorCostosIaExposed(),
+        SERVICIOS.PlanTokenMimo(creditosTokenPlanMimo, diaRenovacionTokenPlanMimo, relojTopeGeneracionIa)
     )
-    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj)
+    val topeGeneracionIa = SERVICIOS.ServicioTopeGeneracionIa(
+        generaciones, SERVICIOS.TopeGastoGeneracionIa(topeGastoGeneracionIaUsd, relojTopeGeneracionIa), creditosMimo
+    )
+    val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj, creditosMimo)
     val pregunta = ServicioPregunta(preguntas, catalogo)
     val mercadoRepo = RepositorioMercadoExposed()
     /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */
     val ofertas = INTEGRACIONES.OfertasEnCache(clienteMercado, cache)
     val contextoMercado = SERVICIOS.ServicioContextoMercado(ofertas, mercadoRepo)
     val generacion = ServicioGeneracionPregunta(
-        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa), generaciones, catalogo,
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa, TipoProveedorIa.MIMO to proveedorIa), generaciones, catalogo,
         topeGeneracionIa,
         mercado = contextoMercado
     )
     val cobertura = SERVICIOS.ServicioCoberturaPreguntas(mercadoRepo, MODELOS.LectorCoberturaPreguntasExposed())
+    val feedbackGenerico = SERVICIOS.ServicioFeedbackGenerico(
+        mapOf(TipoProveedorIa.OPENAI to proveedorIa, TipoProveedorIa.ANTHROPIC to proveedorIa, TipoProveedorIa.MIMO to proveedorIa),
+        MODELOS.RepositorioFeedbackGenericoExposed(),
+        topeGeneracionIa
+    )
 
     val requisitos = ServicioRequisitosCargo(mercadoRepo, mercadoRepo, ofertas)
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
@@ -345,7 +357,7 @@ class SistemaPrueba(
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
-            controladorPregunta(pregunta, generacion, cobertura)
+            controladorPregunta(pregunta, generacion, cobertura, feedbackGenerico)
             controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)

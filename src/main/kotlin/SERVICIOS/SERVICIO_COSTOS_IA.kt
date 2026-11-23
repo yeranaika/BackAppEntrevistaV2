@@ -42,7 +42,9 @@ data class ResumenCostosIa(
     val porDia: List<CostoIaDia>,
     val porModelo: List<Pair<String, GastoIa>>,
     /** Gasto del mes UTC en curso frente al tope de generación (D28): no depende de [desde] ni de [hasta]. */
-    val topeGeneracionPreguntas: EstadoTopeGeneracionIa
+    val topeGeneracionPreguntas: EstadoTopeGeneracionIa,
+    /** Credits del Token Plan de MiMo en el periodo en curso (D31); null sin Token Plan. No depende de [desde] ni [hasta]. */
+    val planTokenMimo: EstadoCreditosTokenPlan? = null
 ) {
     val total: GastoIa get() = reportes + generacionPreguntas
 }
@@ -56,7 +58,8 @@ data class ResumenCostosIa(
 class ServicioCostosIa(
     private val lector: LectorCostosIa,
     private val topeGeneracion: ServicioTopeGeneracionIa,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    private val creditosMimo: ServicioCreditosTokenPlan? = null
 ) {
     /** [desde] y [hasta] son días incluidos (UTC). Sin ellos: los últimos [DIAS_COSTOS_IA_POR_DEFECTO] días. */
     suspend fun resumen(desde: LocalDate?, hasta: LocalDate?): ResumenCostosIa {
@@ -86,7 +89,8 @@ class ServicioCostosIa(
             porDia = porDia,
             porModelo = porModelo,
             // Después de validar el rango: un 400 no hace esta consulta.
-            topeGeneracionPreguntas = topeGeneracion.estado()
+            topeGeneracionPreguntas = topeGeneracion.estado(),
+            planTokenMimo = creditosMimo?.estado()
         )
     }
 
