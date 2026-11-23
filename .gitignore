@@ -118,3 +118,6 @@ pruebas/
 # Herramientas locales y volcados
 .opencode/
 dumps/
+
+opencode.json
+task-t*.md
