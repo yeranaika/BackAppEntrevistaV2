@@ -27,8 +27,8 @@ private const val VERSION_DOCUMENTOS_ESTATICOS = "1.1.0"
 
 /**
  * GET  /consent/current              texto legal vigente (Android)
- * POST /admin/consent/text           publicar versión (admin) { version, title, body, alcances? }
- * POST /me/consent                   aceptar { version, alcances: { nombre: bool } }
+ * POST /admin/consent/text           publicar versión (admin) { version, title, body, alcances? }; 409 si cambia una ya aceptada
+ * POST /me/consent                   aceptar { version, alcances: { nombre: bool } }; descarta los alcances que la versión no ofrece
  * GET  /me/consent/latest            consentimiento vigente (204 si no hay)
  * POST /me/consent/revoke
  * GET  /api/v1/legal/eula | versions | terms | privacy

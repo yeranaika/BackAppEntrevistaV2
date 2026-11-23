@@ -14,6 +14,18 @@ import java.util.UUID
 
 const val ALCANCE_ENTRENAMIENTO_IA = "ia_entrenamiento"
 
+/**
+ * Permiso aparte para medir conductas con la cámara en la simulación tipo videollamada (D35). La app lo registra al
+ * tocar "Acepto, activar cámara"; el consentimiento general no lo marca.
+ */
+const val ALCANCE_ANALISIS_CAMARA = "analisis_conducta_camara"
+
+/**
+ * Estadísticas de uso y errores (Firebase en la app, RF09). Reemplaza a "analytics" en la v1.1: la app anterior lo
+ * enviaba premarcado, así que esa clave no prueba que la persona lo haya elegido y se descarta (D35).
+ */
+const val ALCANCE_ESTADISTICAS_USO = "estadisticas_uso"
+
 data class TextoConsentimiento(
     val version: String,
     val titulo: String,
@@ -48,6 +60,9 @@ interface RepositorioConsentimiento {
 
     /** false si no había uno vigente. */
     suspend fun revocarVigente(usuarioId: UUID): Boolean
+
+    /** Cuántos consentimientos (vigentes o revocados) se otorgaron sobre [version]. */
+    suspend fun contarAceptaciones(version: String): Long
 }
 
 class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
@@ -137,6 +152,10 @@ class RepositorioConsentimientoExposed : RepositorioConsentimiento {
     }
 
     override suspend fun revocarVigente(usuarioId: UUID): Boolean = transaccion { revocar(usuarioId, Instant.now()) > 0 }
+
+    override suspend fun contarAceptaciones(version: String): Long = transaccion {
+        TablaConsentimiento.selectAll().where { TablaConsentimiento.version eq version }.count()
+    }
 
     private fun revocar(usuarioId: UUID, ahora: Instant): Int =
         TablaConsentimiento.update({ (TablaConsentimiento.usuarioId eq usuarioId) and TablaConsentimiento.fechaRevocado.isNull() }) {

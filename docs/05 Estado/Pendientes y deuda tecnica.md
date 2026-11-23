@@ -26,6 +26,11 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en Railway (en la BD local ya está), con
   respaldo, **antes** de desplegar esa rama (sin la columna fallan los endpoints de entrevista y el reporte), y volver
   a correrla una vez desplegada.
+- [ ] **Al unir `feature/consentimiento-v1-1`** (D35, D37): aplicar `migrations/023_modelo_vision_semilla_sin_expresiones.sql`
+  en Railway (idempotente, cuando quieran). Publicar la `v1.1` por la API con sus tres alcances
+  (`estadisticas_uso`, `marketing`, `analisis_conducta_camara`; ver `docs/legal/CONSENTIMIENTO.md`) **después** de
+  desplegar este backend y de publicar la app con el PR #21 (que incluye el #20). Antes, en la app: cambiar
+  `ALCANCE_ANALYTICS` a `estadisticas_uso` en el PR #20.
 - [x] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): 7/7 en verde contra PostgreSQL 16 (2026-11-07).
 
 ## Media

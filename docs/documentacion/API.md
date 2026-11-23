@@ -392,14 +392,14 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 `POST /me/consent` · Usuario · responde `201`
 
-`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior.
+`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona.
 
 ```json
 {
   "version": "{{versionConsentimiento}}",
   "alcances": {
-    "uso_datos": true,
-    "ia_entrenamiento": false
+    "estadisticas_uso": true,
+    "marketing": false
   }
 }
 ```
@@ -430,15 +430,20 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 ### Publicar versión del EULA (admin)
 
-`POST /api/v1/legal/admin/eula` · Admin · responde `200`
+`POST /api/v1/legal/admin/eula` · Admin · responde `201`, `409`
 
-⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`.
+⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`. `alcances` son las opciones que la persona puede aceptar (sin ellas, una versión nueva no ofrece ninguna). `409 version_con_aceptaciones` si cambia el título, el cuerpo o los alcances de una versión que alguien ya aceptó; republicarla igual solo la deja vigente (D35).
 
 ```json
 {
   "version": "2.0.0",
   "title": "EULA",
-  "body": "Texto"
+  "body": "Texto",
+  "alcances": [
+    "estadisticas_uso",
+    "marketing",
+    "analisis_conducta_camara"
+  ]
 }
 ```
 
@@ -874,7 +879,7 @@ Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 ent
 
 `POST /api/v1/entrevistas/{{sesionId}}/respuestas` · Usuario · responde `200`
 
-En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez.
+En alternativas se usa `opcionId`; en abiertas y de video `texto` (`videoClipUrl` se acepta pero se ignora: no se guardan clips, D37). Cada pregunta se responde una vez.
 
 ```json
 {
@@ -1383,15 +1388,20 @@ Igual que `POST /admin/usuarios`.
 
 ### Publicar texto de consentimiento (alias)
 
-`POST /admin/consent/text` · Admin · responde `200`
+`POST /admin/consent/text` · Admin · responde `201`, `409`
 
-⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos.
+⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos (mismo 409).
 
 ```json
 {
   "version": "2.0.0",
   "title": "EULA",
-  "body": "Texto"
+  "body": "Texto",
+  "alcances": [
+    "estadisticas_uso",
+    "marketing",
+    "analisis_conducta_camara"
+  ]
 }
 ```
 
@@ -1514,7 +1524,6 @@ Los 144 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `titulo_invalido` | El título es obligatorio (hasta … caracteres) |
 | 400 | `version_invalida` | La versión es obligatoria y de hasta … caracteres |
 | 400 | `version_requerida` | La versión es obligatoria |
-| 400 | `video_url_invalida` | El clip debe ser una URL https de hasta … caracteres |
 | 401 | `bad_credentials` | Correo o contraseña incorrectos |
 | 401 | `google_email_not_verified` | El correo de Google no está verificado |
 | 401 | `google_exchange_failed` | Google no entregó tokens para el código recibido |
@@ -1554,6 +1563,7 @@ Los 144 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `preguntas_insuficientes` | Aún no hay suficientes preguntas aprobadas para … (…); prueba con otro nivel o cargo |
 | 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
 | 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
+| 409 | `version_con_aceptaciones` | La versión … ya fue aceptada por usuarios: publica los cambios como una versión nueva |
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
 | 429 | `tope_generacion_ia_alcanzado` | Se acabaron los Credits del Token Plan de MiMo de este periodo; se renuevan el … (UTC) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |
