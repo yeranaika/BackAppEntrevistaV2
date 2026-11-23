@@ -23,6 +23,12 @@ import java.time.format.DateTimeFormatter
 /** Peso máximo de un vídeo de prueba: 200 MB. */
 const val MAXIMO_BYTES_VIDEO_PRUEBA: Long = 200L * 1024 * 1024
 
+/**
+ * Tope del parser multipart de Ktor (`formFieldLimit`, por defecto 50 MB). Se aplica antes del handler, así que debe
+ * ser mayor que [MAXIMO_BYTES_VIDEO_PRUEBA] para que el chequeo propio (400) sea el que decida: 210 MB.
+ */
+const val LIMITE_MULTIPART_VIDEO_PRUEBA: Long = 210L * 1024 * 1024
+
 private val FORMATO_MARCA_TIEMPO: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
 
 /**
@@ -38,7 +44,7 @@ fun Route.controladorPruebaVideo(
     post("/pruebas/video") {
         var guardado: Pair<File, Long>? = null
         try {
-            call.receiveMultipart().forEachPart { parte ->
+            call.receiveMultipart(LIMITE_MULTIPART_VIDEO_PRUEBA).forEachPart { parte ->
                 try {
                     if (parte is PartData.FileItem && parte.name == "video" && guardado == null) {
                         val nombreCliente = parte.originalFileName.orEmpty()

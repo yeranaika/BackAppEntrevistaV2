@@ -113,7 +113,7 @@ models/**/*.bin
 models/**/*.joblib
 
 # Vídeos de prueba subidos por la app (no se versionan)
-pruebas/
+/pruebas/
 
 # Herramientas locales y volcados
 .opencode/
