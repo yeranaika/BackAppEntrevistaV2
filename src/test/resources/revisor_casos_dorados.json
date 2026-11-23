@@ -1,0 +1,1811 @@
+{
+ "version": 1,
+ "descripcion": "Casos dorados del revisor de texto libre (T3.13). Mismo archivo en backend y Android: el mismo caso debe dar el mismo puntaje en ambos. 'esperado' se regenera con -DregenerarCasosDorados=true; 'notaHumana' (0-10) es el juicio de una persona y alimenta la calibración. PROVISIONAL: sin evaluaciones reales previas en sesion_pregunta_respuesta.",
+ "casos": [
+  {
+   "id": "cache_excelente",
+   "descripcion": "Semilla cache (fce5c7f8): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Usaría Redis como caché con el patrón cache-aside: el servicio consulta primero Redis y, si hay un cache miss, lee de PostgreSQL usando un pool de conexiones HikariCP, guarda el resultado en Redis con un TTL configurable y lo devuelve. Para lo reactivo emito los datos con Flow y comparto el estado entre coroutines con StateFlow o SharedFlow. Cuando se actualiza una pregunta invalido la entrada de la caché para no servir datos viejos, y como hay accesos concurrentes uso un mutex por clave para evitar que varias coroutines recarguen lo mismo. Serializo en JSON y manejo los errores de Redis cayendo a la base. Un diagrama simple: request, service, Redis, PostgreSQL.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 45.14,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.6667,
+    "similitud": 0.3284,
+    "palabras": 113,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_invalidacion",
+     "considera_concurrencia"
+    ],
+    "scoreJaccard": 47.88,
+    "similitudJaccard": 0.3714,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "cache_buena",
+   "descripcion": "Semilla cache (fce5c7f8): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Pondría Redis delante de PostgreSQL. El service pregunta primero a Redis y si no está (cache miss) va a la base de datos con un pool de conexiones, guarda el dato en Redis con un TTL y responde. Para la parte reactiva usaría Flow y StateFlow. También hay que invalidar la caché cuando cambian los datos.",
+   "notaHumana": 7.0,
+   "esperado": {
+    "score": 36.14,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.4167,
+    "similitud": 0.3298,
+    "palabras": 56,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "scoreJaccard": 30.76,
+    "similitudJaccard": 0.2453,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "cache_parcial",
+   "descripcion": "Semilla cache (fce5c7f8): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Usaría Redis como caché para no consultar siempre la base de datos y ponerle un tiempo de expiración a los datos.",
+   "notaHumana": 4.0,
+   "esperado": {
+    "score": 14.88,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0833,
+    "similitud": 0.1862,
+    "palabras": 21,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "scoreJaccard": 6.93,
+    "similitudJaccard": 0.0612,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "cache_floja",
+   "descripcion": "Semilla cache (fce5c7f8): floja",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Guardaría los datos en una lista en memoria dentro de la aplicación y listo, así es más rápido.",
+   "notaHumana": 2.0,
+   "esperado": {
+    "score": 8.46,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.133,
+    "palabras": 18,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "scoreJaccard": 1.33,
+    "similitudJaccard": 0.0208,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "cache_fuera_de_tema",
+   "descripcion": "Semilla cache (fce5c7f8): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Me gusta el fútbol y los fines de semana salgo a correr por el parque con mi perro.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 7.45,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.117,
+    "palabras": 18,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "cache_lista_de_palabras",
+   "descripcion": "Semilla cache (fce5c7f8): lista_de_palabras",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: usar Redis como caché L1 con TTL configurable. Al recibir el request, el service consulta Redis primero (Cache-Aside pattern). Si hay cache miss, consulta PostgreSQL con HikariCP pool, guarda en Redis y emite el resultado. Para reactivo: usar Flow para emitir los datos y StateFlow/SharedFlow para compartir el estado del caché entre coroutines. Considerar invalidación de caché al actualizar preguntas (CQRS). Mencionar TTL, serialización JSON, y manejo de errores.",
+   "rubrica": {
+    "metodo": "arquitectura_libre",
+    "criterios": [
+     "menciona_cache_aside",
+     "menciona_TTL",
+     "menciona_HikariCP_o_pool",
+     "menciona_invalidacion",
+     "considera_concurrencia",
+     "ejemplo_codigo_o_diagrama"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "cache-aside TTL HikariCP pool invalidación concurrencia Redis Flow StateFlow SharedFlow PostgreSQL diagrama código",
+   "notaHumana": 3.0,
+   "esperado": {
+    "score": 51.09,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 1.0,
+    "similitud": 0.2314,
+    "palabras": 14,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 52.27,
+    "similitudJaccard": 0.25,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "indices_excelente",
+   "descripcion": "Semilla indices (816c1b57): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "B-Tree es un índice de árbol balanceado, el tipo por defecto, ideal para igualdad y rangos (=, <, >, BETWEEN) en columnas escalares como fecha, UUID o estado. GIN es un índice invertido pensado para valores compuestos: JSONB, arrays y búsqueda de texto completo, porque indexa cada elemento por separado y permite preguntar si un JSONB contiene una clave. Usaría B-Tree para filtrar por fecha o estado, y GIN para buscar dentro de una columna JSONB o de un array con el operador @>.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 58.22,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.7333,
+    "similitud": 0.4958,
+    "palabras": 82,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin"
+    ],
+    "scoreJaccard": 54.21,
+    "similitudJaccard": 0.4328,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "indices_buena",
+   "descripcion": "Semilla indices (816c1b57): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "B-Tree sirve para búsquedas por igualdad y por rango, y es el índice por defecto. GIN se usa cuando hay columnas JSONB o arrays y necesito buscar dentro de ellos. Ejemplo: B-Tree en la fecha y GIN en un campo JSONB.",
+   "notaHumana": 7.5,
+   "esperado": {
+    "score": 47.22,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.8667,
+    "similitud": 0.2469,
+    "palabras": 43,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 45.66,
+    "similitudJaccard": 0.2222,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "indices_parcial",
+   "descripcion": "Semilla indices (816c1b57): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Los índices B-Tree son los más comunes y aceleran las consultas. GIN también es un tipo de índice que se usa en algunos casos.",
+   "notaHumana": 4.0,
+   "esperado": {
+    "score": 30.75,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.6333,
+    "similitud": 0.1213,
+    "palabras": 25,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin"
+    ],
+    "scoreJaccard": 26.95,
+    "similitudJaccard": 0.0615,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_floja",
+   "descripcion": "Semilla indices (816c1b57): floja",
+   "origen": "semilla",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Un índice es como el índice de un libro, sirve para encontrar cosas más rápido en la tabla.",
+   "notaHumana": 2.0,
+   "esperado": {
+    "score": 6.39,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1004,
+    "palabras": 18,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_fuera_de_tema",
+   "descripcion": "Semilla indices (816c1b57): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "La receta lleva harina, huevos y azúcar, se mezcla todo y se hornea por cuarenta minutos.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 7.59,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1192,
+    "palabras": 16,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "scoreJaccard": 0.95,
+    "similitudJaccard": 0.0149,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_excelente_con_palabras_clave",
+   "descripcion": "Semilla indices con palabras_clave sintéticas: excelente",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "B-Tree es un índice de árbol balanceado, el tipo por defecto, ideal para igualdad y rangos (=, <, >, BETWEEN) en columnas escalares como fecha, UUID o estado. GIN es un índice invertido pensado para valores compuestos: JSONB, arrays y búsqueda de texto completo, porque indexa cada elemento por separado y permite preguntar si un JSONB contiene una clave. Usaría B-Tree para filtrar por fecha o estado, y GIN para buscar dentro de una columna JSONB o de un array con el operador @>.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 77.02,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": 1.0,
+    "coberturaCriterios": 0.7333,
+    "similitud": 0.4958,
+    "palabras": 82,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin"
+    ],
+    "scoreJaccard": 74.82,
+    "similitudJaccard": 0.4328,
+    "bandaJaccard": "APROBADA"
+   }
+  },
+  {
+   "id": "indices_buena_con_palabras_clave",
+   "descripcion": "Semilla indices con palabras_clave sintéticas: buena",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "B-Tree sirve para búsquedas por igualdad y por rango, y es el índice por defecto. GIN se usa cuando hay columnas JSONB o arrays y necesito buscar dentro de ellos. Ejemplo: B-Tree en la fecha y GIN en un campo JSONB.",
+   "notaHumana": 7.5,
+   "esperado": {
+    "score": 70.97,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": 1.0,
+    "coberturaCriterios": 0.8667,
+    "similitud": 0.2469,
+    "palabras": 43,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 70.11,
+    "similitudJaccard": 0.2222,
+    "bandaJaccard": "APROBADA"
+   }
+  },
+  {
+   "id": "indices_parcial_con_palabras_clave",
+   "descripcion": "Semilla indices con palabras_clave sintéticas: parcial",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "Los índices B-Tree son los más comunes y aceleran las consultas. GIN también es un tipo de índice que se usa en algunos casos.",
+   "notaHumana": 4.0,
+   "esperado": {
+    "score": 36.2,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.4286,
+    "coberturaCriterios": 0.6333,
+    "similitud": 0.1213,
+    "palabras": 25,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays"
+    ],
+    "criteriosFaltantes": [
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin"
+    ],
+    "scoreJaccard": 34.11,
+    "similitudJaccard": 0.0615,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_floja_con_palabras_clave",
+   "descripcion": "Semilla indices con palabras_clave sintéticas: floja",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "Un índice es como el índice de un libro, sirve para encontrar cosas más rápido en la tabla.",
+   "notaHumana": 2.0,
+   "esperado": {
+    "score": 9.94,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.1429,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1004,
+    "palabras": 18,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays"
+    ],
+    "criteriosFaltantes": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "scoreJaccard": 6.43,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_fuera_de_tema_con_palabras_clave",
+   "descripcion": "Semilla indices con palabras_clave sintéticas: fuera_de_tema",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "La receta lleva harina, huevos y azúcar, se mezcla todo y se hornea por cuarenta minutos.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 4.17,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.0,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1192,
+    "palabras": 16,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ],
+    "criteriosFaltantes": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "scoreJaccard": 0.52,
+    "similitudJaccard": 0.0149,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "indices_lista_de_palabras_con_palabras_clave",
+   "descripcion": "Lista de palabras clave sin explicar nada (limitación conocida)",
+   "origen": "sintetico",
+   "respuestaIdeal": "B-Tree: estructura de árbol balanceado, ideal para comparaciones de igualdad y rango (=, <, >, BETWEEN, LIKE 'foo%'). Funciona con casi todos los tipos de datos. Es el tipo por defecto. GIN (Generalized Inverted Index): óptimo para búsquedas dentro de valores compuestos como JSONB, arrays, texto completo (tsvector) y hstore. Indexa cada elemento individual del valor compuesto, permitiendo buscar si un JSONB contiene una clave específica en O(log n). Elijo B-Tree para filtros por columnas escalares (fecha, UUID, estado). Elijo GIN cuando necesito buscar dentro de JSONB (ej: contexto_evaluacion_ia @> '{\"metodo\":\"STAR\"}') o arrays.",
+   "rubrica": {
+    "criterios": [
+     "describe_btree_correctamente",
+     "describe_gin_correctamente",
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin",
+     "menciona_JSONB_o_arrays_para_gin"
+    ],
+    "puntaje_maximo": 10,
+    "palabras_clave": [
+     "B-Tree",
+     "GIN",
+     "JSONB",
+     "igualdad",
+     "rango",
+     "arrays",
+     "índice"
+    ]
+   },
+   "texto": "B-Tree GIN JSONB igualdad rango arrays índice",
+   "notaHumana": 2.0,
+   "esperado": {
+    "score": 62.45,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": 1.0,
+    "coberturaCriterios": 0.7333,
+    "similitud": 0.0795,
+    "palabras": 8,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "da_ejemplo_uso_btree",
+     "da_ejemplo_uso_gin"
+    ],
+    "scoreJaccard": 63.82,
+    "similitudJaccard": 0.1186,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "api_excelente",
+   "descripcion": "Semilla api (b429b3d5): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: POST /sessions → inicia la sesión, retorna 201 con { sesion_id, webrtc_room_id, primera_pregunta }. GET /sessions/{id}/question → obtiene la siguiente pregunta de la sesión. POST /sessions/{id}/answers → envía la respuesta a la pregunta actual (audio transcrito o texto). POST /sessions/{id}/finish → finaliza la sesión, lanza generación asíncrona del reporte, retorna 202 Accepted. GET /sessions/{id}/report → retorna el reporte (200 si listo, 202 si aún procesando con estado \"generando\"). Consideraciones: JWT para autenticación, versionado /api/v1/, paginación si aplica.",
+   "rubrica": {
+    "criterios": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Con POST /sessions creo la sesión y devuelvo 201 con el id de la sesión y la primera pregunta. GET /sessions/{id}/question entrega la siguiente pregunta. POST /sessions/{id}/answers recibe la respuesta, ya sea texto o audio transcrito. POST /sessions/{id}/finish cierra la sesión y lanza la generación del reporte de forma asíncrona, respondiendo 202 Accepted. GET /sessions/{id}/report devuelve el reporte: 200 si está listo o 202 con estado generando si todavía se procesa. Todo va autenticado con JWT y versionado bajo /api/v1/.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 55.78,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.4286,
+    "similitud": 0.6316,
+    "palabras": 89,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_autenticacion"
+    ],
+    "scoreJaccard": 47.92,
+    "similitudJaccard": 0.5082,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "api_buena",
+   "descripcion": "Semilla api (b429b3d5): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: POST /sessions → inicia la sesión, retorna 201 con { sesion_id, webrtc_room_id, primera_pregunta }. GET /sessions/{id}/question → obtiene la siguiente pregunta de la sesión. POST /sessions/{id}/answers → envía la respuesta a la pregunta actual (audio transcrito o texto). POST /sessions/{id}/finish → finaliza la sesión, lanza generación asíncrona del reporte, retorna 202 Accepted. GET /sessions/{id}/report → retorna el reporte (200 si listo, 202 si aún procesando con estado \"generando\"). Consideraciones: JWT para autenticación, versionado /api/v1/, paginación si aplica.",
+   "rubrica": {
+    "criterios": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "POST /sessions para crear la sesión, GET para obtener la pregunta, POST de answers para enviar la respuesta y POST finish para terminar. Luego GET del reporte. Usaría JWT para autenticar.",
+   "notaHumana": 6.5,
+   "esperado": {
+    "score": 32.46,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.4286,
+    "similitud": 0.2653,
+    "palabras": 31,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "scoreJaccard": 27.59,
+    "similitudJaccard": 0.1887,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "api_parcial",
+   "descripcion": "Semilla api (b429b3d5): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: POST /sessions → inicia la sesión, retorna 201 con { sesion_id, webrtc_room_id, primera_pregunta }. GET /sessions/{id}/question → obtiene la siguiente pregunta de la sesión. POST /sessions/{id}/answers → envía la respuesta a la pregunta actual (audio transcrito o texto). POST /sessions/{id}/finish → finaliza la sesión, lanza generación asíncrona del reporte, retorna 202 Accepted. GET /sessions/{id}/report → retorna el reporte (200 si listo, 202 si aún procesando con estado \"generando\"). Consideraciones: JWT para autenticación, versionado /api/v1/, paginación si aplica.",
+   "rubrica": {
+    "criterios": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Haría un endpoint para crear la sesión y otro para enviar las respuestas, protegidos con login.",
+   "notaHumana": 4.0,
+   "esperado": {
+    "score": 23.49,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.4286,
+    "similitud": 0.1242,
+    "palabras": 16,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "scoreJaccard": 17.99,
+    "similitudJaccard": 0.0377,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "api_floja",
+   "descripcion": "Semilla api (b429b3d5): floja",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: POST /sessions → inicia la sesión, retorna 201 con { sesion_id, webrtc_room_id, primera_pregunta }. GET /sessions/{id}/question → obtiene la siguiente pregunta de la sesión. POST /sessions/{id}/answers → envía la respuesta a la pregunta actual (audio transcrito o texto). POST /sessions/{id}/finish → finaliza la sesión, lanza generación asíncrona del reporte, retorna 202 Accepted. GET /sessions/{id}/report → retorna el reporte (200 si listo, 202 si aún procesando con estado \"generando\"). Consideraciones: JWT para autenticación, versionado /api/v1/, paginación si aplica.",
+   "rubrica": {
+    "criterios": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Haría un solo endpoint que devuelva todo y listo.",
+   "notaHumana": 1.5,
+   "esperado": {
+    "score": 15.08,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.2857,
+    "similitud": 0.0737,
+    "palabras": 9,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "propone_POST_para_crear",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "scoreJaccard": 11.64,
+    "similitudJaccard": 0.0196,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "api_fuera_de_tema",
+   "descripcion": "Semilla api (b429b3d5): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "Propuesta ideal: POST /sessions → inicia la sesión, retorna 201 con { sesion_id, webrtc_room_id, primera_pregunta }. GET /sessions/{id}/question → obtiene la siguiente pregunta de la sesión. POST /sessions/{id}/answers → envía la respuesta a la pregunta actual (audio transcrito o texto). POST /sessions/{id}/finish → finaliza la sesión, lanza generación asíncrona del reporte, retorna 202 Accepted. GET /sessions/{id}/report → retorna el reporte (200 si listo, 202 si aún procesando con estado \"generando\"). Consideraciones: JWT para autenticación, versionado /api/v1/, paginación si aplica.",
+   "rubrica": {
+    "criterios": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Para llegar al aeropuerto conviene tomar el metro y bajarse en la última estación.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 6.97,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1095,
+    "palabras": 14,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "propone_POST_para_crear",
+     "incluye_endpoint_pregunta",
+     "incluye_endpoint_respuesta",
+     "incluye_endpoint_finish",
+     "incluye_endpoint_reporte",
+     "considera_estado_asincrono",
+     "menciona_autenticacion"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "capas_excelente",
+   "descripcion": "Semilla capas (474da592): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Separaría en tres capas: presentación con Compose y un ViewModel que expone StateFlow, dominio con casos de uso e interfaces, y datos con repositorios y fuentes de datos, donde el repositorio oculta si la información viene de la API, de Room o de caché. La cámara se maneja con CameraX y el video con WebRTC desde un caso de uso. Inyectaría dependencias con Hilt. Atendería el ciclo de vida de la cámara abriéndola en onStart y liberándola en onStop, y procesaría los frames en Dispatchers.Default para no bloquear el hilo principal de la interfaz.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 48.18,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.6667,
+    "similitud": 0.3762,
+    "palabras": 95,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "considera_threads"
+    ],
+    "scoreJaccard": 47.3,
+    "similitudJaccard": 0.3623,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "capas_buena",
+   "descripcion": "Semilla capas (474da592): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Tres capas: presentación (Compose y ViewModel con StateFlow), dominio con casos de uso y datos con repositorios. La cámara con CameraX y las dependencias con Hilt. Los frames se procesan en un hilo aparte para no bloquear la UI.",
+   "notaHumana": 7.5,
+   "esperado": {
+    "score": 39.14,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.5556,
+    "similitud": 0.2976,
+    "palabras": 39,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "scoreJaccard": 34.47,
+    "similitudJaccard": 0.2241,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "capas_parcial",
+   "descripcion": "Semilla capas (474da592): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Usaría MVVM con un ViewModel y una pantalla en Compose que muestre la cámara.",
+   "notaHumana": 4.0,
+   "esperado": {
+    "score": 12.02,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.1389,
+    "similitud": 0.1095,
+    "palabras": 14,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "describe_3_capas_correctamente",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "scoreJaccard": 8.65,
+    "similitudJaccard": 0.0566,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "capas_floja",
+   "descripcion": "Semilla capas (474da592): floja",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Todo el código en la Activity principal, es más simple.",
+   "notaHumana": 1.5,
+   "esperado": {
+    "score": 5.45,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0857,
+    "palabras": 10,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "capas_fuera_de_tema",
+   "descripcion": "Semilla capas (474da592): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "El clima de hoy estará soleado con algo de viento por la tarde.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 5.3,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0833,
+    "palabras": 13,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "capas_identica_a_la_ideal",
+   "descripcion": "Texto igual a la respuesta ideal",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "notaHumana": 10.0,
+   "esperado": {
+    "score": 96.97,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.9167,
+    "similitud": 1.0,
+    "palabras": 72,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 96.97,
+    "similitudJaccard": 1.0,
+    "bandaJaccard": "APROBADA"
+   }
+  },
+  {
+   "id": "capas_ideal_mayusculas_sin_tildes",
+   "descripcion": "La ideal en MAYUSCULAS y sin tildes puntúa igual que la ideal",
+   "origen": "semilla",
+   "respuestaIdeal": "Capas: Presentation (ViewModel + Compose UI), Domain (UseCases + interfaces), Data (Repositories + datasources). ViewModel expone StateFlow/SharedFlow. El UseCase de simulación coordina: (1) CameraUseCase (CameraX + WebRTC), (2) QuestionUseCase (API), (3) MetricaUseCase (envío de frames). Repository pattern oculta si los datos vienen de API, Room o caché. Hilt para inyección de dependencias. Manejo del ciclo de vida de la cámara en onStart/onStop. Procesamiento de frames en Dispatchers.Default para no bloquear el UI thread.",
+   "rubrica": {
+    "criterios": [
+     "describe_3_capas_correctamente",
+     "menciona_ViewModel_StateFlow",
+     "describe_CameraX_o_WebRTC",
+     "menciona_DI_Hilt",
+     "considera_ciclo_vida_camara",
+     "considera_threads"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "CAPAS: PRESENTATION (VIEWMODEL + COMPOSE UI), DOMAIN (USECASES + INTERFACES), DATA (REPOSITORIES + DATASOURCES). VIEWMODEL EXPONE STATEFLOW/SHAREDFLOW. EL USECASE DE SIMULACION COORDINA: (1) CAMERAUSECASE (CAMERAX + WEBRTC), (2) QUESTIONUSECASE (API), (3) METRICAUSECASE (ENVIO DE FRAMES). REPOSITORY PATTERN OCULTA SI LOS DATOS VIENEN DE API, ROOM O CACHE. HILT PARA INYECCION DE DEPENDENCIAS. MANEJO DEL CICLO DE VIDA DE LA CAMARA EN ONSTART/ONSTOP. PROCESAMIENTO DE FRAMES EN DISPATCHERS.DEFAULT PARA NO BLOQUEAR EL UI THREAD.",
+   "notaHumana": 10.0,
+   "esperado": {
+    "score": 96.97,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.9167,
+    "similitud": 1.0,
+    "palabras": 72,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 96.97,
+    "similitudJaccard": 1.0,
+    "bandaJaccard": "APROBADA"
+   }
+  },
+  {
+   "id": "conflicto_excelente",
+   "descripcion": "Semilla conflicto (c4c8d31b): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR ideal: S: Contexto claro del proyecto y relación con el compañero. T: Conflicto específico (diferencia de criterio técnico, prioridades, comunicación). A: Acciones concretas tomadas: conversación directa, mediación, búsqueda de acuerdo, datos o argumentos usados. R: Resultado positivo: acuerdo alcanzado, relación mantenida, aprendizaje. No hablar mal del compañero. Mostrar empatía y enfoque en solución.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "En un proyecto de pagos trabajaba con un compañero que quería rehacer el módulo con otra tecnología y yo prefería mantenerlo por el plazo. El conflicto era una diferencia de criterio técnico a dos semanas de la entrega. Hablé con él directamente, le pedí que me explicara sus razones para entender su punto, preparé datos de esfuerzo y riesgo, y propuse un acuerdo: migrar solo la parte más crítica ahora y el resto después. Logramos el acuerdo, entregamos a tiempo y la relación mejoró; aprendí a escuchar antes de defender mi postura. No fue culpa de nadie, ambos buscábamos lo mejor para el producto.",
+   "notaHumana": 9.0,
+   "esperado": {
+    "score": 32.05,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.2778,
+    "similitud": 0.3449,
+    "palabras": 104,
+    "relacionLongitud": 0.4,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "situacion_clara",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada"
+    ],
+    "scoreJaccard": 17.42,
+    "similitudJaccard": 0.1149,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "conflicto_buena",
+   "descripcion": "Semilla conflicto (c4c8d31b): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR ideal: S: Contexto claro del proyecto y relación con el compañero. T: Conflicto específico (diferencia de criterio técnico, prioridades, comunicación). A: Acciones concretas tomadas: conversación directa, mediación, búsqueda de acuerdo, datos o argumentos usados. R: Resultado positivo: acuerdo alcanzado, relación mantenida, aprendizaje. No hablar mal del compañero. Mostrar empatía y enfoque en solución.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Con un compañero teníamos distinta opinión sobre cómo diseñar una API. Conversé con él para entender su postura, mostré datos y llegamos a un acuerdo que nos dejó a los dos conformes. El resultado fue positivo y seguimos trabajando bien.",
+   "notaHumana": 6.5,
+   "esperado": {
+    "score": 23.25,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.1667,
+    "similitud": 0.2702,
+    "palabras": 40,
+    "relacionLongitud": 0.15,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "scoreJaccard": 11.55,
+    "similitudJaccard": 0.0862,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "conflicto_parcial",
+   "descripcion": "Semilla conflicto (c4c8d31b): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR ideal: S: Contexto claro del proyecto y relación con el compañero. T: Conflicto específico (diferencia de criterio técnico, prioridades, comunicación). A: Acciones concretas tomadas: conversación directa, mediación, búsqueda de acuerdo, datos o argumentos usados. R: Resultado positivo: acuerdo alcanzado, relación mantenida, aprendizaje. No hablar mal del compañero. Mostrar empatía y enfoque en solución.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Una vez discutí con un compañero. Al final se resolvió solo y seguimos adelante.",
+   "notaHumana": 3.0,
+   "esperado": {
+    "score": 8.51,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.1337,
+    "palabras": 14,
+    "relacionLongitud": 0.05,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "scoreJaccard": 1.33,
+    "similitudJaccard": 0.0208,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "conflicto_floja_culpa_al_otro",
+   "descripcion": "Semilla conflicto (c4c8d31b): floja_culpa_al_otro",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR ideal: S: Contexto claro del proyecto y relación con el compañero. T: Conflicto específico (diferencia de criterio técnico, prioridades, comunicación). A: Acciones concretas tomadas: conversación directa, mediación, búsqueda de acuerdo, datos o argumentos usados. R: Resultado positivo: acuerdo alcanzado, relación mantenida, aprendizaje. No hablar mal del compañero. Mostrar empatía y enfoque en solución.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Mi compañero nunca hacía su parte y era su culpa que todo se atrasara, así que le avisé al jefe.",
+   "notaHumana": 1.5,
+   "esperado": {
+    "score": 10.71,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0556,
+    "similitud": 0.1365,
+    "palabras": 20,
+    "relacionLongitud": 0.08,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "scoreJaccard": 3.32,
+    "similitudJaccard": 0.0204,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "conflicto_fuera_de_tema",
+   "descripcion": "Semilla conflicto (c4c8d31b): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR ideal: S: Contexto claro del proyecto y relación con el compañero. T: Conflicto específico (diferencia de criterio técnico, prioridades, comunicación). A: Acciones concretas tomadas: conversación directa, mediación, búsqueda de acuerdo, datos o argumentos usados. R: Resultado positivo: acuerdo alcanzado, relación mantenida, aprendizaje. No hablar mal del compañero. Mostrar empatía y enfoque en solución.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Me gusta cocinar pasta con tomate los domingos.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 5.67,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0891,
+    "palabras": 8,
+    "relacionLongitud": 0.03,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "situacion_clara",
+     "tarea_o_conflicto_especifico",
+     "accion_propia_descrita",
+     "resultado_positivo",
+     "empatia_demostrada",
+     "no_culpa_al_otro"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "produccion_excelente",
+   "descripcion": "Semilla produccion (3459a6fd): excelente",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR estructurada: S: Sistema crítico en producción con usuarios afectados. T: Diagnóstico y restauración en tiempo mínimo. A: 1) Revisar logs inmediatamente (app + infra). 2) Verificar métricas: CPU, memoria, DB, red. 3) Identificar último despliegue o cambio. 4) Si hay rollback rápido disponible, ejecutarlo. 5) Comunicar estado al equipo y stakeholders. 6) Resolver causa raíz y documentar postmortem. R: Sistema restaurado, equipo informado, lección documentada.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Ante una caída en producción, primero reviso los logs de la aplicación y la infraestructura. Luego miro las métricas de CPU, memoria, base de datos y red, e identifico el último despliegue o cambio. Si existe un rollback rápido lo ejecuto para restaurar el servicio. Mantengo comunicado al equipo y a los stakeholders del estado, con calma, sin entrar en pánico. Cuando el sistema vuelve resuelvo la causa raíz y documento un postmortem con las lecciones.",
+   "notaHumana": 9.5,
+   "esperado": {
+    "score": 54.07,
+    "banda": "CERCANA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.8056,
+    "similitud": 0.3893,
+    "palabras": 76,
+    "relacionLongitud": 0.29,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "calma_bajo_presion"
+    ],
+    "scoreJaccard": 45.2,
+    "similitudJaccard": 0.25,
+    "bandaJaccard": "CERCANA"
+   }
+  },
+  {
+   "id": "produccion_buena",
+   "descripcion": "Semilla produccion (3459a6fd): buena",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR estructurada: S: Sistema crítico en producción con usuarios afectados. T: Diagnóstico y restauración en tiempo mínimo. A: 1) Revisar logs inmediatamente (app + infra). 2) Verificar métricas: CPU, memoria, DB, red. 3) Identificar último despliegue o cambio. 4) Si hay rollback rápido disponible, ejecutarlo. 5) Comunicar estado al equipo y stakeholders. 6) Resolver causa raíz y documentar postmortem. R: Sistema restaurado, equipo informado, lección documentada.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Revisaría los logs y las métricas, haría rollback del último despliegue si es necesario, y avisaría al equipo de lo que pasa. Después haría un postmortem.",
+   "notaHumana": 7.0,
+   "esperado": {
+    "score": 34.68,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.5833,
+    "similitud": 0.2117,
+    "palabras": 26,
+    "relacionLongitud": 0.1,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "comunicacion_stakeholders",
+     "calma_bajo_presion"
+    ],
+    "scoreJaccard": 28.76,
+    "similitudJaccard": 0.1186,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "produccion_parcial",
+   "descripcion": "Semilla produccion (3459a6fd): parcial",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR estructurada: S: Sistema crítico en producción con usuarios afectados. T: Diagnóstico y restauración en tiempo mínimo. A: 1) Revisar logs inmediatamente (app + infra). 2) Verificar métricas: CPU, memoria, DB, red. 3) Identificar último despliegue o cambio. 4) Si hay rollback rápido disponible, ejecutarlo. 5) Comunicar estado al equipo y stakeholders. 6) Resolver causa raíz y documentar postmortem. R: Sistema restaurado, equipo informado, lección documentada.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Trataría de reiniciar el servidor y avisaría a mi jefe.",
+   "notaHumana": 3.5,
+   "esperado": {
+    "score": 5.88,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0925,
+    "palabras": 10,
+    "relacionLongitud": 0.04,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "produccion_floja",
+   "descripcion": "Semilla produccion (3459a6fd): floja",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR estructurada: S: Sistema crítico en producción con usuarios afectados. T: Diagnóstico y restauración en tiempo mínimo. A: 1) Revisar logs inmediatamente (app + infra). 2) Verificar métricas: CPU, memoria, DB, red. 3) Identificar último despliegue o cambio. 4) Si hay rollback rápido disponible, ejecutarlo. 5) Comunicar estado al equipo y stakeholders. 6) Resolver causa raíz y documentar postmortem. R: Sistema restaurado, equipo informado, lección documentada.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "Esperaría a que alguien más lo arregle.",
+   "notaHumana": 1.0,
+   "esperado": {
+    "score": 3.72,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0584,
+    "palabras": 7,
+    "relacionLongitud": 0.03,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "produccion_fuera_de_tema",
+   "descripcion": "Semilla produccion (3459a6fd): fuera_de_tema",
+   "origen": "semilla",
+   "respuestaIdeal": "Respuesta STAR estructurada: S: Sistema crítico en producción con usuarios afectados. T: Diagnóstico y restauración en tiempo mínimo. A: 1) Revisar logs inmediatamente (app + infra). 2) Verificar métricas: CPU, memoria, DB, red. 3) Identificar último despliegue o cambio. 4) Si hay rollback rápido disponible, ejecutarlo. 5) Comunicar estado al equipo y stakeholders. 6) Resolver causa raíz y documentar postmortem. R: Sistema restaurado, equipo informado, lección documentada.",
+   "rubrica": {
+    "metodo": "STAR",
+    "criterios": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "puntaje_maximo": 10,
+    "duracion_esperada_seg": 120
+   },
+   "texto": "El domingo fui a la playa con mi familia y comimos helado.",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 4.95,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0779,
+    "palabras": 12,
+    "relacionLongitud": 0.05,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_logs_primero",
+     "menciona_metricas",
+     "considera_rollback",
+     "comunicacion_stakeholders",
+     "postmortem_mencionado",
+     "calma_bajo_presion"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "valvar_rubrica_completa_identica",
+   "descripcion": "Ideal con rúbrica sintética: palabras clave y criterio de objeto",
+   "origen": "sintetico",
+   "respuestaIdeal": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "rubrica": {
+    "palabras_clave": [
+     "inmutabilidad",
+     "reasignación",
+     "referencia de solo lectura"
+    ],
+    "criterios": [
+     {
+      "nombre": "distingue_val_var",
+      "terminos": [
+       "val",
+       "var"
+      ]
+     }
+    ],
+    "tiempo_esperado_seg": 60
+   },
+   "texto": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "notaHumana": 10.0,
+   "esperado": {
+    "score": 70.0,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.3333,
+    "coberturaCriterios": 1.0,
+    "similitud": 1.0,
+    "palabras": 43,
+    "relacionLongitud": 0.33,
+    "palabrasFaltantes": [
+     "inmutabilidad",
+     "reasignación"
+    ],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 70.0,
+    "similitudJaccard": 1.0,
+    "bandaJaccard": "APROBADA"
+   }
+  },
+  {
+   "id": "valvar_parcial_con_objeto_criterio",
+   "descripcion": "Criterio como objeto con términos, palabra clave de varias palabras y tiempo esperado",
+   "origen": "sintetico",
+   "respuestaIdeal": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "rubrica": {
+    "palabras_clave": [
+     "inmutabilidad",
+     "reasignación",
+     "referencia de solo lectura"
+    ],
+    "criterios": [
+     {
+      "nombre": "distingue_val_var",
+      "terminos": [
+       "val",
+       "var"
+      ]
+     }
+    ],
+    "tiempo_esperado_seg": 60
+   },
+   "texto": "val no se puede reasignar, es inmutable. var sí.",
+   "notaHumana": 6.0,
+   "esperado": {
+    "score": 25.44,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.0,
+    "coberturaCriterios": 1.0,
+    "similitud": 0.1556,
+    "palabras": 9,
+    "relacionLongitud": 0.07,
+    "palabrasFaltantes": [
+     "inmutabilidad",
+     "reasignación",
+     "referencia de solo lectura"
+    ],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 27.0,
+    "similitudJaccard": 0.2,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "valvar_semilla",
+   "descripcion": "Rúbrica real (solo criterios) de la semilla val/var",
+   "origen": "semilla",
+   "respuestaIdeal": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "rubrica": {
+    "criterios": [
+     "menciona_inmutabilidad",
+     "menciona_reasignacion",
+     "distingue_referencia_vs_estado"
+    ],
+    "puntaje_maximo": 10
+   },
+   "texto": "val es de solo lectura, una vez asignada no se puede reasignar, y var es una variable que sí puede cambiar de valor.",
+   "notaHumana": 8.0,
+   "esperado": {
+    "score": 22.63,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.3556,
+    "palabras": 23,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [
+     "menciona_inmutabilidad",
+     "menciona_reasignacion",
+     "distingue_referencia_vs_estado"
+    ],
+    "scoreJaccard": 24.48,
+    "similitudJaccard": 0.3846,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "borde_texto_vacio",
+   "descripcion": "Texto vacío",
+   "origen": "sintetico",
+   "respuestaIdeal": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "rubrica": {
+    "palabras_clave": [
+     "inmutabilidad",
+     "reasignación",
+     "referencia de solo lectura"
+    ],
+    "criterios": [
+     {
+      "nombre": "distingue_val_var",
+      "terminos": [
+       "val",
+       "var"
+      ]
+     }
+    ],
+    "tiempo_esperado_seg": 60
+   },
+   "texto": "",
+   "notaHumana": 0.0,
+   "esperado": {
+    "score": 0.0,
+    "banda": "REVISAR",
+    "evaluable": true,
+    "coberturaPalabrasClave": 0.0,
+    "coberturaCriterios": 0.0,
+    "similitud": 0.0,
+    "palabras": 0,
+    "relacionLongitud": 0.0,
+    "palabrasFaltantes": [
+     "inmutabilidad",
+     "reasignación",
+     "referencia de solo lectura"
+    ],
+    "criteriosFaltantes": [
+     "distingue_val_var"
+    ],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": 0.0,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "borde_sin_referencia",
+   "descripcion": "Sin respuesta ideal ni rúbrica: no evaluable, banda REVISAR",
+   "origen": "sintetico",
+   "respuestaIdeal": null,
+   "rubrica": {},
+   "texto": "Cualquier cosa que escriba la persona.",
+   "notaHumana": null,
+   "esperado": {
+    "score": 0.0,
+    "banda": "REVISAR",
+    "evaluable": false,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": null,
+    "similitud": null,
+    "palabras": 6,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 0.0,
+    "similitudJaccard": null,
+    "bandaJaccard": "REVISAR"
+   }
+  },
+  {
+   "id": "borde_solo_ideal",
+   "descripcion": "Solo respuesta ideal (sin rúbrica): puntúa por similitud",
+   "origen": "sintetico",
+   "respuestaIdeal": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "rubrica": {},
+   "texto": "val declara una referencia de solo lectura (inmutable): una vez asignada no puede reasignarse. var declara una referencia mutable que puede cambiar de valor. Ambos pueden referenciar objetos cuyo estado interno puede mutar; la diferencia está en la referencia, no en el objeto.",
+   "notaHumana": 10.0,
+   "esperado": {
+    "score": 100.0,
+    "banda": "APROBADA",
+    "evaluable": true,
+    "coberturaPalabrasClave": null,
+    "coberturaCriterios": null,
+    "similitud": 1.0,
+    "palabras": 43,
+    "relacionLongitud": null,
+    "palabrasFaltantes": [],
+    "criteriosFaltantes": [],
+    "scoreJaccard": 100.0,
+    "similitudJaccard": 1.0,
+    "bandaJaccard": "APROBADA"
+   }
+  }
+ ]
+}

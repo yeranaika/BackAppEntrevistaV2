@@ -7,7 +7,9 @@ import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
 import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
@@ -88,8 +90,24 @@ class RepositorioUsuarioExposed : RepositorioUsuario, LectorUsuarioSesion {
 
     override suspend fun actualizarEstado(id: UUID, estado: String) = actualizar(id) { it[TablaUsuario.estado] = estado }
 
-    // ON DELETE CASCADE en la BD borra sesiones, perfil, objetivos, consentimientos y suscripciones.
+    /**
+     * Borra la cuenta y todos sus datos, salvo el registro de consentimiento (prueba de que aceptó los términos).
+     * Todo en una transacción: o se borra la cuenta con el consentimiento ya desligado, o no cambia nada.
+     * En PostgreSQL el resto lo borra ON DELETE CASCADE (perfil, sesiones, métricas, predicciones, suscripciones...);
+     * sesiones y métricas se borran también explícitamente para no depender solo de las FK.
+     */
     override suspend fun eliminar(id: UUID): Boolean = transaccion {
+        val correoUsuario = TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq id }.limit(1)
+            .firstOrNull()?.get(TablaUsuario.correo) ?: return@transaccion false
+        // Desliga el consentimiento del usuario y deja el correo como identidad antes de que la fila deje de existir.
+        TablaConsentimiento.update({ TablaConsentimiento.usuarioId eq id }) {
+            it[identidadRef] = correoUsuario
+            it[usuarioId] = null
+        }
+        val sesiones = TablaSesionEntrevista.select(TablaSesionEntrevista.sesionId)
+            .where { TablaSesionEntrevista.usuarioId eq id }
+        TablaMetricaVideo.deleteWhere { sesionId inSubQuery sesiones }
+        TablaSesionEntrevista.deleteWhere { usuarioId eq id }
         TablaUsuario.deleteWhere { usuarioId eq id } > 0
     }
 

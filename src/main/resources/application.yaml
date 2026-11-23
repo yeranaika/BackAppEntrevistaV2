@@ -3,7 +3,7 @@ ktor:
     modules:
       - ApplicationKt.module
   deployment:
-    port: 8080
+    port: 8093
     # Netty (ms): período de gracia y tope para las solicitudes en curso al apagar. La espera de reportes y correos va
     # aparte (APAGADO_ESPERA_TAREAS_SEGUNDOS, D20). Todo tiene que caber en RAILWAY_DEPLOYMENT_DRAINING_SECONDS.
     shutdownGracePeriod: 1000
@@ -28,3 +28,7 @@ google:
     package: ${?GOOGLE_PLAY_PACKAGE}
     serviceJsonB64: ${?GOOGLE_PLAY_SERVICE_JSON_B64}
     billingMock: ${?GOOGLE_PLAY_BILLING_MOCK}
+
+vision:
+  # Motor de inferencia (módulo :motor-vision). Sin definir: http://localhost:8094/predict
+  motorEndpoint: ${?MOTOR_ENDPOINT}

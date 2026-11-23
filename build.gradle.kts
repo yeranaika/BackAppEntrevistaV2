@@ -61,6 +61,8 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
     testImplementation("io.ktor:ktor-client-mock:3.3.1")
     testImplementation("com.h2database:h2:2.3.232")
+    // Solo pruebas: el motor real (modelo ONNX) para probar /health y la cadena backend -> motor. En producción no se carga aquí.
+    testImplementation(project(":motor-vision"))
 
     // serialización JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -101,4 +103,8 @@ dependencies {
 
     // Excel Export
     implementation("org.apache.poi:poi-ooxml:5.2.5")
+
+    // Contrato, errores y validación de visión compartidos con el motor. El modelo ONNX NO se carga aquí: lo hace
+    // :motor-vision (otro proceso) y el backend lo consulta por HTTP (MOTOR_ENDPOINT).
+    implementation(project(":nucleo-vision"))
 }

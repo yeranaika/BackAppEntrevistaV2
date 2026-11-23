@@ -1,6 +1,7 @@
 package PRUEBAS
 
 import CONFIGURACION.EstadoFreemiumReadiness
+import CONFIGURACION.VERSION_MODELO_DIVLARA
 import CONTROLADORES.controladorSalud
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -10,9 +11,14 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PruebaDisponibilidadFreemium {
@@ -24,8 +30,13 @@ class PruebaDisponibilidadFreemium {
         val antes = client.get("/ready")
         assertEquals(HttpStatusCode.ServiceUnavailable, antes.status)
         assertEquals("""{"status":"warming"}""", antes.bodyAsText())
-        assertEquals(HttpStatusCode.OK, client.get("/health").status)
-        assertEquals("OK", client.get("/health").bodyAsText())
+        val salud = client.get("/health")
+        assertEquals(HttpStatusCode.OK, salud.status)
+        val cuerpoSalud = Json.parseToJsonElement(salud.bodyAsText()).jsonObject
+        assertEquals("OK", cuerpoSalud["status"]?.jsonPrimitive?.content)
+        val modelo = cuerpoSalud["modeloDivlara"]?.jsonObject
+        assertEquals(VERSION_MODELO_DIVLARA, modelo?.get("version")?.jsonPrimitive?.content)
+        assertFalse(modelo?.get("cargado")?.jsonPrimitive?.boolean ?: true)
 
         disponibilidad.completar(LoggerFactory.getLogger("test.readiness")) { }
         val despues = client.get("/ready")

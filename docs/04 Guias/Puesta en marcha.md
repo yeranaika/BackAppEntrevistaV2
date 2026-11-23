@@ -1,7 +1,7 @@
 ---
 tipo: guia
 tags: [guia, setup, local]
-actualizado: 2026-11-07
+actualizado: 2026-11-19
 ---
 
 # Puesta en marcha
@@ -42,7 +42,7 @@ cd src/DB && docker compose up -d        # primera vez: crea el esquema y carga 
 ```
 Si la BD ya existía de antes, aplicar las migraciones pendientes (son idempotentes):
 ```bash
-for m in migrations/0{14,15,16,17,18,19,20,21,22}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
+for m in migrations/0{14,15,16,17,18,19,20,21,22,23}_*.sql; do docker exec -i Entrevista_APP psql -U root -d DBentrevista -v ON_ERROR_STOP=1 < "$m"; done
 ```
 La **022** (`rubrica_snap`, D24) tiene que estar aplicada **antes** de desplegar el código que la lee, en local y en
 Railway: sin ella fallan los endpoints de entrevista y el reporte. **Volver a correrla una vez desplegado**: es
@@ -60,9 +60,23 @@ pwsh src/DB/PROBAR_SEMILLA.ps1 -Bin C:\ruta\pgsql\bin -Puerto 5432   # termina c
 
 ## 3. Ejecutar
 ```bash
-./gradlew run                       # http://localhost:8080 ; GET /health → OK ; GET /ready → 200 al terminar el calentamiento
+./gradlew run                       # http://localhost:8080 ; GET /health → 200 JSON (con modeloDivlara) ; GET /ready → 200 al terminar el calentamiento
 ```
-En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `OK` mientras el proceso esté vivo. `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
+En Railway, configura el healthcheck del despliegue para usar **`/ready`**. `/health` es solo liveness y responde `200` con `{"status":"OK","modeloDivlara":{"version":"divlara-resnet-v1","cargado":false}}` mientras el proceso esté vivo (incluso si falta el artefacto del modelo o falla su carga). `FREEMIUM_HTTP_WARMUP=0` desactiva el calentamiento y deja `/ready` disponible desde el arranque.
+
+### Modelo de visión DivLara (instalación del artefacto y contrato)
+El modelo DivLara se empaqueta **dentro del proyecto del backend** en `models/divlara-resnet-v1/` (nunca en carpetas externas). Al arrancar, `CargadorModeloDivlara` busca una sola vez `models/divlara-resnet-v1/modelo.onnx`:
+
+- **Sin artefacto instalado** (estado mientras R-2 termina el entrenamiento en `training_runs/resnet_v1/`): el cargador queda en `NO_DISPONIBLE`, el backend arranca sin errores y `GET /health` reporta `modeloDivlara.cargado = false`.
+- **Instalación al recibir el artefacto de R-2**:
+  1. Si R-2 entrega un checkpoint PyTorch (`.pt`/`.pth`), exportarlo a **ONNX** (para usar `onnxruntime` liviano en JVM en T3.1).
+  2. Copiar el archivo en `models/divlara-resnet-v1/modelo.onnx` (los binarios están en `.gitignore`, no se suben a Git).
+  3. Actualizar `models/divlara-resnet-v1/MANIFIESTO.json` con `sha256`, `tamanoEsperadoBytes`, dimensiones `T`/`N` y **CRÍTICO**: la `media` y `std` exactas usadas en el entrenamiento de DivLARA.
+  4. Reiniciar el backend y verificar con `curl http://localhost:8080/health` que `modeloDivlara.cargado` sea `true` (sin campo `error`).
+- **Contrato de inferencia** (detalle completo en `models/divlara-resnet-v1/MANIFIESTO.json` y `models/divlara-resnet-v1/README.md`):
+  - **Entrada**: tensor `float32` de landmarks faciales MediaPipe por ventana temporal (~500 ms) con forma `[T, N, 3]`, orden canónico `0..N-1` y coordenadas `(x, y)` normalizadas `[0, 1]` + `z` relativa al ancho; procesamiento efímero en RAM (0 días, sin video crudo, P-1 / P-4).
+  - **Normalización**: z-score `(x - media) / (std + eps)` con parámetros exactos del entrenamiento.
+  - **Salidas**: métricas observables sin emociones (`RNF10` / `D22`) etiquetadas con `versionModelo = divlara-resnet-v1` (`RNF08`): `contactoVisual` (`0..100`), `postura` (`0..100`), `confianza` (`0..100`, nullable) y `gestos` restringidos a `GESTOS_OBSERVABLES` (`toca_cara`, `manos_visibles`, `gesticula_manos`, `movimiento_cabeza`, `cabeza_inclinada`, `mirada_fuera`, `rostro_visible`).
 
 ### Apagado ordenado en Railway (D20)
 - `railway.json` fija `deploy.drainingSeconds: 200`: Railway espera hasta 200 s entre SIGTERM y SIGKILL (por defecto da 0).

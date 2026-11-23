@@ -60,6 +60,8 @@ object TablaMetricaVideo : Table("metrica_video") {
     val confianza = decimal("confianza_score", 5, 2).nullable()
     val gestos = jsonb("gestos_detectados", Json, JsonObject.serializer()).nullable()
     val expresionDominante = varchar("expresion_dominante", 20).nullable()
+    /** Versión del modelo de visión que produjo esta métrica (RNF08, migración 023). */
+    val versionModelo = varchar("version_modelo", 50).nullable()
 
     override val primaryKey = PrimaryKey(metricaId)
 

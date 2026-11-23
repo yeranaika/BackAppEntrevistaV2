@@ -94,7 +94,7 @@ Estado del servicio.
 
 `GET /health` · Pública · responde `200`
 
-Liveness del proceso: responde `OK` mientras el servidor siga vivo, aunque una dependencia esté fallando. No usar como healthcheck de disponibilidad.
+Liveness del proceso: responde `200` en JSON mientras el servidor siga vivo, aunque una dependencia o el modelo de visión no estén disponibles. Incluye `modeloDivlara: { version, cargado, error? }` (campo `error` solo cuando existen los artefactos y falla su carga). Ejemplo sin artefactos: `{"status":"OK","modeloDivlara":{"version":"divlara-e14-mlp","cargado":false}}`. No usar como healthcheck de disponibilidad. Contrato de inferencia del modelo guía E14: `models/divlara-e14-mlp/MANIFIESTO.json`.
 
 ### Disponibilidad
 
@@ -820,6 +820,8 @@ Simulación pregunta a pregunta.
 | `GET` | `/api/v1/entrevistas/{{sesionId}}/siguiente` | Usuario | Siguiente pregunta |
 | `POST` | `/api/v1/entrevistas/{{sesionId}}/respuestas` | Usuario | Responder pregunta |
 | `POST` | `/api/v1/entrevistas/{{sesionId}}/metricas` | Usuario | Enviar métricas de video |
+| `POST` | `/api/v1/vision/predecir` | Usuario | Predecir conductas observables (DivLara E14) |
+| `GET` | `/api/v1/vision/reporte/{{sesionId}}` | Usuario | Reporte de la simulación (texto tabulado) |
 | `GET` | `/api/v1/entrevistas/{{sesionId}}` | Usuario | Detalle de la entrevista |
 | `POST` | `/api/v1/entrevistas/{{sesionId}}/finalizar` | Usuario | Finalizar entrevista |
 | `GET` | `/api/v1/entrevistas` | Usuario | Historial de entrevistas |
@@ -865,7 +867,7 @@ En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https e
 
 `POST /api/v1/entrevistas/{{sesionId}}/metricas` · Usuario · responde `201`
 
-Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible).
+Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`.
 
 ```json
 {
@@ -890,6 +892,27 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
   ]
 }
 ```
+
+### Predecir conductas observables (DivLara E14)
+
+`POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `503`
+
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+
+```json
+{
+  "features": [
+    0.0,
+    0.0
+  ]
+}
+```
+
+### Reporte de la simulación (texto tabulado)
+
+`GET /api/v1/vision/reporte/{{sesionId}}` · Usuario · responde `200`, `404`
+
+Responde `text/plain` (no JSON): cabecera (sesión, duración, predicciones), **línea de tiempo** de tramos continuos de una misma acción `hh:mm:ss  hh:mm:ss  ACCION  DUR` y **resumen por acción** (veces, total, máximo y promedio por tramo; orden por tiempo total descendente), con columnas de ancho fijo. Una acción es la variable del modelo con mayor valor en ese instante si llega a 4.0 de 8; antes de la primera predicción se muestra `(esperando ventana)` y sin ninguna sobre el umbral `(sin accion reconocida)`. Sin datos: `sin predicciones registradas para esta sesion`. Solo el dueño de la sesión (`404 entrevista_no_encontrada` si no). Las predicciones se guardan con `POST /api/v1/vision/predecir` + `sesionId` y se borran con `POST /api/v1/entrevistas/{id}/borrar`.
 
 ### Detalle de la entrevista
 
@@ -965,6 +988,11 @@ Rondas de preguntas escritas (sin video) con feedback inmediato.
 | `GET` | `/api/v1/practicas` | Usuario | Mis prácticas |
 | `GET` | `/api/v1/pruebas/historial` | Usuario | Historial de todas las pruebas |
 | `POST` | `/api/v1/sync/attempts` | Usuario | Sincronizar intentos offline |
+| `GET` | `/api/v1/revision-local/preguntas?cantidad=20` | Usuario | Preguntas abiertas para revisar sin conexión |
+| `POST` | `/api/v1/revision-local/respuestas` | Usuario | Subir respuestas revisadas sin conexión |
+| `POST` | `/api/v1/llamadas` | Usuario | Guardar una llamada en vivo |
+| `GET` | `/api/v1/llamadas?pagina=1&tamano=20` | Usuario | Historial de llamadas |
+| `GET` | `/api/v1/llamadas/{{llamadaId}}` | Usuario | Detalle de una llamada |
 | `POST` | `/api/v1/practice/evaluate-freemium` | Usuario | Evaluar texto (freemium) |
 
 ### Iniciar práctica
@@ -1045,6 +1073,82 @@ Idempotente por `localAttemptId`. Requiere un `skillId` existente (si no hay ski
   ]
 }
 ```
+
+### Preguntas abiertas para revisar sin conexión
+
+`GET /api/v1/revision-local/preguntas?cantidad=20` · Usuario · responde `200`
+
+T3.13, **sin IA**. Preguntas `abierta_texto` aprobadas, al azar, **con** `respuestaIdeal` y `rubrica` (a diferencia de `GET /api/v1/preguntas`, que no las manda): la app las guarda y revisa el texto en el teléfono sin internet. Filtros `nivel`, `categoria`, `cantidad` (1-50, por defecto 20; `400 cantidad_invalida`). Responde `{ versionRevisor, preguntas: [{ id, tipo, categoria, nivel, enunciado, respuestaIdeal, rubrica }] }`; `versionRevisor` cambia si cambia la fórmula.
+
+### Subir respuestas revisadas sin conexión
+
+`POST /api/v1/revision-local/respuestas` · Usuario · responde `200`, `400`
+
+T3.13, **sin IA**. Solo texto (nunca audio ni video). El servidor repite la revisión léxica con la **misma fórmula** de la app (puntaje 0-100 y banda APROBADA ≥ 70 / CERCANA ≥ 40 / REVISAR) y guarda la suya: `scoreServidor` es el que vale; `coincide` avisa si el puntaje del teléfono (`scoreLocal`/`bandaLocal`, opcionales) es el mismo. Idempotente por `idLocal` y usuario: un reenvío responde `estado: ya_recibida` sin duplicar. Por respuesta `estado` es `guardada`, `ya_recibida` o `rechazada` (la pregunta ya no está disponible: la app no debe reintentar). Hasta 100 por lote; `400` con `lote_vacio`, `lote_demasiado_grande`, `id_local_invalido`, `id_local_repetido`, `pregunta_invalida`, `texto_vacio`, `texto_demasiado_largo` (4000) o `puntaje_invalido`; un lote con algo malformado no guarda nada.
+
+```json
+{
+  "respuestas": [
+    {
+      "idLocal": "local-{{$timestamp}}",
+      "preguntaId": "{{preguntaId}}",
+      "texto": "Uso cache-aside con Redis y un TTL.",
+      "scoreLocal": 50.0,
+      "bandaLocal": "CERCANA",
+      "revisadoEnMs": 1700000000000
+    }
+  ]
+}
+```
+
+### Guardar una llamada en vivo
+
+`POST /api/v1/llamadas` · Usuario · responde `200`, `201`
+
+T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.
+
+```json
+{
+  "idLocal": "llamada-{{$timestamp}}",
+  "fechaInicioMs": 1700000000000,
+  "duracionSeg": 120,
+  "preguntasCnt": 3,
+  "resumen": {
+    "acciones": [
+      {
+        "accion": "head_nodding",
+        "veces": 2,
+        "totalMs": 9000,
+        "maximoMs": 6000
+      }
+    ],
+    "linea": [
+      {
+        "inicioMs": 0,
+        "finMs": 3000,
+        "accion": "sin_accion"
+      },
+      {
+        "inicioMs": 3000,
+        "finMs": 9000,
+        "accion": "head_nodding"
+      }
+    ]
+  }
+}
+```
+
+### Historial de llamadas
+
+`GET /api/v1/llamadas?pagina=1&tamano=20` · Usuario · responde `200`
+
+T3.15. Llamadas del usuario, la más reciente primero. Responde `{ elementos: [{ id, idLocal, fechaInicioMs, duracionSeg, preguntasCnt, accionesCnt }], total, pagina, tamano }`.
+
+### Detalle de una llamada
+
+`GET /api/v1/llamadas/{{llamadaId}}` · Usuario · responde `200`
+
+T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo). `404 llamada_no_encontrada` si no existe o es de otro usuario.
 
 ### Evaluar texto (freemium)
 
@@ -1394,7 +1498,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 141 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 155 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1418,23 +1522,27 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `dia_invalido` | Día no válido: … |
 | 400 | `dias_invalidos` | days no puede ser negativo |
 | 400 | `dias_requeridos` | Elige al menos un día |
+| 400 | `duracion_invalida` | duracionSeg debe estar entre 0 y … |
 | 400 | `duracion_requerida` | Define days > 0 o expires_at |
 | 400 | `enunciado_invalido` | El enunciado es obligatorio (hasta … caracteres) |
 | 400 | `enunciado_requerido` | El enunciado es obligatorio |
 | 400 | `estado_invalido` | Estado debe ser pendiente, aprobada o rechazada |
 | 400 | `etiqueta_invalida` | label no puede superar … caracteres |
 | 400 | `expiracion_invalida` | expires_at debe venir en ISO-8601 (ej: 2026-01-31T23:59:59Z) |
+| 400 | `fecha_invalida` | fechaInicioMs debe ser una fecha válida |
 | 400 | `genero_invalido` | Género no válido |
 | 400 | `hora_invalida` | La hora debe tener formato HH:mm (00:00 a 23:59) |
-| 400 | `id_invalido` | Formato de UUID inválido |
-| 400 | `id_local_invalido` | localAttemptId es obligatorio (hasta … caracteres) |
+| 400 | `id_invalido` | sesionId no es un UUID válido |
+| 400 | `id_local_invalido` | idLocal debe tener entre 1 y … caracteres |
 | 400 | `id_local_repetido` | Hay intentos repetidos en el lote |
 | 400 | `id_requerido` | Falta el parámetro … |
 | 400 | `idioma_invalido` | Idioma no soportado |
 | 400 | `invalid_uuid` | Identificador con formato inválido |
 | 400 | `licencia_invalida` | licenseType debe ser PROM, INST o GOOG |
 | 400 | `limite_invalido` | El límite debe estar entre 1 y … |
+| 400 | `lote_demasiado_grande` | Se pueden subir hasta … respuestas por vez |
 | 400 | `lote_invalido` | Envía entre 1 y … métricas por solicitud |
+| 400 | `lote_vacio` | No hay respuestas que subir |
 | 400 | `max_usos_invalido` | max_uses debe ser al menos 1 |
 | 400 | `metrica_fuera_de_rango` | Los puntajes de video van de 0 a 100 |
 | 400 | `metrica_invalida` | timestampMs no puede ser negativo |
@@ -1464,15 +1572,20 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `palabras_clave_invalidas` | Se admiten hasta … palabras clave |
 | 400 | `parametro_invalido` | El parámetro … debe ser un número |
 | 400 | `password_too_long` | La contraseña no puede superar … caracteres |
+| 400 | `pregunta_invalida` | preguntaId no es un UUID |
 | 400 | `pregunta_no_aprobada` | Solo se pueden usar preguntas aprobadas (…) |
 | 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
 | 400 | `pregunta_repetida` | Cada pregunta se responde una sola vez |
 | 400 | `pregunta_sesion_id_invalido` | El id de la pregunta no es válido |
+| 400 | `preguntas_invalidas` | preguntasCnt debe estar entre 0 y … |
+| 400 | `puntaje_invalido` | scoreLocal debe estar entre 0 y 100 |
 | 400 | `rango_invalido` | La fecha 'hasta' no puede ser anterior a 'desde' |
 | 400 | `respuesta_ideal_o_rubrica_requerida` | Indica una respuesta ideal o una rúbrica para evaluarla |
 | 400 | `respuesta_muy_larga` | La respuesta admite hasta … caracteres |
 | 400 | `respuesta_requerida` | Escribe tu respuesta |
 | 400 | `respuestas_invalidas` | Cada intento lleva entre 1 y … respuestas |
+| 400 | `resumen_demasiado_grande` | El resumen no puede superar … elementos |
+| 400 | `resumen_invalido` | El resumen trae tiempos o conteos negativos |
 | 400 | `rol_invalido` | El rol debe ser 'user' o 'admin' |
 | 400 | `sector_invalido` | El sector no puede superar … caracteres |
 | 400 | `sin_respuestas` | Responde al menos una pregunta |
@@ -1480,8 +1593,11 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `skill_no_encontrada` | La skill del intento … no existe |
 | 400 | `tamano_invalido` | El tamaño de página debe estar entre 1 y … |
 | 400 | `telefono_invalido` | El teléfono no tiene un formato válido |
+| 400 | `texto_demasiado_largo` | La respuesta no puede superar … caracteres |
 | 400 | `texto_muy_largo` | Los textos admiten hasta … caracteres |
+| 400 | `texto_vacio` | La respuesta no puede estar vacía |
 | 400 | `tiempo_invalido` | El tiempo de respuesta debe estar entre 0 y 1 hora |
+| 400 | `timestamp_invalido` | timestampMs debe ser mayor o igual a cero |
 | 400 | `tipo_invalido` | Tipo debe ser opcion_multiple, abierta_texto o simulacion_video |
 | 400 | `tipo_practica_invalido` | El tipo de práctica es obligatorio y de hasta … caracteres |
 | 400 | `tipo_prueba_no_soportado` | El tipo de prueba debe ser ENT (entrevista), PR o BL (práctica) o NV (nivelación) |
@@ -1502,6 +1618,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 404 | `cargo_not_found` | No se encontró el cargo especificado |
 | 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |
 | 404 | `entrevista_no_encontrada` | La entrevista no existe |
+| 404 | `llamada_no_encontrada` | La llamada no existe |
 | 404 | `nivelacion_no_encontrada` | El test de nivelación no existe |
 | 404 | `objetivo_not_found` | El usuario no tiene un objetivo activo |
 | 404 | `onboarding_not_found` | No se encontró información de onboarding |
@@ -1518,6 +1635,7 @@ Los 141 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `cargo_existente` | Ya existe un cargo con ese nombre |
 | 409 | `compra_ya_registrada` | Esta compra ya está asociada a otra cuenta |
 | 409 | `email_in_use` | Ese correo ya está registrado |
+| 409 | `entrevista_en_curso` | Finaliza o cancela la entrevista antes de borrar sus datos de video |
 | 409 | `entrevista_en_progreso` | Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra |
 | 409 | `entrevista_no_activa` | La entrevista ya fue finalizada o cancelada |
 | 409 | `entrevista_no_finalizada` | El reporte estará disponible cuando finalices la entrevista |

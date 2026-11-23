@@ -103,3 +103,18 @@ Desktop.ini
 docs/.obsidian/workspace.json
 docs/.obsidian/workspace-mobile.json
 docs/.obsidian/cache
+
+# Artefactos binarios de modelos ML (el contrato y README sí van en git)
+models/**/*.onnx
+models/**/*.onnx.data
+models/**/*.pt
+models/**/*.pth
+models/**/*.bin
+models/**/*.joblib
+
+# Vídeos de prueba subidos por la app (no se versionan)
+pruebas/
+
+# Herramientas locales y volcados
+.opencode/
+dumps/

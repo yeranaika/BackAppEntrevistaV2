@@ -148,7 +148,7 @@
                 "health"
               ]
             },
-            "description": "Liveness del proceso: responde `OK` mientras el servidor siga vivo, aunque una dependencia esté fallando. No usar como healthcheck de disponibilidad.",
+            "description": "Liveness del proceso: responde `200` en JSON mientras el servidor siga vivo, aunque una dependencia o el modelo de visión no estén disponibles. Incluye `modeloDivlara: { version, cargado, error? }` (campo `error` solo cuando existen los artefactos y falla su carga). Ejemplo sin artefactos: `{\"status\":\"OK\",\"modeloDivlara\":{\"version\":\"divlara-e14-mlp\",\"cargado\":false}}`. No usar como healthcheck de disponibilidad. Contrato de inferencia del modelo guía E14: `models/divlara-e14-mlp/MANIFIESTO.json`.",
             "auth": {
               "type": "noauth"
             }
@@ -2719,7 +2719,7 @@
                 "metricas"
               ]
             },
-            "description": "Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible).",
+            "description": "Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"metricas\": [\n    {\n      \"timestampMs\": 0,\n      \"contactoVisual\": 80.5,\n      \"postura\": 70\n    },\n    {\n      \"timestampMs\": 500,\n      \"contactoVisual\": 78,\n      \"postura\": 72,\n      \"gestos\": {\n        \"toca_cara\": 0,\n        \"mirada_fuera\": 0.25\n      }\n    },\n    {\n      \"timestampMs\": 1000\n    }\n  ]\n}",
@@ -2743,6 +2743,74 @@
               }
             }
           ]
+        },
+        {
+          "name": "Predecir conductas observables (DivLara E14)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vision/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vision",
+                "predecir"
+              ]
+            },
+            "description": "El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": [\n    0.0,\n    0.0\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte de la simulación (texto tabulado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vision/reporte/{{sesionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vision",
+                "reporte",
+                "{{sesionId}}"
+              ]
+            },
+            "description": "Responde `text/plain` (no JSON): cabecera (sesión, duración, predicciones), **línea de tiempo** de tramos continuos de una misma acción `hh:mm:ss  hh:mm:ss  ACCION  DUR` y **resumen por acción** (veces, total, máximo y promedio por tramo; orden por tiempo total descendente), con columnas de ancho fijo. Una acción es la variable del modelo con mayor valor en ese instante si llega a 4.0 de 8; antes de la primera predicción se muestra `(esperando ventana)` y sin ninguna sobre el umbral `(sin accion reconocida)`. Sin datos: `sin predicciones registradas para esta sesion`. Solo el dueño de la sesión (`404 entrevista_no_encontrada` si no). Las predicciones se guardan con `POST /api/v1/vision/predecir` + `sesionId` y se borran con `POST /api/v1/entrevistas/{id}/borrar`."
+          }
         },
         {
           "name": "Detalle de la entrevista",
@@ -3207,6 +3275,162 @@
               }
             }
           ]
+        },
+        {
+          "name": "Preguntas abiertas para revisar sin conexión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/revision-local/preguntas?cantidad=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "revision-local",
+                "preguntas?cantidad=20"
+              ]
+            },
+            "description": "T3.13, **sin IA**. Preguntas `abierta_texto` aprobadas, al azar, **con** `respuestaIdeal` y `rubrica` (a diferencia de `GET /api/v1/preguntas`, que no las manda): la app las guarda y revisa el texto en el teléfono sin internet. Filtros `nivel`, `categoria`, `cantidad` (1-50, por defecto 20; `400 cantidad_invalida`). Responde `{ versionRevisor, preguntas: [{ id, tipo, categoria, nivel, enunciado, respuestaIdeal, rubrica }] }`; `versionRevisor` cambia si cambia la fórmula."
+          }
+        },
+        {
+          "name": "Subir respuestas revisadas sin conexión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/revision-local/respuestas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "revision-local",
+                "respuestas"
+              ]
+            },
+            "description": "T3.13, **sin IA**. Solo texto (nunca audio ni video). El servidor repite la revisión léxica con la **misma fórmula** de la app (puntaje 0-100 y banda APROBADA ≥ 70 / CERCANA ≥ 40 / REVISAR) y guarda la suya: `scoreServidor` es el que vale; `coincide` avisa si el puntaje del teléfono (`scoreLocal`/`bandaLocal`, opcionales) es el mismo. Idempotente por `idLocal` y usuario: un reenvío responde `estado: ya_recibida` sin duplicar. Por respuesta `estado` es `guardada`, `ya_recibida` o `rechazada` (la pregunta ya no está disponible: la app no debe reintentar). Hasta 100 por lote; `400` con `lote_vacio`, `lote_demasiado_grande`, `id_local_invalido`, `id_local_repetido`, `pregunta_invalida`, `texto_vacio`, `texto_demasiado_largo` (4000) o `puntaje_invalido`; un lote con algo malformado no guarda nada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"respuestas\": [\n    {\n      \"idLocal\": \"local-{{$timestamp}}\",\n      \"preguntaId\": \"{{preguntaId}}\",\n      \"texto\": \"Uso cache-aside con Redis y un TTL.\",\n      \"scoreLocal\": 50.0,\n      \"bandaLocal\": \"CERCANA\",\n      \"revisadoEnMs\": 1700000000000\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guardar una llamada en vivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/llamadas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "llamadas"
+              ]
+            },
+            "description": "T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idLocal\": \"llamada-{{$timestamp}}\",\n  \"fechaInicioMs\": 1700000000000,\n  \"duracionSeg\": 120,\n  \"preguntasCnt\": 3,\n  \"resumen\": {\n    \"acciones\": [\n      {\n        \"accion\": \"head_nodding\",\n        \"veces\": 2,\n        \"totalMs\": 9000,\n        \"maximoMs\": 6000\n      }\n    ],\n    \"linea\": [\n      {\n        \"inicioMs\": 0,\n        \"finMs\": 3000,\n        \"accion\": \"sin_accion\"\n      },\n      {\n        \"inicioMs\": 3000,\n        \"finMs\": 9000,\n        \"accion\": \"head_nodding\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
+                  "    const j = pm.response.json();",
+                  "    pm.collectionVariables.set(\"llamadaId\", j.id);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.code !== 204) {",
+                  "    pm.test(\"Responde un mensaje de éxito\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\").and.not.empty);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de llamadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/llamadas?pagina=1&tamano=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "llamadas?pagina=1&tamano=20"
+              ]
+            },
+            "description": "T3.15. Llamadas del usuario, la más reciente primero. Responde `{ elementos: [{ id, idLocal, fechaInicioMs, duracionSeg, preguntasCnt, accionesCnt }], total, pagina, tamano }`."
+          }
+        },
+        {
+          "name": "Detalle de una llamada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/llamadas/{{llamadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "llamadas",
+                "{{llamadaId}}"
+              ]
+            },
+            "description": "T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo). `404 llamada_no_encontrada` si no existe o es de otro usuario."
+          }
         },
         {
           "name": "Evaluar texto (freemium)",

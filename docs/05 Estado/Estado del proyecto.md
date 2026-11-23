@@ -1,7 +1,7 @@
 ---
 tipo: estado
 tags: [estado, fases, ramas]
-actualizado: 2026-11-17
+actualizado: 2026-11-20
 ---
 
 # Estado del proyecto
@@ -38,6 +38,9 @@ actualizado: 2026-11-17
 | Cupo de reportes con IA visible | `GET /billing/status` y el canje traen `reportes_ia_limite`, `reportes_ia_restantes` y `reportes_ia_renovacion` solo para premium con IA activa, con la misma condición SQL que la reserva (D29) | `feature/cierre-pendientes` | (ver git log) | 418 pruebas · 11 mutaciones detectadas (2026-11-17) |
 | IP del consentimiento | `ip_origen` con la IP real del cliente (la misma que el límite por IP), sin DNS inverso | `feature/ip-consentimiento-y-limites` | (ver git log) | 325 pruebas · 2 mutaciones detectadas |
 | Límite por IP en Redis | Contador compartido entre instancias (D18), IP de la conexión o cabecera validada (D19), respaldo en memoria | `feature/limite-ip-redis` | (ver git log) | 289 pruebas · 12 mutaciones detectadas · revisión adversarial |
+| Motor de visión desacoplado (T3.11) | El modelo E14 sale del backend: segunda app Ktor (`motor-vision`, 8094) con `POST /predict`; el backend es cliente HTTP (`MOTOR_ENDPOINT`, 3 s + 1 reintento, 503 `MOTOR_NO_DISPONIBLE`). Ver [[Motor de vision]] | sin rama (cambios sin commit sobre `main`) | — | 490 pruebas (backend 460 + motor 30) |
+| Revisor de texto libre sin IA (T3.13) | `SERVICIOS/REVISOR_TEXTO_LIBRE.kt` (misma fórmula en la app, paridad por `revisor_casos_dorados.json`), `GET /api/v1/revision-local/preguntas` y `POST /api/v1/revision-local/respuestas` (idempotente por `idLocal`; migración 026, tabla `revision_texto_local`). Pesos A=0,45 / B=0,20 / C=0,35 y umbrales 70/40 aprobados; similitud por defecto Levenshtein (r=0,808 vs Jaccard 0,786, n=44). **Calibración PROVISIONAL**: `sesion_pregunta_respuesta` estaba vacía, se calibró con las semillas y respuestas redactadas a mano. Migración 026 **sin aplicar** a la BD local | (rama sin crear, sin commit) | (sin commit) | 484 pruebas (460 + 24) · app 402 · 2 mutaciones detectadas |
+| Historial de llamadas en vivo (T3.15) | `POST/GET /api/v1/llamadas` y `GET /api/v1/llamadas/{id}` (`SERVICIOS/SERVICIO_LLAMADA.kt`, `MODELOS/REPOSITORIO_LLAMADA.kt`, migración 027, tabla `llamada` con `resumen` JSONB). Idempotente por `(usuario, idLocal)`: 201 la guarda, 200 si ya estaba. Sin `resumen` y con `sesionId`, se deriva del reporte de T3.10. En la app (SQLDelight, no Room): tabla `llamada_local` (migración local 4.sqm, esquema v5), se guarda al detener la cámara, se sube con WorkManager y la pantalla "Historial de llamadas" lee solo la base local. Migración 027 **sin aplicar** a la BD local; app **sin compilar ni probar** en esta tarea (otro agente usaba gradle ahí) | (rama sin crear, sin commit) | (sin commit) | 522 pruebas backend (8 nuevas de llamadas) · app: pruebas escritas, sin correr |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
