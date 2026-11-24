@@ -17,7 +17,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 
-private const val VERSION_INICIAL_EULA = "1.1.0"
+private const val VERSION_INICIAL_EULA = "1.2.0"
 private const val TITULO_INICIAL_EULA = "Acuerdo de Licencia de Usuario Final (EULA)"
 private const val LARGO_MAXIMO_VERSION = 20
 private const val LARGO_MAXIMO_ALCANCE = 50
@@ -30,8 +30,21 @@ private const val LARGO_MAXIMO_ALCANCE = 50
 const val PLAZO_CONSERVACION_CONSENTIMIENTO_ANIOS = 5L
 
 /** Si la persona dio el permiso para medir conductas con la cámara (D38). */
-fun interface PermisoCamara {
+interface PermisoCamara {
     suspend fun permite(usuarioId: UUID): Boolean
+
+    /**
+     * Se llama después de guardar algo medido con la cámara. Si el permiso se retiró mientras se guardaba, el borrado
+     * del retiro pudo no verlo: se borra ahora y devuelve false (lo guardado ya no cuenta).
+     */
+    suspend fun confirmarDespuesDeGuardar(usuarioId: UUID): Boolean = true
+
+    companion object {
+        /** Sin consentimiento de por medio (pruebas que no lo usan): siempre permite. */
+        val SIEMPRE: PermisoCamara = object : PermisoCamara {
+            override suspend fun permite(usuarioId: UUID) = true
+        }
+    }
 }
 
 /**
@@ -107,22 +120,33 @@ class ServicioConsentimiento(
         if (noOfrecidos.isNotEmpty()) {
             log.warn("Consentimiento {}: se descartan alcances que la versión no ofrece: {}", texto.version, noOfrecidos.sorted())
         }
-        val aceptados = alcances.filterValues { it }.keys.map { it.trim() }.filter { it in ofrecidos }.distinct().sorted()
+        val aceptadosPedidos = alcances.filterValues { it }.keys.map { it.trim() }.filter { it in ofrecidos }
+        val camaraPedida = alcances.entries.firstOrNull { it.key.trim() == ALCANCE_ANALISIS_CAMARA }?.value
         val anterior = consentimientos.vigente(usuarioId)
-        val nuevo = consentimientos.otorgar(usuarioId, texto.version, aceptados, ipOrigen)
-        if (tenia(anterior) && ALCANCE_ANALISIS_CAMARA !in aceptados) borrarDatosCamara(usuarioId, "retiró el permiso")
-        return nuevo
+        // La pantalla general del consentimiento y la de Perfil no editan el permiso de cámara (se da aparte, en
+        // "Acepto, activar cámara"): si el pedido no trae la clave, se conserva el que tenía. Solo un false lo retira.
+        val conservaCamara = camaraPedida == null && ALCANCE_ANALISIS_CAMARA in ofrecidos &&
+            anterior != null && ALCANCE_ANALISIS_CAMARA in anterior.alcancesAceptados
+        val aceptados = (aceptadosPedidos + listOfNotNull(ALCANCE_ANALISIS_CAMARA.takeIf { conservaCamara })).distinct().sorted()
+        // Se borra antes de guardar el consentimiento: si algo falla después, un reintento vuelve a borrar (D38).
+        val permitiraDespues = ALCANCE_ANALISIS_CAMARA !in ofrecidos || ALCANCE_ANALISIS_CAMARA in aceptados
+        if (camaraPedida == false || (!permitiraDespues && permite(usuarioId))) {
+            borrarDatosCamara(usuarioId, "no tiene el permiso de cámara")
+        }
+        return consentimientos.otorgar(usuarioId, texto.version, aceptados, ipOrigen)
     }
 
     suspend fun vigente(usuarioId: UUID): Consentimiento? = consentimientos.vigente(usuarioId)
 
-    /** Retirar el consentimiento retira también el permiso de cámara: se borra lo medido con ella (D38). */
+    /**
+     * Retirar el consentimiento retira también el permiso de cámara: se borra lo medido con ella (D38). Se borra antes de
+     * revocar y siempre, así un reintento (aunque ya no haya consentimiento vigente y responda 404) vuelve a borrar.
+     */
     suspend fun revocar(usuarioId: UUID) {
-        val anterior = consentimientos.vigente(usuarioId)
+        borrarDatosCamara(usuarioId, "retiró el consentimiento")
         if (!consentimientos.revocarVigente(usuarioId)) {
             throw ErrorNoEncontrado("consentimiento_no_encontrado", "No hay consentimiento vigente")
         }
-        if (tenia(anterior)) borrarDatosCamara(usuarioId, "retiró el consentimiento")
     }
 
     /**
@@ -149,8 +173,11 @@ class ServicioConsentimiento(
         return borrados
     }
 
-    private fun tenia(consentimiento: Consentimiento?): Boolean =
-        consentimiento != null && ALCANCE_ANALISIS_CAMARA in consentimiento.alcancesAceptados
+    override suspend fun confirmarDespuesDeGuardar(usuarioId: UUID): Boolean {
+        if (permite(usuarioId)) return true
+        borrarDatosCamara(usuarioId, "perdió el permiso de cámara mientras se guardaba")
+        return false
+    }
 
     private suspend fun borrarDatosCamara(usuarioId: UUID, motivo: String) {
         val borradas = datosCamara.borrarDeUsuario(usuarioId)

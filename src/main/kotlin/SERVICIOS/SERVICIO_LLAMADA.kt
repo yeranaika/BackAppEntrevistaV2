@@ -28,19 +28,27 @@ data class LlamadaRegistrada(val llamada: Llamada, val creada: Boolean)
  */
 class ServicioLlamada(
     private val llamadas: RepositorioLlamada,
-    private val simulacion: ServicioSimulacion
+    private val simulacion: ServicioSimulacion,
+    private val permisoCamara: PermisoCamara = PermisoCamara.SIEMPRE
 ) {
     suspend fun registrar(usuarioId: UUID, solicitud: SolicitudRegistrarLlamada): LlamadaRegistrada {
         validar(solicitud)
         llamadas.buscarPorIdLocal(usuarioId, solicitud.idLocal)?.let { return LlamadaRegistrada(it, false) }
         val sesionId = solicitud.sesionId?.let(::leerSesion)
+        // Las acciones, la línea de tiempo y el feedback se miden con la cámara: sin el permiso solo se guardan la
+        // duración y las preguntas (D38).
+        val conCamara = permisoCamara.permite(usuarioId)
         val llamada = Llamada(
             id = UUID.randomUUID(), idLocal = solicitud.idLocal, sesionId = sesionId,
             fechaInicio = Instant.ofEpochMilli(solicitud.fechaInicioMs),
             duracionSeg = solicitud.duracionSeg, preguntasCnt = solicitud.preguntasCnt,
-            resumen = conFeedback(resumenDe(usuarioId, sesionId, solicitud), solicitud)
+            resumen = if (conCamara) conFeedback(resumenDe(usuarioId, sesionId, solicitud), solicitud) else ResumenLlamada()
         )
-        if (llamadas.registrar(usuarioId, llamada)) return LlamadaRegistrada(llamada, true)
+        if (llamadas.registrar(usuarioId, llamada)) {
+            // Si el permiso se retiró mientras se guardaba, el resumen ya se vació en la BD.
+            val vigente = if (!conCamara || permisoCamara.confirmarDespuesDeGuardar(usuarioId)) llamada else llamada.copy(resumen = ResumenLlamada())
+            return LlamadaRegistrada(vigente, true)
+        }
         // Perdió la carrera contra otro envío de la misma llamada: devolver la que quedó.
         val existente = llamadas.buscarPorIdLocal(usuarioId, solicitud.idLocal) ?: llamada
         return LlamadaRegistrada(existente, false)

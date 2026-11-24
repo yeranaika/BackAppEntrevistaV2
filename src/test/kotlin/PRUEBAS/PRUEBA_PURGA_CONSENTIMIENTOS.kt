@@ -62,4 +62,23 @@ class PruebaPurgaConsentimientos {
         )
         assertEquals(0, sistema.consentimiento.purgarRegistrosVencidos(ahora), "una segunda pasada no borra nada más")
     }
+
+    @Test
+    fun `una cuenta borrada sin fecha se completa en la purga y su plazo corre desde ahi`() = runBlocking<Unit> {
+        val id = registrarYAceptar("por-sql@ejemplo.com")
+        // Como un borrado hecho por SQL o por el backend anterior: queda huérfana, con IP y sin fecha de borrado.
+        transaction {
+            TablaConsentimiento.update({ TablaConsentimiento.usuarioId eq id }) {
+                it[usuarioId] = null
+                it[identidadRef] = "por-sql@ejemplo.com"
+            }
+        }
+
+        assertEquals(0, sistema.consentimiento.purgarRegistrosVencidos(ahora))
+
+        val fila = transaction { TablaConsentimiento.selectAll().single { it[TablaConsentimiento.identidadRef] == "por-sql@ejemplo.com" } }
+        assertEquals(null, fila[TablaConsentimiento.ipOrigen])
+        assertEquals(true, fila[TablaConsentimiento.cuentaEliminadaEn] != null)
+        assertEquals(true, fila[TablaConsentimiento.fechaRevocado] != null)
+    }
 }

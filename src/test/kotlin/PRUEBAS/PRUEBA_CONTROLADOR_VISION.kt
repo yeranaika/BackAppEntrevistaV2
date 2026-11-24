@@ -69,6 +69,27 @@ class PruebaControladorVision {
     }
 
     @Test
+    fun `sin el permiso de camara responde 403 y no predice (D38)`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val token = tokenDe(sistema, "sin-camara@ejemplo.com")
+        runBlocking {
+            val id = sistema.usuarios.buscarPorCorreo("sin-camara@ejemplo.com")!!.id
+            sistema.consentimiento.publicar("v1.1", "Consentimiento", "Texto", listOf("estadisticas_uso", "marketing", "analisis_conducta_camara"))
+            sistema.consentimiento.otorgar(id, "v1.1", mapOf("estadisticas_uso" to true, "analisis_conducta_camara" to false), null)
+        }
+
+        val respuesta = client.post(ruta) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SolicitudPrediccionVision(List(CANTIDAD_FEATURES_DIVLARA) { 0.0 })))
+        }
+
+        assertEquals(HttpStatusCode.Forbidden, respuesta.status)
+        assertEquals("permiso_camara_requerido", json.parseToJsonElement(respuesta.bodyAsText()).jsonObject["error"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun `rechaza con 400 cuando features tiene longitud distinta de 343`() = testApplication {
         val sistema = SistemaPrueba()
         application { sistema.montar(this) }

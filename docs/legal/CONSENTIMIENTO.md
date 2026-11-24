@@ -15,7 +15,8 @@ Al publicar una versión nueva, la app le pide a cada usuario que la acepte otra
   - `analisis_conducta_camara` es el permiso aparte para medir conductas con la cámara: la app debe registrarlo (misma
     versión, con los demás alcances que ya tenía la persona) al tocar "Acepto, activar cámara" en el consentimiento de
     video. Hoy ninguna versión de la app lo envía (checklist C09). Con la `v1.1` vigente, sin ese permiso el backend
-    no guarda métricas ni predicciones de la cámara, y al retirarlo borra lo medido (D38).
+    no guarda nada medido con la cámara, y al retirarlo (`false` explícito o retirar el consentimiento) borra lo
+    medido. Si el pedido no trae la clave, el backend conserva el permiso que la persona ya tenía (D38).
   - Una clave que la versión no ofrece se descarta al aceptar, y `GET /me/consent/latest` y la respuesta de
     `POST /me/consent` solo traen las que ofrece: la app debe tomar el estado de esa respuesta, no de lo que envió (D35).
 
@@ -36,6 +37,7 @@ Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus da
 1. Qué datos usamos
 • Tu cuenta: correo, nombre y lo que eliges al empezar (área, cargo objetivo y nivel de experiencia).
 • Tus prácticas: las respuestas que escribes o dictas, las opciones que marcas, tus puntajes y tu historial.
+• El registro de este consentimiento: la versión, las opciones que eliges, las fechas y la dirección IP desde la que lo aceptas. La IP se borra si eliminas tu cuenta.
 • El dictado por voz se convierte en texto dentro de tu teléfono. No enviamos ni guardamos tu audio.
 
 2. La cámara en la simulación de entrevista

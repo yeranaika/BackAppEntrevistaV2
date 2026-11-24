@@ -28,7 +28,7 @@ class ServicioSimulacion(
     private val predicciones: RepositorioPrediccionSimulacion,
     private val sesiones: RepositorioSesionEntrevista,
     private val reloj: Clock = Clock.systemUTC(),
-    private val permisoCamara: PermisoCamara = PermisoCamara { true }
+    private val permisoCamara: PermisoCamara = PermisoCamara.SIEMPRE
 ) {
     /**
      * Sin [sesionId] no hace nada (la predicción sigue siendo solo de consulta). [timestampMs] son los ms desde el
@@ -47,7 +47,12 @@ class ServicioSimulacion(
             PrediccionSimulacion(ts, variable, valor, nivelDe(valor))
         }
         predicciones.registrar(sesionId, ts, variables)
+        // Si el permiso se retiró mientras se guardaba, se borra ahora (D38).
+        permisoCamara.confirmarDespuesDeGuardar(usuarioId)
     }
+
+    /** Si la persona puede medir conductas con la cámara: sin el permiso no se predice ni se guarda (D38). */
+    suspend fun permiteCamara(usuarioId: UUID): Boolean = permisoCamara.permite(usuarioId)
 
     suspend fun reporte(usuarioId: UUID, sesionId: UUID): ReporteSimulacion {
         buscarPropia(usuarioId, sesionId)

@@ -167,6 +167,16 @@ class RepositorioConsentimientoExposed : RepositorioConsentimiento {
     }
 
     override suspend fun purgarCuentasEliminadas(eliminadasAntesDe: Instant): Int = transaccion {
+        // Una cuenta borrada sin pasar por RepositorioUsuario.eliminar (por SQL, o por la versión anterior del backend
+        // con la 029 ya aplicada) deja la fila sin fecha: se completa como en la 029 y el plazo corre desde hoy.
+        val ahora = Instant.now()
+        TablaConsentimiento.update({ TablaConsentimiento.usuarioId.isNull() and TablaConsentimiento.cuentaEliminadaEn.isNull() }) {
+            it[cuentaEliminadaEn] = ahora
+            it[ipOrigen] = null
+        }
+        TablaConsentimiento.update({ TablaConsentimiento.usuarioId.isNull() and TablaConsentimiento.fechaRevocado.isNull() }) {
+            it[fechaRevocado] = ahora
+        }
         TablaConsentimiento.deleteWhere {
             usuarioId.isNull() and (cuentaEliminadaEn less eliminadasAntesDe) and (retencionLegal eq false)
         }

@@ -305,7 +305,7 @@ class SistemaPrueba(
     val revisionLocal = SERVICIOS.ServicioRevisionLocal(preguntas, revisionesTexto)
     val simulacion = ServicioSimulacion(prediccionesSimulacion, sesionesEntrevista, reloj, consentimiento)
     val llamadasRepo = MODELOS.RepositorioLlamadaExposed()
-    val llamadas = SERVICIOS.ServicioLlamada(llamadasRepo, simulacion)
+    val llamadas = SERVICIOS.ServicioLlamada(llamadasRepo, simulacion, consentimiento)
 
     // Reporte de feedback (reportesRepo está más arriba). En las pruebas se llama a reporte.procesar(...) a mano para que
     // sea determinista.

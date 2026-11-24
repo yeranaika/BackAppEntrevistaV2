@@ -291,7 +291,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val servicioSimulacion = ServicioSimulacion(
         repositorioPrediccionSimulacion, repositorioSesionEntrevista, permisoCamara = servicioConsentimiento
     )
-    val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion)
+    val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion, servicioConsentimiento)
     val servicioRevisionLocal = ServicioRevisionLocal(repositorioPregunta, RepositorioRevisionTextoExposed())
     private val corrector = CorrectorRespuestas(evaluadorRespuesta)
     private val repositorioPractica = RepositorioPracticaExposed()

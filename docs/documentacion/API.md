@@ -392,7 +392,7 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 `POST /me/consent` · Usuario · responde `201`
 
-`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona. Si la persona tenía `analisis_conducta_camara` y el consentimiento nuevo no lo trae, se borran sus métricas de video y predicciones de la simulación (D38).
+`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona. **Permiso de cámara (D38):** si el pedido no trae la clave `analisis_conducta_camara`, se conserva la que tenía la persona (la pantalla general y la de Perfil no la editan); `analisis_conducta_camara: false` lo retira y borra lo medido con la cámara, igual que pasar de una versión sin el permiso aparte (v1.0) a una que lo ofrece sin aceptarlo.
 
 ```json
 {
@@ -412,7 +412,7 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 `POST /me/consent/revoke` · Usuario · responde `200`, `404`
 
-Retirar el consentimiento retira también el permiso de cámara: si estaba aceptado, se borran las métricas de video y las predicciones de la simulación de todas las sesiones de la persona (D38). `404` si no había uno vigente.
+Retirar el consentimiento retira también el permiso de cámara: se borra lo medido con ella en todo lo de la persona (métricas de video, predicciones de la simulación, resumen de sus llamadas en vivo y el puntaje corporal de sus reportes) (D38). Se borra siempre, también si responde `404` porque no había uno vigente: así un reintento vuelve a borrar.
 
 ### EULA vigente
 
@@ -925,9 +925,9 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
 
 ### Predecir conductas observables (DivLara E14)
 
-`POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `503`
+`POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `403`, `503`
 
-El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. Sin el permiso de cámara (si la versión del consentimiento lo ofrece) la predicción se responde igual pero no se guarda (D38). `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
 
 ```json
 {
@@ -1135,7 +1135,7 @@ T3.13, **sin IA**. Solo texto (nunca audio ni video). El servidor repite la revi
 
 `POST /api/v1/llamadas` · Usuario · responde `200`, `201`
 
-T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.
+T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`. **Permiso de cámara (D38):** sin él la llamada se guarda solo con la duración y las preguntas (sin acciones, línea ni feedback), y retirarlo vacía el resumen de las llamadas ya guardadas.
 
 ```json
 {
@@ -1533,7 +1533,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 162 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 163 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1655,6 +1655,7 @@ Los 162 códigos que puede devolver el backend en `error`, leídos del código f
 | 401 | `missing_id_token` | La respuesta de Google no trae id_token |
 | 401 | `unauthorized` | Falta el token de acceso |
 | 403 | `inactive_user` | La cuenta no está activa |
+| 403 | `permiso_camara_requerido` | Activa el permiso de análisis con cámara para medir conductas |
 | 404 | `cargo_no_encontrado` | El cargo no existe |
 | 404 | `cargo_not_found` | No se encontró el cargo especificado |
 | 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |

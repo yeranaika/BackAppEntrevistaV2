@@ -533,13 +533,24 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   - `ServicioConsentimiento.permite(usuario)`: si la versión del consentimiento de la persona (o la vigente, si no
     aceptó ninguna) ofrece `analisis_conducta_camara`, hace falta haberlo aceptado. Una versión que no lo ofrece (la
     `v1.0` de Railway) sigue como antes, para no cortar las métricas de todos mientras rige.
-  - Sin el permiso, `POST /entrevistas/{id}/metricas` responde `201` con `insertadas: 0` y `/vision/predecir` responde
-    la predicción pero no la guarda: la práctica sigue sin cámara, como dice el texto.
-  - Al retirar el permiso (un consentimiento nuevo sin él) o el consentimiento (`/me/consent/revoke`) se borran las
-    métricas de video y las predicciones de la simulación de todas las sesiones de la persona (`BorradorDatosCamara`).
+  - Sin el permiso, `POST /entrevistas/{id}/metricas` responde `201` con `insertadas: 0`, `/vision/predecir` responde
+    `403 permiso_camara_requerido` sin procesar los puntos, y `POST /llamadas` guarda la llamada solo con la duración y
+    las preguntas: la práctica sigue sin cámara, como dice el texto.
+  - **Qué cuenta como retirarlo:** `analisis_conducta_camara: false` en `POST /me/consent`, retirar el consentimiento,
+    o pasar de una versión sin el permiso aparte (v1.0, permiso implícito) a una que lo ofrece sin aceptarlo. Si el
+    pedido no trae la clave, se conserva el permiso que la persona ya tenía, también al aceptar una versión nueva que lo
+    ofrece: la pantalla general y la de Perfil no lo editan, se da y se quita aparte.
+  - Al retirarlo se borra lo medido con la cámara en todo lo de la persona (`BorradorDatosCamara`): métricas de video,
+    predicciones de la simulación, el resumen de sus llamadas en vivo (acciones, línea y feedback) y, en sus reportes,
+    el puntaje de lenguaje corporal y sus dos frases. Como en el borrado biométrico por sesión, el puntaje global y el
+    resumen del reporte se quedan.
+  - El borrado va **antes** de guardar el consentimiento o de revocarlo, y revocar borra siempre (también si responde
+    404): si algo falla, un reintento vuelve a borrar. Después de guardar métricas, predicciones o una llamada se vuelve
+    a mirar el permiso (`confirmarDespuesDeGuardar`): si se retiró mientras tanto, se borra lo recién guardado.
   - El texto `v1.1` ya no dice "solo envía números resumidos": dice que el teléfono envía solo números (medidas o la
     posición de algunos puntos del cuerpo y de los ojos, nunca imágenes), que esos puntos no se guardan y que al
-    retirar el permiso se borra lo medido. La Política (1.2.0) dice lo mismo.
+    retirar el permiso se borra lo medido. La Política (1.2.0) y el EULA de respaldo (1.2.0) dicen lo mismo, y el
+    punto 1 del texto `v1.1` nombra la IP del registro del consentimiento.
 - **Decisión — plazo del consentimiento de una cuenta eliminada: 5 años desde el borrado.** Investigado y verificado
   en el texto publicado en el Diario Oficial (Ley 19.628 modificada por la Ley 21.719):
   - La ley no fija años: los datos se guardan solo lo necesario y después se suprimen o anonimizan (art. 3 c). Guardar la
@@ -554,7 +565,8 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
     necesario) y se cierra el consentimiento (`fecha_revocado`). Se guardan la versión, las opciones, las fechas y el
     correo. `cuenta_eliminada_en` marca desde cuándo corre el plazo.
   - `TareaPurgaConsentimientos` borra cada día los registros vencidos. `retencion_legal = TRUE` (a mano, por SQL) los
-    conserva mientras haya un reclamo, un procedimiento de la Agencia o un juicio.
+    conserva mientras haya un reclamo, un procedimiento de la Agencia o un juicio. Una fila de cuenta borrada sin fecha
+    (borrada por SQL o por el backend anterior con la 029 ya aplicada) se completa en la purga como en la 029.
   - El plazo está en el punto 5 del texto `v1.1`, en la Política de Privacidad 1.2.0 (el art. 14 ter i obliga a
     informarlo) y en `DELETE /cuenta`.
   - Lo que debe validar un abogado: que el plazo del art. 40 corra desde el borrado y que la vía contractual de 5 años
@@ -563,5 +575,8 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   de ella borra la IP, cierra el consentimiento y cuenta el plazo desde el día en que se aplica.
 - **Contrato Android**: sin cambios de forma. Con la `v1.1` vigente, la app tiene que registrar
   `analisis_conducta_camara` (C09) para que se guarden las métricas: sin eso `insertadas` sale en 0.
-- **Pruebas**: `PruebaPermisoCamara` (6), `PruebaPurgaConsentimientos`, `PruebaEliminarCuentaConsentimiento` (IP,
-  cierre y fecha de borrado), versión de la Política en `PruebaControladorFase4`, y `PROBAR_SEMILLA.ps1` con la 029.
+- **Pruebas**: `PruebaPermisoCamara` (12: guardar sin permiso, qué cuenta como retirarlo, llamadas y reportes,
+  reintento del retiro), `PruebaPurgaConsentimientos` (2), `PruebaEliminarCuentaConsentimiento` (IP, cierre y fecha de
+  borrado), el 403 en `PruebaControladorVision`, versiones de la Política y el EULA, y `PROBAR_SEMILLA.ps1` con la 029.
+  Una revisión adversarial de 4 ángulos (lógica, BD, contrato con la app, textos legales) encontró las llamadas, los
+  reportes, el retiro implícito de la v1.0, la atomicidad del borrado y la IP del punto 1; todo quedó corregido.

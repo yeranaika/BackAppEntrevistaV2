@@ -65,7 +65,7 @@ class ServicioEntrevista(
     private val procesador: ProcesadorEntrevistaFinalizada,
     private val tareasSegundoPlano: CoroutineScope,
     private val reloj: Clock = Clock.systemUTC(),
-    private val permisoCamara: PermisoCamara = PermisoCamara { true }
+    private val permisoCamara: PermisoCamara = PermisoCamara.SIEMPRE
 ) {
     private val log = LoggerFactory.getLogger(ServicioEntrevista::class.java)
 
@@ -166,7 +166,9 @@ class ServicioEntrevista(
                 versionModelo = VERSION_MODELO_DIVLARA
             )
         }
-        return metricas.insertarLote(sesionId, sanitizadas)
+        val insertadas = metricas.insertarLote(sesionId, sanitizadas)
+        // Si el permiso se retiró mientras se insertaba, el lote ya se borró: no cuenta (D38).
+        return if (permisoCamara.confirmarDespuesDeGuardar(usuarioId)) insertadas else 0
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */
