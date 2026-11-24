@@ -44,13 +44,14 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Validar con un abogado el plazo de 5 años** (D38): que el art. 40 corra desde el borrado de la cuenta y que la
   vía contractual (art. 2515 del Código Civil) aplique. Revisar si la Agencia de Protección de Datos dicta
   instrucciones sobre plazos cuando empiece a operar (la Ley 21.719 rige desde el 15-10-2027, Ley 21.855).
-- [ ] **`POST /pruebas/video` sin sesión** (de `main`): guarda `.mp4` de hasta 200 MB en la carpeta `pruebas/` del
-  servidor, sin autenticación y en todas las instancias. Contradice D37. Montarlo solo con una variable apagada por
-  defecto, o detrás del rol admin, antes de desplegar.
+- [x] ~~**`POST /pruebas/video` sin sesión**~~ (de `main`): ahora solo existe con `HABILITAR_PRUEBAS_VIDEO=true`,
+  apagada por defecto y prohibida en Railway (D39, 2026-11-24).
 - [x] ~~**Puerto 8093 en `application.yaml`**~~ (commit `f8d6d86` de `main`): Railway revisa `/ready` en el 8080, así
-  que los 3 despliegues de `main` del 2026-11-23 fallaron y producción siguió con el PR #6. Vuelve a 8080 (2026-11-24);
-  en local se usa `-P:ktor.deployment.port=8093`. Antes de llevar `DEV` a `main`: D39 unido y migraciones 023 a 029
-  aplicadas en Railway, porque con el puerto correcto `main` sí se despliega.
+  que los 3 despliegues de `main` del 2026-11-23 fallaron y producción siguió con el PR #6 (`/pruebas/video` nunca
+  llegó a producción). Vuelve a 8080 (2026-11-24); en local se usa `-P:ktor.deployment.port=8093`.
+- [ ] **Antes de llevar `DEV` a `main`**: con el puerto correcto Railway sí despliega `main`. Aplicar antes en Railway las
+  migraciones 023 a 029 en orden. Después de desplegar, comprobar que `POST /pruebas/video` responde 404 y, si el
+  servicio tiene un volumen en el directorio de trabajo, revisar que `pruebas/` esté vacío.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.
