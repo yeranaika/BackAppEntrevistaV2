@@ -1,7 +1,9 @@
 package CONTROLADORES
 
+import CONFIGURACION.VERSION_MODELO_DIVLARA
 import ERRORES.ErrorValidacion
 import ESQUEMAS.MetricaVideoEntrada
+import ESQUEMAS.RespuestaBorradoBiometrico
 import ESQUEMAS.RespuestaMetricasRegistradas
 import ESQUEMAS.SolicitudIniciarEntrevista
 import ESQUEMAS.SolicitudMetricasVideo
@@ -35,6 +37,7 @@ import java.util.UUID
  * POST /api/v1/entrevistas/{id}/metricas        lote de métricas de video { metricas: [...] }
  * POST /api/v1/entrevistas/{id}/finalizar
  * POST /api/v1/entrevistas/{id}/cancelar
+ * POST /api/v1/entrevistas/{id}/borrar         borra clips, transcripciones y métricas de video (Art. 17 RGPD; 409 si sigue en curso)
  */
 fun Route.controladorEntrevista(servicio: ServicioEntrevista) {
     authenticate("auth-jwt") {
@@ -79,13 +82,25 @@ fun Route.controladorEntrevista(servicio: ServicioEntrevista) {
                 post("/metricas") {
                     val lote = call.receive<SolicitudMetricasVideo>().metricas.map { it.aModelo() }
                     val insertadas = servicio.registrarMetricas(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), lote)
-                    call.responderConMensaje(RespuestaMetricasRegistradas(insertadas), "Métricas de video registradas: $insertadas", HttpStatusCode.Created)
+                    call.responderConMensaje(
+                        RespuestaMetricasRegistradas(insertadas, VERSION_MODELO_DIVLARA),
+                        "Métricas de video registradas: $insertadas",
+                        HttpStatusCode.Created
+                    )
                 }
 
                 post("/finalizar") {
                     call.responderConMensaje(
                         servicio.finalizar(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id")).aRespuesta(),
                         "Entrevista finalizada. El reporte de feedback se está generando"
+                    )
+                }
+
+                post("/borrar") {
+                    val borrado = servicio.borrarDatosBiometricos(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"))
+                    call.responderConMensaje(
+                        RespuestaBorradoBiometrico(borrado.clipsBorrados, borrado.transcripcionesBorradas, borrado.metricasBorradas),
+                        "Se borraron los datos de video de la entrevista"
                     )
                 }
 
@@ -108,7 +123,9 @@ private fun MetricaVideoEntrada.aModelo() = MetricaVideo(
     postura = postura?.let(::aDecimal),
     confianza = confianza?.let(::aDecimal),
     // `expresion` se acepta por compatibilidad pero se ignora: no se infieren ni se guardan emociones (RNF10, D22).
-    gestos = gestos
+    gestos = gestos,
+    // La versión del modelo la fija el backend desde configuración, nunca el cliente (RNF08).
+    versionModelo = VERSION_MODELO_DIVLARA
 )
 
 /** Las columnas son NUMERIC(5,2). */

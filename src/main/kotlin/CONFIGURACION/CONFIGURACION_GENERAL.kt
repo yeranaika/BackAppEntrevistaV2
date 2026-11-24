@@ -15,6 +15,8 @@ private const val TAMANO_POOL_BD_POR_DEFECTO = 10
 private const val REGISTROS_POR_IP_POR_DEFECTO = 30
 private const val RECUPERACIONES_POR_IP_POR_DEFECTO = 5
 private const val GENERACIONES_IA_POR_IP_POR_DEFECTO = 30
+private const val MOTOR_ENDPOINT_POR_DEFECTO = "http://localhost:8094/predict"
+private const val MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO = 3_000L
 private const val HOST_JSEARCH_POR_DEFECTO = "jsearch.p.rapidapi.com"
 
 data class ConfiguracionBaseDatos(
@@ -104,6 +106,23 @@ data class ConfiguracionLimites(
     }
 }
 
+/**
+ * Motor de inferencia de visión (T3.11): proceso aparte que carga el modelo. Es solo la URL de `POST /predict`: apuntarla a
+ * otro motor (o a un proveedor externo con el mismo contrato) cambia el modelo sin tocar el backend.
+ */
+data class ConfiguracionMotorVision(
+    val endpoint: String = MOTOR_ENDPOINT_POR_DEFECTO,
+    /** Tiempo máximo de cada intento (hay 1 reintento). */
+    val tiempoMaximoMs: Long = MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO
+) {
+    init {
+        require(Regex("^https?://[^\\s/]+(/.*)?$").matches(endpoint)) {
+            "MOTOR_ENDPOINT inválido (debe ser http(s)://host[:puerto]/ruta)"
+        }
+        require(tiempoMaximoMs > 0) { "MOTOR_TIMEOUT_MS debe ser mayor a cero" }
+    }
+}
+
 /** Apagado ordenado (D20): cuánto se espera a los reportes y correos en curso antes de cancelarlos. */
 data class ConfiguracionApagado(val esperaTareas: Duration = ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO.seconds)
 
@@ -118,7 +137,8 @@ data class ConfiguracionGeneral(
     val mercadoLaboral: ConfiguracionMercadoLaboral,
     val llm: ConfiguracionLlm,
     val limites: ConfiguracionLimites,
-    val apagado: ConfiguracionApagado = ConfiguracionApagado()
+    val apagado: ConfiguracionApagado = ConfiguracionApagado(),
+    val motorVision: ConfiguracionMotorVision = ConfiguracionMotorVision()
 )
 
 private val ClaveConfiguracion = AttributeKey<ConfiguracionGeneral>("configuracion-general")
@@ -233,6 +253,10 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO),
             cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() },
             generacionesIaPorIp = lector.entero("LIMITE_GENERACIONES_IA_POR_IP", GENERACIONES_IA_POR_IP_POR_DEFECTO).coerceAtLeast(1)
+        ),
+        motorVision = ConfiguracionMotorVision(
+            endpoint = lector.opcional("MOTOR_ENDPOINT", "vision.motorEndpoint")?.trim()?.takeIf { it.isNotEmpty() } ?: MOTOR_ENDPOINT_POR_DEFECTO,
+            tiempoMaximoMs = (lector.opcional("MOTOR_TIMEOUT_MS")?.toLongOrNull() ?: MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO).coerceIn(100L, 30_000L)
         ),
         apagado = ConfiguracionApagado(
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).

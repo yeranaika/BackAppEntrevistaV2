@@ -98,7 +98,8 @@ data class MetricaVideo(
     val contactoVisual: BigDecimal?,
     val postura: BigDecimal?,
     val confianza: BigDecimal?,
-    val gestos: JsonObject?
+    val gestos: JsonObject?,
+    val versionModelo: String? = null
 )
 
 /** Resumen para el historial (sin las preguntas). */

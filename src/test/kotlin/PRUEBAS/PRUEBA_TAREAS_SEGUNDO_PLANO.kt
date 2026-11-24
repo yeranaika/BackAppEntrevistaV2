@@ -89,7 +89,9 @@ class PruebaTareasSegundoPlano {
     fun `una tarea que falla no corta a las demas`() = runBlocking<Unit> {
         val barrera = CompletableDeferred<Unit>()
         val terminada = AtomicBoolean(false)
-        tareas.launch { error("falla esta tarea") }
+        // Con su propio manejador: sin él la excepción llega al handler global de la JVM y hace fallar, por azar, la
+        // siguiente prueba con testApplication que corra en el mismo proceso (UncaughtExceptionsBeforeTest).
+        tareas.launch(kotlinx.coroutines.CoroutineExceptionHandler { _, _ -> }) { error("falla esta tarea") }
         tareas.launch { barrera.await(); terminada.set(true) }
         delay(50)
         barrera.complete(Unit)

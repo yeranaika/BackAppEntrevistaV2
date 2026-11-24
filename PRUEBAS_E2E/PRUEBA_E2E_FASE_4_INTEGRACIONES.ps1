@@ -56,7 +56,7 @@ try {
 
     Seccion 'Salud y esquema (migración 015)'
     $salud = Llamar-Api GET '/health'
-    Probar 'GET /health → 200 OK (verifica la BD)' { $salud.Estado -eq 200 -and $salud.Texto -eq 'OK' }
+    Probar 'GET /health → 200 OK (con estado modeloDivlara)' { $salud.Estado -eq 200 -and $salud.Json.status -eq 'OK' -and $null -ne $salud.Json.modeloDivlara }
     Probar 'consentimiento ya no tiene la columna extra "alcances"' {
         (Ejecutar-Sql "select count(*) from information_schema.columns where table_schema='app' and table_name='consentimiento' and column_name='alcances'") -eq '0'
     }

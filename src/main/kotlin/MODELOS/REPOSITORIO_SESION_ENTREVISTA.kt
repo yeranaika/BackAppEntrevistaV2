@@ -14,6 +14,8 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.avg
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -47,7 +49,21 @@ interface RepositorioSesionEntrevista {
 
     /** Para el historial de la app: puntaje = alternativas correctas sobre alternativas servidas. */
     suspend fun listarResumenes(usuarioId: UUID, limite: Int): List<ResumenPrueba>
+
+    /**
+     * Borrado duro de lo que salió del video de la sesión, en una sola transacción: clips, transcripciones, feedback,
+     * métricas y el texto del reporte derivado de ellos. Se conserva la fila de la sesión y los costos de IA del reporte
+     * (tope de gasto y cupo de reportes). Es idempotente: repetirlo devuelve ceros.
+     */
+    suspend fun purgarDatosBiometricos(sesionId: UUID): ResumenPurgaBiometrica
 }
+
+/** Cuántos registros se borraron o vaciaron en [RepositorioSesionEntrevista.purgarDatosBiometricos]. */
+data class ResumenPurgaBiometrica(
+    val clipsBorrados: Int,
+    val transcripcionesBorradas: Int,
+    val metricasBorradas: Int
+)
 
 class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
 
@@ -185,7 +201,41 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
         }
     }
 
+    override suspend fun purgarDatosBiometricos(sesionId: UUID): ResumenPurgaBiometrica = transaccion {
+        val delaSesion = TablaSesionPreguntaRespuesta.sesionId eq sesionId
+        val clips = TablaSesionPreguntaRespuesta.update({ delaSesion and TablaSesionPreguntaRespuesta.videoClipUrl.isNotNull() }) {
+            it[videoClipUrl] = null
+        }
+        // Lo que la persona dijo (o escribió) sale de la transcripción; el feedback de la IA la cita, así que también se borra.
+        val transcripciones = TablaSesionPreguntaRespuesta.update({ delaSesion and TablaSesionPreguntaRespuesta.transcripcion.isNotNull() }) {
+            it[transcripcion] = null
+            it[feedbackTecnico] = null
+            it[feedbackBlando] = null
+        }
+        val metricas = TablaMetricaVideo.deleteWhere { TablaMetricaVideo.sesionId eq sesionId }
+        // Las predicciones por instante salen del video: se borran con él (no entran en el resumen que ve el cliente).
+        TablaPrediccionSimulacion.deleteWhere { TablaPrediccionSimulacion.sesionId eq sesionId }
+        vaciarTextoDelReporte(sesionId)
+        ResumenPurgaBiometrica(clips, transcripciones, metricas)
+    }
+
     // ---------- Apoyo (dentro de una transacción) ----------
+
+    /** El resumen y las listas narrativas se redactaron con la transcripción y el video; los puntajes y el costo se quedan. */
+    private fun vaciarTextoDelReporte(sesionId: UUID) {
+        TablaReporteEntrevista.update({ TablaReporteEntrevista.sesionId eq sesionId }) {
+            it[resumen] = null
+            it[fortalezas] = emptyList()
+            it[areasMejora] = emptyList()
+            it[recomendaciones] = emptyList()
+            it[puntajeLenguajeCorporal] = null
+        }
+        val reportes = TablaReporteEntrevista.select(TablaReporteEntrevista.reporteId)
+            .where { TablaReporteEntrevista.sesionId eq sesionId }
+        TablaReporteSkillDetalle.update({ TablaReporteSkillDetalle.reporteId inSubQuery reportes }) {
+            it[observacion] = null
+        }
+    }
 
     private fun cerrarSiSigueEnProgreso(sesionId: UUID, estado: EstadoSesionEntrevista, fecha: Instant): Boolean =
         TablaSesionEntrevista.update({
@@ -328,6 +378,7 @@ class RepositorioMetricaVideoExposed : RepositorioMetricaVideo {
             this[TablaMetricaVideo.postura] = metrica.postura
             this[TablaMetricaVideo.confianza] = metrica.confianza
             this[TablaMetricaVideo.gestos] = metrica.gestos
+            this[TablaMetricaVideo.versionModelo] = metrica.versionModelo
         }
         nuevas.size
     }

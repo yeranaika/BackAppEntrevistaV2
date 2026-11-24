@@ -132,7 +132,8 @@ class ServicioContrasena(
                 log.warn("Envío del correo de recuperación cancelado por el apagado del servidor")
                 throw e
             } catch (e: Exception) {
-                log.error("No se pudo enviar el correo de recuperación", e)
+                // Sin la traza: los errores de SMTP traen la dirección del destinatario en el mensaje.
+                log.error("No se pudo enviar el correo de recuperación ({})", e.javaClass.simpleName)
             }
         }
     }

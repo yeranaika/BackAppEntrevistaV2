@@ -6,6 +6,7 @@ import ESQUEMAS.RespuestaPaginaPreguntas
 import ESQUEMAS.RespuestaPregunta
 import ESQUEMAS.RespuestaPreguntaGenerada
 import ESQUEMAS.RespuestaPreguntaPublica
+import ESQUEMAS.RespuestaPreguntaRevisable
 import MODELOS.EstadoPregunta
 import MODELOS.PaginaPreguntas
 import MODELOS.Pregunta
@@ -49,6 +50,17 @@ fun Pregunta.aRespuestaPublica() = RespuestaPreguntaPublica(
     nivel = nivel.valorBd,
     enunciado = enunciado,
     opciones = opciones.map { RespuestaOpcionPublica(it.id.toString(), it.texto, it.orden) }
+)
+
+/** Para revisar sin conexión (T3.13): ESTA vista sí lleva la respuesta ideal y la rúbrica, porque la revisión se hace en el teléfono. */
+fun Pregunta.aRespuestaRevisable() = RespuestaPreguntaRevisable(
+    id = id.toString(),
+    tipo = tipo.valorBd,
+    categoria = categoria.valorBd,
+    nivel = nivel.valorBd,
+    enunciado = enunciado,
+    respuestaIdeal = respuestaIdeal,
+    rubrica = rubrica
 )
 
 fun PreguntaCreadaPorIa.aRespuesta() = RespuestaPreguntaGenerada(

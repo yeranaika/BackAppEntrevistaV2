@@ -1,0 +1,109 @@
+{
+  "id_modelo": "divlara-d35-mlp",
+  "fuente": "E:\\entrenamienrto-IA\\DivLara\\scratch\\e17\\export_d35_onnx.py (DivLara e17 mlp_d35, ensamble top-4 semillas con shift+round+clip, exportado 2026-11-22)",
+  "arquitectura": "Ensamble de 4 Multi-Task MLP (20 cabezas) promediado en un unico ONNX, con shift+round+clip",
+  "input": {
+    "tipo": "ventana_landmarks",
+    "ventana_seg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "n_features": 343,
+    "requiere_archivos": [
+      "modelo.onnx",
+      "scaler.json",
+      "meta.json"
+    ],
+    "pipeline_features": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "output": {
+    "variables": [
+      "posture_stability",
+      "torso_lean",
+      "body_rigidity",
+      "shoulder_symmetry",
+      "upper_body_openness",
+      "arm_crossing",
+      "table_rest",
+      "gesture_activity",
+      "movement_level",
+      "head_nodding",
+      "camera_orientation",
+      "framing_quality",
+      "fidgeting_index",
+      "gaze_alignment",
+      "gaze_direction",
+      "hand_to_face_adaptors",
+      "head_tilt_forward",
+      "shoulder_elevation_sustained",
+      "torso_movement_index",
+      "trunk_openness_dynamics"
+    ],
+    "n_variables": 20,
+    "escala": "0-8",
+    "umbrales": "sin definir (modelo guia)",
+    "nota_targets": "El artefacto real (model.pt/modelo.onnx) tiene 20 salidas verificadas en T3.1 (n_targets=20); meta.json solo detalla los loss_weights de las 12 originales."
+  },
+  "estado": "modelo d35: test macro 86.20 vs e14 81.79 (d35final_out.txt de DivLara)",
+  "version": "divlara-d35-mlp",
+  "constanteBackend": "CONFIGURACION.VERSION_MODELO_DIVLARA",
+  "artefacto": {
+    "archivo": "modelo.onnx",
+    "archivosOrigen": [
+      "model_e17mlp_b0_d35_draft_20261122_094429",
+      "model_e17mlp_b0_d35x_draft_20261122_095209",
+      "model_e17mlp_b0_d35x_draft_20261122_095333",
+      "model_e17mlp_b0_d35x_draft_20261122_100126"
+    ],
+    "sha256": {
+      "modelo.onnx": "e350cdbf2a1be8e97d7319ec740b9c3e8d713c786efcecf139527eea427270cf",
+      "scaler.json": "de899956eb0695f53ebf9752f6f647177187a5f37949e4260ebb4f1daa7c3887",
+      "meta.json": "0dcea1dcb7731686f02b66a8b7d3b1228e2b35b0521c50b979351b4c7c6504ab",
+      "golden.json": "7945895dc7e33103186e808f5ee5b6f48e88107498660891bf41be12df7eaebc",
+      "golden_features.json": "5928dee9498ddc0dfe9d7c8d6d4ded63f016ab9ada4242f36989ed7d46dca39e"
+    },
+    "nota": "modelo.onnx/scaler.json/meta.json/golden.json generados por export_d35_onnx.py. golden_features.json: ventana de landmarks y features copiadas de e14 (pipeline de features identico, feature_columns iguales); expected_predicciones_onnx recalculado ejecutando el modelo.onnx real de d35 (onnxruntime) sobre expected_features escaladas con scaler.json de d35. Las 14 features faltantes (cara) en expected_features se rellenan con scaler.mean de d35 (fallback equivalente a live.py)."
+  },
+  "entrada": {
+    "tipo": "ventana_landmarks",
+    "ventanaSeg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "nFeatures": 343,
+    "privacidad": "Procesamiento efímero en RAM (0 días de retención). MediaPipe corre en Android y envía solo landmarks de la ventana (P-1)."
+  },
+  "normalizacion": {
+    "metodo": "scaler_json",
+    "archivo": "scaler.json",
+    "pipeline": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "salidas": {
+    "versionModelo": "divlara-d35-mlp",
+    "sinEmociones": true,
+    "reglaPrivacidad": "RNF10 / D22: prohibido inferir o persistir emociones; solo conductas observables acotadas.",
+    "gestos": {
+      "clavesPermitidas": [
+        "toca_cara",
+        "manos_visibles",
+        "gesticula_manos",
+        "movimiento_cabeza",
+        "cabeza_inclinada",
+        "mirada_fuera",
+        "rostro_visible"
+      ],
+      "nota": "Mapeo desde las variables de E14 (escala 0-8) a conductas observables del backend (GESTOS_OBSERVABLES) se define en T3.1b/umbrales."
+    }
+  },
+  "ensambleSemillas": [
+    "model_e17mlp_b0_d35_draft_20261122_094429",
+    "model_e17mlp_b0_d35x_draft_20261122_095209",
+    "model_e17mlp_b0_d35x_draft_20261122_095333",
+    "model_e17mlp_b0_d35x_draft_20261122_100126"
+  ],
+  "metricasTest": {
+    "macroAcc_d35": 86.2,
+    "macroAcc_e14": 81.79,
+    "fuente": "d35final_out.txt"
+  }
+}

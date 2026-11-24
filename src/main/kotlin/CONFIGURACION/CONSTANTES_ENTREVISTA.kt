@@ -22,3 +22,13 @@ const val METRICAS_VIDEO_MAXIMAS_POR_LOTE = 300
 const val PUNTAJE_MAXIMO_RESPUESTA = 100
 const val TAMANO_PAGINA_ENTREVISTAS_POR_DEFECTO = 20
 const val TAMANO_PAGINA_ENTREVISTAS_MAXIMO = 100
+
+/** Un valor del modelo de visión (0-8) desde este umbral cuenta como acción reconocida en el reporte de simulación (T3.10). */
+const val UMBRAL_ACCION_RECONOCIDA = 4.0
+
+/** Duración que se asume para la última predicción (y para una sola) cuando no hay una siguiente que marque el fin: 1 s. */
+const val PASO_PREDICCION_POR_DEFECTO_MS = 1_000L
+
+/** Texto de la línea de tiempo antes de la primera predicción y cuando ninguna variable llega al umbral. */
+const val ACCION_ESPERANDO_VENTANA = "(esperando ventana)"
+const val ACCION_SIN_ACCION = "(sin accion reconocida)"

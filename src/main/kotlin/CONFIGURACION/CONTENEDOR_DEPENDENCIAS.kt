@@ -1,6 +1,7 @@
 package CONFIGURACION
 
 import INTEGRACIONES.CacheRedis
+import INTEGRACIONES.ClienteMotorVision
 import INTEGRACIONES.ClienteCorreoSmtp
 import INTEGRACIONES.ClienteGooglePlay
 import INTEGRACIONES.ClienteGoogleIdentidad
@@ -60,6 +61,9 @@ import SERVICIOS.ServicioTendenciasSkill
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioLlamadaExposed
+import MODELOS.RepositorioPrediccionSimulacionExposed
+import MODELOS.RepositorioRevisionTextoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
 import MODELOS.RepositorioNivelSkillExposed
 import MODELOS.RepositorioNivelacionExposed
@@ -86,6 +90,9 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import SERVICIOS.ServicioLlamada
+import SERVICIOS.ServicioRevisionLocal
+import SERVICIOS.ServicioSimulacion
 import MODELOS.LectorCostosIaExposed
 import SERVICIOS.ServicioCostosIa
 import SERVICIOS.TareaRescateReportes
@@ -128,6 +135,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     private val clienteGooglePlay = if (configuracion.googlePlay.esSimulado) null else ClienteGooglePlay(configuracion.googlePlay)
     val verificadorCompras: VerificadorCompraGoogle = clienteGooglePlay ?: VerificadorCompraSimulado()
     val documentosLegales = FuenteDocumentosLegalesArchivo()
+    /** Motor de inferencia de visión en otro proceso (T3.11): el backend no carga el modelo, lo consulta por HTTP. */
+    val clienteMotorVision = ClienteMotorVision(configuracion.motorVision)
 
     private val clienteHttpLlm = crearClienteHttpLlm()
 
@@ -251,6 +260,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         else -> null
     }
     private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()
+    private val repositorioPrediccionSimulacion = RepositorioPrediccionSimulacionExposed()
     private val repositorioNivelSkill = RepositorioNivelSkillExposed()
 
     val servicioReporte = ServicioReporteEntrevista(
@@ -275,6 +285,9 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         procesador = servicioReporte,
         tareasSegundoPlano = tareasSegundoPlano
     )
+    val servicioSimulacion = ServicioSimulacion(repositorioPrediccionSimulacion, repositorioSesionEntrevista)
+    val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion)
+    val servicioRevisionLocal = ServicioRevisionLocal(repositorioPregunta, RepositorioRevisionTextoExposed())
     private val corrector = CorrectorRespuestas(evaluadorRespuesta)
     private val repositorioPractica = RepositorioPracticaExposed()
     private val repositorioNivelacion = RepositorioNivelacionExposed()
@@ -338,6 +351,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         clienteMercadoLaboral.close()
         clienteGooglePlay?.close()
         clienteHttpLlm.close()
+        clienteMotorVision.close()
         cache.close()
     }
 }

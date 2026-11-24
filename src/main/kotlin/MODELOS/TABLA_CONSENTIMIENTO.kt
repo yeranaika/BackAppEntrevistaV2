@@ -25,7 +25,10 @@ object TablaTextoConsentimiento : Table("consentimiento_texto") {
 /** Aceptación de un usuario a una versión, con los alcances que eligió. */
 object TablaConsentimiento : Table("consentimiento") {
     val id = uuid("consentimiento_id")
-    val usuarioId = uuid("usuario_id")
+    /** NULL cuando la cuenta se eliminó: el registro se conserva como prueba de aceptación. */
+    val usuarioId = uuid("usuario_id").nullable()
+    /** Correo del usuario copiado al eliminar la cuenta (quién aceptó). */
+    val identidadRef = varchar("identidad_ref", 320).nullable()
     val version = varchar("version", 20)
     /** Lista de alcances aceptados, ej: ["uso_datos", "ia_entrenamiento"]. */
     val alcancesAceptados = jsonb("alcances_aceptados", Json, listaDeTextos).default(emptyList())
