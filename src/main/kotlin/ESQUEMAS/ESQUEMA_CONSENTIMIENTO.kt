@@ -15,12 +15,16 @@ data class RespuestaTextoConsentimiento(
 data class SolicitudPublicarTexto(
     val version: String,
     val title: String,
-    val body: String
+    val body: String,
+    /** Opciones que el usuario puede aceptar o rechazar (en la v1.1: "estadisticas_uso", "marketing" y
+     *  "analisis_conducta_camara"). Si no viene, una versión nueva queda sin opciones y una existente conserva las suyas. */
+    val alcances: List<String>? = null
 )
 
 @Serializable
 data class SolicitudConsentimiento(
     val version: String,
+    /** Solo se guardan los alcances que ofrece la versión; los demás se descartan. */
     val alcances: Map<String, Boolean>
 )
 

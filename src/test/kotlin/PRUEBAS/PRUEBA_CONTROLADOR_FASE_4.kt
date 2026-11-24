@@ -100,15 +100,24 @@ class PruebaControladorFase4 {
         val sistema = SistemaPrueba()
         application { sistema.montar(this) }
         val ana = tokenDe(sistema, "ana@ejemplo.com")
+        runBlocking { sistema.consentimiento.publicar("v1.1", "Consentimiento de uso de datos", "Texto", listOf("estadisticas_uso", "marketing", "analisis_conducta_camara")) }
 
         val vigente = enviar("GET", "/consent/current").objeto()
         val version = vigente.texto("version")!!
+        assertEquals("v1.1", version)
         assertEquals(HttpStatusCode.NoContent, enviar("GET", "/me/consent/latest", token = ana).status)
         assertEquals(HttpStatusCode.Unauthorized, enviar("POST", "/me/consent", "{}").status)
 
-        val otorgado = enviar("POST", "/me/consent", """{"version":"$version","alcances":{"uso_datos":true,"ia_entrenamiento":false}}""", ana)
+        // Lo que manda la app, más claves que la versión no ofrece ("analytics" premarcado de la app vieja): se descartan (D35).
+        val otorgado = enviar("POST", "/me/consent", """{"version":"$version","alcances":{"estadisticas_uso":true,"marketing":false,"analytics":true,"ia_entrenamiento":true}}""", ana)
         assertEquals(HttpStatusCode.Created, otorgado.status)
-        assertEquals(true, otorgado.objeto()["alcances"]!!.jsonObject["uso_datos"]!!.jsonPrimitive.boolean)
+        val alcances = otorgado.objeto()["alcances"]!!.jsonObject.mapValues { it.value.jsonPrimitive.boolean }
+        assertEquals(mapOf("estadisticas_uso" to true, "marketing" to false, "analisis_conducta_camara" to false), alcances)
+        // La app vieja (solo "analytics" premarcado) acepta igual, pero no queda ninguna estadística encendida.
+        val vieja = enviar("POST", "/me/consent", """{"version":"$version","alcances":{"analytics":true,"marketing":false}}""", ana)
+        assertEquals(HttpStatusCode.Created, vieja.status)
+        assertEquals(false, vieja.objeto()["alcances"]!!.jsonObject["estadisticas_uso"]!!.jsonPrimitive.boolean)
+        assertEquals(null, vieja.objeto()["alcances"]!!.jsonObject["analytics"])
         assertEquals(version, enviar("GET", "/me/consent/latest", token = ana).objeto().texto("version"))
 
         assertEquals("version_no_encontrada", enviar("POST", "/me/consent", """{"version":"9.9.9","alcances":{"uso_datos":true}}""", ana).objeto().texto("error"))
@@ -164,6 +173,13 @@ class PruebaControladorFase4 {
         assertEquals(HttpStatusCode.Created, enviar("POST", "/admin/consent/text", nueva, admin).status)
         assertEquals("2.0.0", enviar("GET", "/consent/current").objeto().texto("version"))
         assertEquals(2, enviar("GET", "/api/v1/legal/versions").lista().size)
+
+        // Una vez aceptada, la 2.0.0 no se puede cambiar: 409 (D35). Republicarla igual sí.
+        assertEquals(HttpStatusCode.Created, enviar("POST", "/me/consent", """{"version":"2.0.0","alcances":{"analytics":true}}""", usuario).status)
+        val cambiada = enviar("POST", "/api/v1/legal/admin/eula", """{"version":"2.0.0","title":"EULA v2","body":"Texto cambiado"}""", admin)
+        assertEquals(HttpStatusCode.Conflict, cambiada.status)
+        assertEquals("version_con_aceptaciones", cambiada.objeto().texto("error"))
+        assertEquals(HttpStatusCode.Created, enviar("POST", "/admin/consent/text", nueva, admin).status)
     }
 
     // ---------- Recordatorios ----------

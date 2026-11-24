@@ -415,6 +415,64 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaValidadorLotePreguntaIa` (5 casos). Sigue pendiente aceptar lo válido de un lote parcial y rechazar
   preguntas abiertas manuales con rúbrica vacía.
 
+## D35 · Consentimiento v1.1 y documentos legales alineados con RNF09/RNF10 (2026-11)
+- **Contexto**: el consentimiento v1.0 de la semilla hablaba de "grabaciones de video" y del alcance
+  `analisis_video_expresiones`, y prometía revocar "desde Configuración > Privacidad", que no existe en la app. La
+  Política de Privacidad y los Términos (1.0.0) hablaban de "transcripciones de audio", "respuestas grabadas" y
+  "análisis multimodal", sin nombrar la cámara, el proveedor de IA ni Firebase. Todo eso contradice RNF09 (el video no se
+  graba y el dictado se hace en el teléfono) y RNF10 (feedback sin emociones). Además, `POST /api/v1/legal/admin/eula`
+  no permitía indicar los alcances, así que una versión publicada por la API quedaba sin `alcances_posibles` y el mapa
+  de `GET /me/consent/latest` no traía en `false` lo que el usuario rechazó.
+- **Decisión**:
+  - Texto nuevo `v1.1` en `docs/legal/CONSENTIMIENTO.md` (fuente única; la app lo muestra como texto plano), con los
+    alcances que ya envía la app: `["analytics", "marketing"]`. Dice qué datos se usan, que el audio y el video no salen
+    del teléfono, que no se reconoce el rostro ni se deducen emociones, qué va al proveedor de IA en Premium (sin
+    nombre ni correo, posiblemente fuera de Chile), que no se entrena IA con las respuestas, y los derechos según la Ley
+    19.628 modificada por la Ley 21.719.
+  - `SolicitudPublicarTexto` acepta `alcances` (opcional): en una versión nueva sin `alcances` queda la lista vacía; al
+    republicar una existente sin `alcances` se conservan los que tenía.
+  - Política de Privacidad y Términos pasan a `1.1.0` (`VERSION_DOCUMENTOS_ESTATICOS`); la semilla carga la `v1.1`.
+  - En producción la `v1.1` se publica por la API (no por la semilla, que no pisa la `v1.0` existente): al publicarla,
+    la app pide a cada usuario aceptar otra vez. Publicarla **con** `alcances: ["estadisticas_uso", "marketing",
+    "analisis_conducta_camara"]` (si no, queda sin opciones y se descarta todo lo que la app envíe), **después** de
+    publicar la app con el PR #21 (que incluye el #20) y con el backend de D35 ya desplegado: el texto promete cambiar
+    las opciones y retirar el consentimiento en Perfil, y eso llega con el #21.
+- **`estadisticas_uso` en vez de `analytics`**: la app de `dev` envía `analytics` **premarcado** (`ConsentViewModel`), así
+  que esa clave no prueba un opt-in real (Ley 21.719). Si la `v1.1` ofreciera `analytics`, quien la aceptara con esa app
+  quedaría guardado como que eligió las estadísticas y, al actualizar a la app con Firebase (PR #20), se encendería el
+  monitoreo. Con una clave que la app vieja nunca envía, su `analytics` se descarta, sin importar el orden de los
+  despliegues. La app (PR #20/#21, `ALCANCE_ANALYTICS`) debe pasar a `estadisticas_uso`; mientras no lo haga, Firebase
+  queda apagado (falla del lado seguro).
+- **Permiso aparte para la cámara (checklist C09)**: la `v1.1` ofrece además `analisis_conducta_camara`
+  (`ALCANCE_ANALISIS_CAMARA`): medir conductas con la cámara en la simulación tipo videollamada. El texto lo explica
+  ("te pedimos un permiso aparte la primera vez que activas la cámara") y el consentimiento general no lo marca. La app
+  debe registrarlo al tocar "Acepto, activar cámara": `POST /me/consent` con la misma versión, los alcances que ya
+  tenía la persona y este en `true` (y en `false` si lo retira), sin perderlo al cambiar las otras opciones. Va en la
+  misma `v1.1` para que nadie tenga que aceptar dos versiones seguidas. Exigirlo en `/metricas` y borrar las métricas al
+  retirarlo es la tarea C10 (cuando la app ya lo registre, para no rechazar las métricas de todos).
+- **Solo cuentan los alcances que ofrece la versión**: en `POST /me/consent` una clave que el texto no ofrece
+  (`ia_entrenamiento`, `analytics`, una inventada) **se descarta** y queda en el log; no se rechaza el pedido, para que
+  la app actual pueda seguir aceptando aunque en producción rija una versión sin sus opciones (un 400 la habría dejado
+  sin poder practicar). Y el mapa de `alcances` que devuelven `POST /me/consent` y `GET /me/consent/latest` trae **solo**
+  los que ofrece la versión: un `analytics` que se guardó antes de este filtro (sobre la `v1.0`, que no lo ofrece) ya
+  no sale en `true`. La app debe tomar el estado de ese mapa, no de lo que envió.
+- **Una versión ya aceptada no se cambia**: publicar una versión existente con otro título, cuerpo o alcances responde
+  `409 version_con_aceptaciones` si alguien ya la aceptó (cambiaría lo que esa persona aceptó: va en una versión nueva).
+  Republicarla igual solo la vuelve a dejar vigente, y una que nadie aceptó se puede corregir.
+- **EULA de respaldo `1.1.0`** (`docs/legal/EULA.md`, se publica solo si la BD no tiene ningún texto): ya no ofrece
+  usar los datos "con fines de mejora del modelo"; dice que no se entrena IA con las respuestas, la voz ni la imagen,
+  que la cámara no graba y que rige la Ley 19.628 modificada por la Ley 21.719.
+- **App**: Perfil › Privacidad y consentimiento permite cambiar las opciones (vuelve a aceptar la misma versión con
+  los alcances nuevos) y retirar el consentimiento (`POST /me/consent/revoke`; la app lo pide de nuevo antes de
+  seguir). Rama `feature/gestionar-consentimiento` de la app: publicar la `v1.1` después de instalar esa versión.
+- **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise; evaluación de impacto
+  breve según la Ley 21.719 y fecha de vigencia de esa ley (checklist C08); app: registrar el permiso de cámara (C09).
+- **Pruebas**: `PruebaServicioConsentimiento` (alcances guardados, conservados al republicar, mapa con los rechazados
+  en `false`, alcance vacío rechazado, claves no ofrecidas descartadas, `analytics` premarcado descartado en la `v1.1`,
+  fila anterior al filtro que no sale en el mapa, versión sin alcances, permiso de cámara aparte, 409 al cambiar una
+  versión aceptada y reactivación) y el flujo HTTP de `PruebaControladorFase4` (lo que manda la app
+  y el 409). `PROBAR_SEMILLA.ps1` con la `v1.1` cargada con saltos de línea y sus tres alcances.
+
 ## D36 · Feedback genérico por pregunta: correcto, medio y malo (2026-11)
 - **Pedido:** que cada pregunta generada traiga 3 feedbacks genéricos (correcto, medio, malo) y un método para completar
   las preguntas que ya están en el banco y no tienen alguno de los tres.
@@ -444,3 +502,20 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaFeedbackGenerico` (17 casos: modelo, esquema y prompt de IA, validación del admin, corrección
   abierta y de opción múltiple, completar por lote o por id, omitidos, fallo a mitad de camino, límites y permisos).
 
+## D37 · Sin clips de video en las respuestas y modelo de visión de ejemplo deprecado (2026-11)
+- **Contexto**: `POST /api/v1/entrevistas/{id}/respuestas` aceptaba y guardaba `videoClipUrl` (una URL https), y una
+  pregunta de simulación en video se podía responder solo con el clip. El consentimiento `v1.1` (D35) dice que no se
+  graba ni se envía video (RNF09) y la app no lo envía. La semilla registraba un modelo de visión `activo` que
+  "detecta expresiones faciales", con una precisión inventada, contra RNF10 y D22 (checklist C53 y parte de C47).
+- **Decisión**:
+  - `videoClipUrl` se sigue aceptando en el JSON (para no romper un cliente antiguo con 400) pero **se ignora y no se
+    guarda**. Toda pregunta abierta o de video se responde con `texto` (escrito o dictado); sin texto, `400
+    respuesta_requerida`. La columna `video_clip_url` queda para las respuestas anteriores (no se borran datos) y
+    `respuesta.videoClipUrl` sale `null` en las nuevas.
+  - La fila de ejemplo del modelo de visión queda `deprecado`, sin la etiqueta `expresion_dominante` ni métricas.
+    Semilla corregida y `migrations/023_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
+    (idempotente; el código no lee esa tabla, así que se puede aplicar antes o después de desplegar). El modelo real
+    se registra cuando el compañero lo entregue (C02).
+- **Contrato Android**: sin cambios (la app nunca envió `videoClipUrl`).
+- **Pruebas**: `PruebaServicioEntrevista` (la pregunta de video exige texto y no guarda el clip) y
+  `PruebaControladorEntrevista` (el JSON con `videoClipUrl` responde 200 y el clip no aparece).

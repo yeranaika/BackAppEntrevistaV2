@@ -125,8 +125,12 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
     ]),
     ("05 · Consentimientos y documentos legales", "", [
         req("Texto vigente", "GET", "/consent/current", PUBLICA, guarda={"versionConsentimiento": ("j.version", lambda j: j.get("version"))}),
-        req("Aceptar consentimiento", "POST", "/me/consent", body={"version": "{{versionConsentimiento}}", "alcances": {"uso_datos": True, "ia_entrenamiento": False}},
-            espera=[201], desc="`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior."),
+        req("Aceptar consentimiento", "POST", "/me/consent", body={"version": "{{versionConsentimiento}}", "alcances": {"estadisticas_uso": True, "marketing": False}},
+            espera=[201], desc="`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. "
+                               "Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): "
+                               "una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae "
+                               "los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, "
+                               "con la misma versión y los alcances que ya tenía la persona."),
         req("Mi consentimiento", "GET", "/me/consent/latest", espera=[200, 204]),
         req("Revocar consentimiento", "POST", "/me/consent/revoke", espera=[200, 404]),
         req("EULA vigente", "GET", "/api/v1/legal/eula", PUBLICA),
@@ -134,8 +138,10 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Términos de servicio", "GET", "/api/v1/legal/terms", PUBLICA),
         req("Política de privacidad", "GET", "/api/v1/legal/privacy", PUBLICA),
         req("Publicar versión del EULA (admin)", "POST", "/api/v1/legal/admin/eula", ADMIN,
-            body={"version": "2.0.0", "title": "EULA", "body": "Texto"}, omitir_en_prueba=True,
-            desc="⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`."),
+            body={"version": "2.0.0", "title": "EULA", "body": "Texto", "alcances": ["estadisticas_uso", "marketing", "analisis_conducta_camara"]}, omitir_en_prueba=True, espera=[201, 409],
+            desc="⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`. `alcances` son las opciones "
+                 "que la persona puede aceptar (sin ellas, una versión nueva no ofrece ninguna). `409 version_con_aceptaciones` si cambia "
+                 "el título, el cuerpo o los alcances de una versión que alguien ya aceptó; republicarla igual solo la deja vigente (D35)."),
     ]),
     ("06 · Recordatorios", "", [
         req("Guardar preferencias", "PUT", "/recordatorios/preferencias",
@@ -262,7 +268,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                                  lambda j: (j.get("opciones") or [{}])[0].get("opcionId", ""))}),
         req("Responder pregunta", "POST", "/api/v1/entrevistas/{{sesionId}}/respuestas",
             body={"preguntaSesionId": "{{preguntaSesionId}}", "opcionId": "{{opcionId}}", "texto": "Una corrutina se suspende sin bloquear el hilo."},
-            desc="En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez."),
+            desc="En alternativas se usa `opcionId`; en abiertas y de video `texto` (`videoClipUrl` se acepta pero se ignora: no se guardan clips, D37). Cada pregunta se responde una vez."),
         req("Enviar métricas de video", "POST", "/api/v1/entrevistas/{{sesionId}}/metricas",
             body={"metricas": [{"timestampMs": 0, "contactoVisual": 80.5, "postura": 70},
                                {"timestampMs": 500, "contactoVisual": 78, "postura": 72, "gestos": {"toca_cara": 0, "mirada_fuera": 0.25}},
@@ -381,8 +387,8 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             body={"correo": "alias.{{$timestamp}}@ejemplo.com", "contrasena": "Clave-segura-1", "rol": "user"}, espera=[201],
             desc="Igual que `POST /admin/usuarios`."),
         req("Publicar texto de consentimiento (alias)", "POST", "/admin/consent/text", ADMIN,
-            body={"version": "2.0.0", "title": "EULA", "body": "Texto"}, omitir_en_prueba=True,
-            desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos."),
+            body={"version": "2.0.0", "title": "EULA", "body": "Texto", "alcances": ["estadisticas_uso", "marketing", "analisis_conducta_camara"]}, omitir_en_prueba=True, espera=[201, 409],
+            desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos (mismo 409)."),
         req("Generar preguntas con IA (alias)", "POST", "/api/v1/admin/questions/generate-ai", ADMIN,
             body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2}, omitir_en_prueba=True,
             desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: "

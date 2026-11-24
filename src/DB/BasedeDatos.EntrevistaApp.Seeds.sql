@@ -28,15 +28,14 @@ SET search_path TO app, public;
 -- S1: CONSENTIMIENTO LEGAL
 -- =============================================================================
 
+-- Texto fuente y cambios frente a la v1.0: docs/legal/CONSENTIMIENTO.md (la app lo muestra como texto plano).
 INSERT INTO consentimiento_texto (version, titulo, cuerpo, alcances_posibles, vigente)
 VALUES (
-    'v1.0',
-    'Consentimiento de uso de datos y análisis con IA',
-    'Al usar esta plataforma aceptas que tus datos de sesión, respuestas de texto '
-    'y grabaciones de video sean procesados por modelos de IA para generar tu '
-    'reporte de desempeño personalizado. Puedes revocar este consentimiento en '
-    'cualquier momento desde Configuración > Privacidad.',
-    '["uso_datos_sesion","analisis_respuestas_texto","analisis_video_expresiones","mejora_modelos_ia","comunicaciones_plataforma"]',
+    'v1.1',
+    'Consentimiento de uso de datos',
+    E'Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus datos. Aquí te contamos cuáles, para qué y qué no hacemos con ellos.\n\n1. Qué datos usamos\n• Tu cuenta: correo, nombre y lo que eliges al empezar (área, cargo objetivo y nivel de experiencia).\n• Tus prácticas: las respuestas que escribes o dictas, las opciones que marcas, tus puntajes y tu historial.\n• El dictado por voz se convierte en texto dentro de tu teléfono. No enviamos ni guardamos tu audio.\n\n2. La cámara en la simulación de entrevista\n• La cámara solo se usa en la simulación tipo videollamada y solo si le das permiso a tu teléfono.\n• No grabamos ni enviamos video ni fotos.\n• Cuando la app mide conductas, como si tus manos están a la vista o cuánto mueves la cabeza, lo calcula en tu teléfono y solo envía números resumidos.\n• No reconocemos tu rostro ni deducimos tus emociones.\n• Para medir esas conductas te pedimos un permiso aparte la primera vez que activas la cámara. Si no lo das, puedes practicar sin cámara; si lo das, lo retiras junto con este consentimiento (punto 6).\n\n3. Para qué los usamos\n• Para evaluar tus respuestas y darte un reporte con tus fortalezas, lo que te falta reforzar y recomendaciones.\n• En el plan gratuito, tus respuestas se evalúan con reglas en nuestro servidor.\n• En el plan Premium, el texto de tus respuestas y las preguntas se envían a un proveedor de inteligencia artificial (hoy Xiaomi MiMo; también podríamos usar OpenAI o Google) para escribir tu reporte. Estos proveedores pueden procesar los datos fuera de Chile. No les enviamos tu nombre ni tu correo.\n• No usamos tus respuestas para entrenar modelos de inteligencia artificial.\n\n4. Dos opciones que tú decides\n• Estadísticas de uso y errores: datos sobre qué partes de la app se usan y cuándo falla, para mejorarla. No incluyen tu nombre, tu correo ni lo que respondes.\n• Comunicaciones: novedades y consejos de la app.\nSi no las aceptas, la app funciona igual. Puedes cambiarlas cuando quieras en Perfil › Privacidad y consentimiento.\n\n5. Seguridad y conservación\n• Tus datos viajan cifrados y solo tú puedes ver tu historial.\n• Los guardamos mientras tengas tu cuenta. Si la eliminas (Perfil › Editar perfil › Eliminar cuenta), se borran tu cuenta y tus prácticas.\n\n6. Tus derechos\nPuedes retirar este consentimiento cuando quieras en Perfil › Privacidad y consentimiento; para seguir practicando tendrás que aceptarlo de nuevo. También puedes pedir acceso, corrección o eliminación de tus datos, u oponerte a su uso, según la ley chilena de protección de datos personales (Ley 19.628, modificada por la Ley 21.719), escribiendo a privacidad@entrevistaapp.com.',
+
+    '["estadisticas_uso","marketing","analisis_conducta_camara"]',
     TRUE
 )
 ON CONFLICT (version) DO NOTHING;
@@ -697,17 +696,19 @@ WHERE p.enunciado = '¿Qué es el ciclo de vida de un Activity en Android y cuá
 -- Registro inicial del modelo base (MediaPipe). El equipo de AI lo actualiza
 -- cuando entrena versiones custom.
 
+-- Fila de ejemplo heredada (D37): no es un modelo real ni lo usa el backend. Queda 'deprecado', sin expresiones
+-- faciales ni métricas inventadas (RNF10, D22). El modelo real se registra cuando el compañero lo entregue.
+-- En una BD ya sembrada la corrige migrations/023_modelo_vision_semilla_sin_expresiones.sql.
 INSERT INTO modelo_vision_ia (nombre, version, descripcion, tipo_arquitectura,
     labels_detectados, metricas_rendimiento, estado)
 VALUES (
-    'MediaPipe Base',
+    'MediaPipe Base (ejemplo, sin uso)',
     'v1.0.0-mediapipe',
-    'Modelo base usando MediaPipe Face Mesh + Pose. No requiere entrenamiento propio. '
-    'Detecta contacto visual, postura y expresiones faciales en tiempo real.',
+    'Fila de ejemplo heredada: no es un modelo entregado ni está en uso. No detecta expresiones ni emociones (RNF10).',
     'mediapipe',
-    '["contacto_visual","postura_score","expresion_dominante","gestos_detectados"]',
-    '{"precision_expresion": 0.78, "latencia_ms": 45, "fps_soportados": 30}',
-    'activo'
+    '["contacto_visual","postura_score","gestos_detectados"]',
+    NULL,
+    'deprecado'
 )
 ON CONFLICT (version) DO NOTHING;
 

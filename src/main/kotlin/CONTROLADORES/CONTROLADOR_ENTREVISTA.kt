@@ -31,7 +31,7 @@ import java.util.UUID
  * GET  /api/v1/entrevistas/actual               la entrevista en curso (204 si no hay)
  * GET  /api/v1/entrevistas/{id}                 detalle con preguntas y respuestas
  * GET  /api/v1/entrevistas/{id}/siguiente       siguiente pregunta sin responder (204 si no quedan)
- * POST /api/v1/entrevistas/{id}/respuestas      { preguntaSesionId, texto? | opcionId? | videoClipUrl? }
+ * POST /api/v1/entrevistas/{id}/respuestas      { preguntaSesionId, texto? | opcionId? } (videoClipUrl se ignora, D37)
  * POST /api/v1/entrevistas/{id}/metricas        lote de métricas de video { metricas: [...] }
  * POST /api/v1/entrevistas/{id}/finalizar
  * POST /api/v1/entrevistas/{id}/cancelar
@@ -71,8 +71,7 @@ fun Route.controladorEntrevista(servicio: ServicioEntrevista) {
                     val respuesta = RespuestaUsuario(
                         preguntaSesionId = uuidDelCuerpo(solicitud.preguntaSesionId),
                         texto = solicitud.texto,
-                        opcionId = solicitud.opcionId,
-                        videoClipUrl = solicitud.videoClipUrl
+                        opcionId = solicitud.opcionId
                     )
                     call.responderConMensaje(servicio.responder(call.usuarioIdDesdeJwt(), call.uuidDeParametro("id"), respuesta).aRespuesta(), "Respuesta guardada")
                 }
