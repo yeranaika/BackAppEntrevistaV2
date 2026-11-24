@@ -2,6 +2,7 @@ package PRUEBAS
 
 import CONFIGURACION.configurarErrores
 import CONTROLADORES.controladorPruebaVideo
+import CONTROLADORES.controladorPruebaVideoSiHabilitado
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
@@ -18,6 +19,7 @@ import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Recepción de vídeos de prueba: guarda con nombre del servidor y rechaza extensión o peso inválidos. */
@@ -36,6 +38,39 @@ class PruebaControladorPruebaVideo {
                 append(HttpHeaders.ContentDisposition, "filename=\"$nombre\"")
             })
         })
+
+    @Test
+    fun `sin HABILITAR_PRUEBAS_VIDEO las rutas no existen y no se guarda nada (D39)`() = testApplication {
+        val carpeta = Files.createTempDirectory("pruebas-video").toFile().resolve("pruebas")
+        try {
+            application {
+                install(ContentNegotiation) { json() }
+                configurarErrores()
+                routing { controladorPruebaVideoSiHabilitado(false, carpeta, 1024) }
+            }
+            assertEquals(HttpStatusCode.NotFound, subir("prueba.mp4", ByteArray(10)).status)
+            assertEquals(HttpStatusCode.NotFound, client.get("/pruebas").status)
+            assertFalse(carpeta.exists(), "no se crea la carpeta ni se escribe nada")
+        } finally {
+            carpeta.parentFile.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `con HABILITAR_PRUEBAS_VIDEO las rutas se montan`() = testApplication {
+        val carpeta = Files.createTempDirectory("pruebas-video").toFile().resolve("pruebas")
+        try {
+            application {
+                install(ContentNegotiation) { json() }
+                configurarErrores()
+                routing { controladorPruebaVideoSiHabilitado(true, carpeta, 1024) }
+            }
+            assertEquals(HttpStatusCode.OK, subir("prueba.mp4", ByteArray(10)).status)
+            assertEquals(1, carpeta.listFiles().orEmpty().size)
+        } finally {
+            carpeta.parentFile.deleteRecursively()
+        }
+    }
 
     @Test
     fun `una subida valida guarda el archivo con nombre del servidor y aparece en el listado`() = testApplication {

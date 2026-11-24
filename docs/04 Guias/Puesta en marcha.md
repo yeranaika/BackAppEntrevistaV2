@@ -1,7 +1,7 @@
 ---
 tipo: guia
 tags: [guia, setup, local]
-actualizado: 2026-11-19
+actualizado: 2026-11-24
 ---
 
 # Puesta en marcha
@@ -36,6 +36,7 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `APAGADO_ESPERA_TAREAS_SEGUNDOS` | No (150) | Al apagar, espera a los reportes y correos en curso antes de cortarlos (D20) |
 | `CABECERA_IP_CLIENTE` | No (vacía) | Cabecera con la IP real del cliente puesta por el proxy. En Railway `X-Real-IP`, **solo tras la prueba de humo** (abajo) |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
+| `HABILITAR_PRUEBAS_VIDEO` | No (false) | `true` monta `POST /pruebas/video` y `GET /pruebas` (calibración del modelo de visión, **sin sesión**, guardan `.mp4` en `pruebas/`). Solo en una máquina propia: en Railway el servidor no arranca con ella activa (D39) |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.
 
@@ -80,6 +81,13 @@ El modelo DivLara se empaqueta **dentro del proyecto del backend** en `models/di
   - **Entrada**: tensor `float32` de landmarks faciales MediaPipe por ventana temporal (~500 ms) con forma `[T, N, 3]`, orden canónico `0..N-1` y coordenadas `(x, y)` normalizadas `[0, 1]` + `z` relativa al ancho; procesamiento efímero en RAM (0 días, sin video crudo, P-1 / P-4).
   - **Normalización**: z-score `(x - media) / (std + eps)` con parámetros exactos del entrenamiento.
   - **Salidas**: métricas observables sin emociones (`RNF10` / `D22`) etiquetadas con `versionModelo = divlara-resnet-v1` (`RNF08`): `contactoVisual` (`0..100`), `postura` (`0..100`), `confianza` (`0..100`, nullable) y `gestos` restringidos a `GESTOS_OBSERVABLES` (`toca_cara`, `manos_visibles`, `gesticula_manos`, `movimiento_cabeza`, `cabeza_inclinada`, `mirada_fuera`, `rostro_visible`).
+
+### Calibrar el modelo de visión con video (`/pruebas/video`, D39)
+1. En el backend de pruebas (por ejemplo el del puerto 8093, nunca el 8080 del desarrollador ni Railway) poner
+   `HABILITAR_PRUEBAS_VIDEO=true` y arrancar: el log avisa que la ruta está abierta sin sesión.
+2. Compilar la app con `-PgrabarPrueba=true -PbackendHost=<ip> -PbackendPort=8093` y hacer la llamada de prueba.
+3. Con `GET /pruebas` en ese puerto, comprobar que el `.mp4` llegó a `pruebas/`.
+4. Al terminar: quitar la variable (o dejarla en `false`), reiniciar y borrar los videos de `pruebas/` que ya no sirvan.
 
 ### Apagado ordenado en Railway (D20)
 - `railway.json` fija `deploy.drainingSeconds: 200`: Railway espera hasta 200 s entre SIGTERM y SIGKILL (por defecto da 0).
