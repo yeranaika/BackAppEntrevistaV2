@@ -47,6 +47,9 @@
 3. `UMBRALES_CAJA_VIVA` actualizados con los de Fase3 (por evento).
 4. Build: `assembleReleaseLocal -PversionCode=17 -PversionName=1.9.8 -PbackendPort=8093
    -PmostrarOverlayVision=true -PgrabarPrueba=true` + tests + install + prueba en vivo.
+   > Desde D39 (2026-11-24): para que la subida del video funcione, el backend de 8093 debe arrancar con
+   > `HABILITAR_PRUEBAS_VIDEO=true`. Sin la variable, `POST /pruebas/video` responde 404 y la app solo avisa que el
+   > video quedó en el teléfono. Quitarla al terminar.
 5. APK servido como siempre.
 
 ### Fase6 — Reviews (Antigravity)

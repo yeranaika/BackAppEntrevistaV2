@@ -12,10 +12,12 @@ import CONTROLADORES.controladorNivelacion
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorDiccionario
 import CONTROLADORES.controladorLlamada
+import CONTROLADORES.controladorTranscripcion
 import CONTROLADORES.controladorRevisionLocal
 import CONTROLADORES.controladorPruebaPractica
-import CONTROLADORES.controladorPruebaVideo
+import CONTROLADORES.controladorPruebaVideoSiHabilitado
 import CONTROLADORES.controladorRecordatorio
 import CONTROLADORES.controladorSalud
 import CONTROLADORES.controladorSuscripcion
@@ -25,7 +27,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
 
 /** Monta todas las rutas con las dependencias ya construidas en el contenedor. */
-fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: EstadoFreemiumReadiness) {
+fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: EstadoFreemiumReadiness, pruebasVideo: Boolean = false) {
     routing {
         controladorSalud(disponibilidad, d.clienteMotorVision)
 
@@ -50,11 +52,14 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
         controladorEntrevista(d.servicioEntrevista)
         controladorVision(d.clienteMotorVision, d.servicioSimulacion)
         controladorLlamada(d.servicioLlamada)
+        controladorTranscripcion(d.servicioTranscripcion)
+        controladorDiccionario(d.servicioDiccionario)
         controladorFeedback(d.servicioReporte)
         controladorPractica(d.servicioPractica, d.servicioPruebasApp, d.evaluadorRespuesta)
         controladorRevisionLocal(d.servicioRevisionLocal)
         controladorNivelacion(d.servicioNivelacion, d.servicioTestNivelacion)
         controladorPruebaPractica(d.servicioPruebasApp)
-        controladorPruebaVideo()
+        // Calibración del modelo de visión: solo con HABILITAR_PRUEBAS_VIDEO=true, nunca en Railway (D39).
+        controladorPruebaVideoSiHabilitado(pruebasVideo)
     }
 }

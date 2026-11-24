@@ -294,7 +294,7 @@ Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollado
 
 `DELETE /cuenta` · Usuario · responde `200`
 
-⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{"confirmar": "eliminar"}`.
+⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{"confirmar": "eliminar"}`. Solo se conserva el registro de consentimiento (versión, alcances, fechas y correo, sin la IP) durante 5 años desde el borrado, como prueba (D38); después una tarea diaria lo borra.
 
 ```json
 {
@@ -392,14 +392,14 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 `POST /me/consent` · Usuario · responde `201`
 
-`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior.
+`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona. **Permiso de cámara (D38):** si el pedido no trae la clave `analisis_conducta_camara`, se conserva la que tenía la persona (la pantalla general y la de Perfil no la editan); `analisis_conducta_camara: false` lo retira y borra lo medido con la cámara, igual que pasar de una versión sin el permiso aparte (v1.0) a una que lo ofrece sin aceptarlo.
 
 ```json
 {
   "version": "{{versionConsentimiento}}",
   "alcances": {
-    "uso_datos": true,
-    "ia_entrenamiento": false
+    "estadisticas_uso": true,
+    "marketing": false
   }
 }
 ```
@@ -411,6 +411,8 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 ### Revocar consentimiento
 
 `POST /me/consent/revoke` · Usuario · responde `200`, `404`
+
+Retirar el consentimiento retira también el permiso de cámara: se borra lo medido con ella en todo lo de la persona (métricas de video, predicciones de la simulación, resumen de sus llamadas en vivo y el puntaje corporal de sus reportes) (D38). Se borra siempre, también si responde `404` porque no había uno vigente: así un reintento vuelve a borrar.
 
 ### EULA vigente
 
@@ -430,15 +432,20 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 ### Publicar versión del EULA (admin)
 
-`POST /api/v1/legal/admin/eula` · Admin · responde `200`
+`POST /api/v1/legal/admin/eula` · Admin · responde `201`, `409`
 
-⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`.
+⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`. `alcances` son las opciones que la persona puede aceptar (sin ellas, una versión nueva no ofrece ninguna). `409 version_con_aceptaciones` si cambia el título, el cuerpo o los alcances de una versión que alguien ya aceptó; republicarla igual solo la deja vigente (D35).
 
 ```json
 {
   "version": "2.0.0",
   "title": "EULA",
-  "body": "Texto"
+  "body": "Texto",
+  "alcances": [
+    "estadisticas_uso",
+    "marketing",
+    "analisis_conducta_camara"
+  ]
 }
 ```
 
@@ -682,7 +689,7 @@ Nace aprobada. Opción múltiple: 2 a 6 opciones y exactamente una correcta. Req
 
 `POST /api/v1/admin/preguntas` · Admin · responde `201`
 
-Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium.
+Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium. **Formato de la respuesta ideal (D40)**, el que ordena la app en la tarjeta: técnica, una frase de resumen y los pasos `1) 2) 3)`; blanda, `S: … T: … A: … R: …` (letras en mayúscula, en ese orden, con dos puntos y un espacio). Sin encabezados como `Respuesta ideal:`. El backend guarda el texto tal cual; si no sigue el formato, la app lo muestra como párrafo.
 
 ```json
 {
@@ -691,7 +698,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
   "categoria": "tecnica",
   "nivel": "junior",
   "enunciado": "Explica qué es una corrutina {{$timestamp}}",
-  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo y se reanuda después.",
+  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo. 1) Se lanza en un scope. 2) Se suspende en un punto de suspensión. 3) Se reanuda después.",
   "rubrica": {
     "criterios": [
       "explica_suspension"
@@ -715,7 +722,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
   "categoria": "blanda",
   "nivel": "junior",
   "enunciado": "Cuéntame de un conflicto en tu equipo {{$timestamp}}",
-  "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."
+  "respuestaIdeal": "S: Dos compañeros discutían por el diseño. T: Debía destrabar la decisión. A: 1) Los escuché por separado. 2) Propuse criterios comunes. R: Se eligió un diseño y el equipo siguió avanzando."
 }
 ```
 
@@ -876,7 +883,7 @@ Sin `cargoId` acepta `cargo` (nombre) o usa el objetivo del onboarding. `409 ent
 
 `POST /api/v1/entrevistas/{{sesionId}}/respuestas` · Usuario · responde `200`
 
-En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez.
+En alternativas se usa `opcionId`; en abiertas y de video `texto` (`videoClipUrl` se acepta pero se ignora: no se guardan clips, D37). Cada pregunta se responde una vez.
 
 ```json
 {
@@ -890,7 +897,7 @@ En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https e
 
 `POST /api/v1/entrevistas/{{sesionId}}/metricas` · Usuario · responde `201`
 
-Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`.
+Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `201` con `insertadas: 0` y no guarda nada (la práctica sigue sin cámara).
 
 ```json
 {
@@ -918,9 +925,9 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
 
 ### Predecir conductas observables (DivLara E14)
 
-`POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `503`
+`POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `403`, `503`
 
-El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
 
 ```json
 {
@@ -1128,7 +1135,7 @@ T3.13, **sin IA**. Solo texto (nunca audio ni video). El servidor repite la revi
 
 `POST /api/v1/llamadas` · Usuario · responde `200`, `201`
 
-T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.
+T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`. **Permiso de cámara (D38):** sin él la llamada se guarda solo con la duración y las preguntas (sin acciones, línea ni feedback), y retirarlo vacía el resumen de las llamadas ya guardadas.
 
 ```json
 {
@@ -1487,15 +1494,20 @@ Igual que `POST /admin/usuarios`.
 
 ### Publicar texto de consentimiento (alias)
 
-`POST /admin/consent/text` · Admin · responde `200`
+`POST /admin/consent/text` · Admin · responde `201`, `409`
 
-⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos.
+⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos (mismo 409).
 
 ```json
 {
   "version": "2.0.0",
   "title": "EULA",
-  "body": "Texto"
+  "body": "Texto",
+  "alcances": [
+    "estadisticas_uso",
+    "marketing",
+    "analisis_conducta_camara"
+  ]
 }
 ```
 
@@ -1521,7 +1533,7 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 162 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 163 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
@@ -1634,7 +1646,6 @@ Los 162 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `video_demasiado_grande` | El vídeo supera el máximo de … MB |
 | 400 | `video_ilegible` | No se pudo leer el vídeo enviado |
 | 400 | `video_requerido` | Falta el campo multipart 'video' |
-| 400 | `video_url_invalida` | El clip debe ser una URL https de hasta … caracteres |
 | 401 | `bad_credentials` | Correo o contraseña incorrectos |
 | 401 | `google_email_not_verified` | El correo de Google no está verificado |
 | 401 | `google_exchange_failed` | Google no entregó tokens para el código recibido |
@@ -1644,6 +1655,7 @@ Los 162 códigos que puede devolver el backend en `error`, leídos del código f
 | 401 | `missing_id_token` | La respuesta de Google no trae id_token |
 | 401 | `unauthorized` | Falta el token de acceso |
 | 403 | `inactive_user` | La cuenta no está activa |
+| 403 | `permiso_camara_requerido` | Activa el permiso de análisis con cámara para medir conductas |
 | 404 | `cargo_no_encontrado` | El cargo no existe |
 | 404 | `cargo_not_found` | No se encontró el cargo especificado |
 | 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |
@@ -1676,6 +1688,7 @@ Los 162 códigos que puede devolver el backend en `error`, leídos del código f
 | 409 | `preguntas_insuficientes` | Aún no hay suficientes preguntas aprobadas para … (…); prueba con otro nivel o cargo |
 | 409 | `reintentos_agotados` | Se alcanzó el máximo de … intentos para este reporte |
 | 409 | `reporte_no_reintentable` | Solo se puede reintentar un reporte que terminó con error |
+| 409 | `version_con_aceptaciones` | La versión … ya fue aceptada por usuarios: publica los cambios como una versión nueva |
 | 429 | `demasiados_intentos` | Demasiados intentos. Solicita un nuevo código |
 | 429 | `tope_generacion_ia_alcanzado` | Se acabaron los Credits del Token Plan de MiMo de este periodo; se renuevan el … (UTC) |
 | 502 | `provider_http_error` | El proveedor de IA no respondió |

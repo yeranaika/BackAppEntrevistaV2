@@ -42,7 +42,10 @@ fun Application.module() {
     }
 
     val disponibilidad = crearEstadoFreemiumReadiness()
-    configurarRutas(dependencias, disponibilidad)
+    if (configuracion.pruebasVideoHabilitadas) {
+        log.warn("HABILITAR_PRUEBAS_VIDEO=true: POST /pruebas/video recibe video sin sesión y lo guarda en el disco. Solo para calibrar en local, nunca en Railway.")
+    }
+    configurarRutas(dependencias, disponibilidad, configuracion.pruebasVideoHabilitadas)
     configurarCalentamientoFreemium(configuracion.jwt, disponibilidad)
     configurarMonitoreo()
 }

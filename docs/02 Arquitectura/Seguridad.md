@@ -19,7 +19,8 @@ actualizado: 2026-11-17
 | IA | Las respuestas del candidato van como **datos** en el mensaje de usuario, nunca en las instrucciones (limita inyección de prompts). Modelo, tokens y costo no se exponen |
 | Errores | Al cliente solo código + mensaje; trazas y detalles al log |
 | Secretos | Solo en `.env` / variables de entorno (ignorado por git). La config falla al arrancar si falta uno obligatorio |
-| Datos personales | Ley 19.628 (Chile). `DELETE /cuenta` borra todo (confirmación explícita). Consentimiento versionado |
+| Datos personales | Ley 19.628 (Chile), modificada por la Ley 21.719. `DELETE /cuenta` borra todo (confirmación explícita) salvo el registro de consentimiento sin IP, que se guarda 5 años desde el borrado y luego se purga a diario (D38). Consentimiento versionado: solo se guardan los alcances que la versión ofrece y una versión ya aceptada no se puede cambiar (D35) |
+| Rutas de calibración | `POST /pruebas/video` y `GET /pruebas` no tienen sesión y guardan video en disco: solo se montan con `HABILITAR_PRUEBAS_VIDEO=true`, apagada por defecto y nunca en Railway (D39) |
 | Transporte | TLS lo provee el despliegue (proxy / plataforma); el backend escucha HTTP en 8080 |
 
 > [!warning] Pendiente de confirmar

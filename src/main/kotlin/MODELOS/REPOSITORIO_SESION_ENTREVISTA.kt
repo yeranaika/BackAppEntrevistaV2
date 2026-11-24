@@ -212,11 +212,13 @@ class RepositorioSesionEntrevistaExposed : RepositorioSesionEntrevista {
             it[feedbackTecnico] = null
             it[feedbackBlando] = null
         }
+        // Lo dicho en la llamada (VOZ-4) también es la voz de la persona convertida en texto: se borra con lo demás.
+        val transcripcionesLlamada = TablaTranscripcionRespuesta.deleteWhere { TablaTranscripcionRespuesta.sesionId eq sesionId }
         val metricas = TablaMetricaVideo.deleteWhere { TablaMetricaVideo.sesionId eq sesionId }
         // Las predicciones por instante salen del video: se borran con él (no entran en el resumen que ve el cliente).
         TablaPrediccionSimulacion.deleteWhere { TablaPrediccionSimulacion.sesionId eq sesionId }
         vaciarTextoDelReporte(sesionId)
-        ResumenPurgaBiometrica(clips, transcripciones, metricas)
+        ResumenPurgaBiometrica(clips, transcripciones + transcripcionesLlamada, metricas)
     }
 
     // ---------- Apoyo (dentro de una transacción) ----------

@@ -1,8 +1,9 @@
 package CONTROLADORES
 
+import ERRORES.ErrorProhibido
 import ESQUEMAS.SolicitudPrediccionVision
-import SERVICIOS.ServicioSimulacion
 import SERVICIOS.PredictorVision
+import SERVICIOS.ServicioSimulacion
 import UTILIDADES.responderConMensaje
 import UTILIDADES.usuarioIdDesdeJwt
 import UTILIDADES.uuidDeParametro
@@ -28,9 +29,14 @@ fun Route.controladorVision(servicio: PredictorVision, simulacion: ServicioSimul
     authenticate("auth-jwt") {
         route("/api/v1/vision") {
             post("/predecir") {
+                val usuarioId = call.usuarioIdDesdeJwt()
+                // Sin el permiso de cámara no se procesan los puntos del cuerpo ni de los ojos (D38).
+                if (!simulacion.permiteCamara(usuarioId)) {
+                    throw ErrorProhibido("permiso_camara_requerido", "Activa el permiso de análisis con cámara para medir conductas")
+                }
                 val solicitud = call.receive<SolicitudPrediccionVision>()
                 val resultado = servicio.predecir(solicitud)
-                simulacion.registrar(call.usuarioIdDesdeJwt(), solicitud.sesionId?.let(::uuidDeTexto), solicitud.timestampMs, resultado)
+                simulacion.registrar(usuarioId, solicitud.sesionId?.let(::uuidDeTexto), solicitud.timestampMs, resultado)
                 call.responderConMensaje(resultado.aRespuesta(), "Predicción generada")
             }
 

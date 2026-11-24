@@ -28,7 +28,10 @@ class PruebaEliminarCuentaConsentimiento {
         sistema.usuarios.buscarPorCorreo(correo)!!.id
     }
 
-    private fun versionVigente(): String = runBlocking { sistema.consentimiento.textoVigente().version }
+    /** Solo se guardan los alcances que ofrece la versión (D35): esta los ofrece para probar que se conservan. */
+    private fun publicarVersionConAlcances(): String = runBlocking {
+        sistema.consentimiento.publicar("9.0.0", "Consentimiento de prueba", "Texto", listOf("uso_datos", "ia_entrenamiento")).version
+    }
 
     private fun sembrarSesionConMetricas(usuarioId: UUID): UUID = transaction {
         val sesion = UUID.randomUUID()
@@ -53,7 +56,7 @@ class PruebaEliminarCuentaConsentimiento {
     fun `eliminar la cuenta borra todo y conserva el consentimiento con la identidad`() = runBlocking<Unit> {
         val ana = registrar("ana@ejemplo.com")
         val otra = registrar("otra@ejemplo.com")
-        val version = versionVigente()
+        val version = publicarVersionConAlcances()
         sistema.consentimiento.otorgar(ana, version, mapOf("uso_datos" to true, "ia_entrenamiento" to true), "10.0.0.1")
         sistema.consentimiento.otorgar(otra, version, mapOf("uso_datos" to true), null)
         val sesionAna = sembrarSesionConMetricas(ana)
@@ -75,6 +78,11 @@ class PruebaEliminarCuentaConsentimiento {
             assertEquals(listOf("ia_entrenamiento", "uso_datos"), fila[TablaConsentimiento.alcancesAceptados])
             assertTrue(fila[TablaConsentimiento.aceptaEntrenamientoIa])
             assertNotNull(fila[TablaConsentimiento.fechaOtorgado])
+            // D38: la IP no se guarda, el consentimiento queda cerrado y desde ahí corre el plazo de conservación
+            assertNull(fila[TablaConsentimiento.ipOrigen])
+            assertNotNull(fila[TablaConsentimiento.fechaRevocado])
+            assertNotNull(fila[TablaConsentimiento.cuentaEliminadaEn])
+            assertEquals(false, fila[TablaConsentimiento.retencionLegal])
             // Los textos legales (globales) siguen ahí
             assertTrue(TablaTextoConsentimiento.selectAll().count() > 0)
             // Lo de otra persona no se toca

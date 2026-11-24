@@ -23,7 +23,7 @@ data class SolicitudResponderPregunta(
     val texto: String? = null,
     /** Para preguntas de opción múltiple. */
     val opcionId: String? = null,
-    /** Clip de video (https) para preguntas de simulación en video. */
+    /** Obsoleto: se acepta para no romper clientes antiguos, pero se ignora y no se guarda (D37, RNF09). */
     val videoClipUrl: String? = null
 )
 
@@ -71,6 +71,7 @@ data class RespuestaOpcionEntrevista(
 data class RespuestaDadaEntrevista(
     val texto: String? = null,
     val opcionId: String? = null,
+    /** Solo respuestas anteriores a D37; las nuevas no guardan clips. */
     val videoClipUrl: String? = null,
     val fechaRespuesta: String
 )

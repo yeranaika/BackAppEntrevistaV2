@@ -98,11 +98,13 @@ class PruebaControladorEntrevista {
             val cuerpo = if (pregunta.texto("tipo") == "opcion_multiple") {
                 """{"preguntaSesionId":"${pregunta.texto("preguntaSesionId")}","opcionId":"${pregunta["opciones"]!!.jsonArray[0].jsonObject.texto("opcionId")}"}"""
             } else {
-                """{"preguntaSesionId":"${pregunta.texto("preguntaSesionId")}","texto":"Mi respuesta"}"""
+                // videoClipUrl se sigue aceptando en el JSON (clientes antiguos) pero se ignora y no se guarda (D37).
+                """{"preguntaSesionId":"${pregunta.texto("preguntaSesionId")}","texto":"Mi respuesta","videoClipUrl":"https://storage.ejemplo.com/clip.mp4"}"""
             }
             val respondida = enviar("POST", "$base/$id/respuestas", cuerpo, ana)
             assertEquals(HttpStatusCode.OK, respondida.status, respondida.bodyAsText())
             assertEquals("true", respondida.objeto().texto("respondida"))
+            assertFalse(respondida.bodyAsText().contains("storage.ejemplo.com"), "el clip no se guarda")
         }
         assertEquals(HttpStatusCode.NoContent, enviar("GET", "$base/$id/siguiente", token = ana).status)
 

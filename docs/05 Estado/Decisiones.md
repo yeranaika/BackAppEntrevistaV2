@@ -415,6 +415,64 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaValidadorLotePreguntaIa` (5 casos). Sigue pendiente aceptar lo válido de un lote parcial y rechazar
   preguntas abiertas manuales con rúbrica vacía.
 
+## D35 · Consentimiento v1.1 y documentos legales alineados con RNF09/RNF10 (2026-11)
+- **Contexto**: el consentimiento v1.0 de la semilla hablaba de "grabaciones de video" y del alcance
+  `analisis_video_expresiones`, y prometía revocar "desde Configuración > Privacidad", que no existe en la app. La
+  Política de Privacidad y los Términos (1.0.0) hablaban de "transcripciones de audio", "respuestas grabadas" y
+  "análisis multimodal", sin nombrar la cámara, el proveedor de IA ni Firebase. Todo eso contradice RNF09 (el video no se
+  graba y el dictado se hace en el teléfono) y RNF10 (feedback sin emociones). Además, `POST /api/v1/legal/admin/eula`
+  no permitía indicar los alcances, así que una versión publicada por la API quedaba sin `alcances_posibles` y el mapa
+  de `GET /me/consent/latest` no traía en `false` lo que el usuario rechazó.
+- **Decisión**:
+  - Texto nuevo `v1.1` en `docs/legal/CONSENTIMIENTO.md` (fuente única; la app lo muestra como texto plano), con los
+    alcances que ya envía la app: `["analytics", "marketing"]`. Dice qué datos se usan, que el audio y el video no salen
+    del teléfono, que no se reconoce el rostro ni se deducen emociones, qué va al proveedor de IA en Premium (sin
+    nombre ni correo, posiblemente fuera de Chile), que no se entrena IA con las respuestas, y los derechos según la Ley
+    19.628 modificada por la Ley 21.719.
+  - `SolicitudPublicarTexto` acepta `alcances` (opcional): en una versión nueva sin `alcances` queda la lista vacía; al
+    republicar una existente sin `alcances` se conservan los que tenía.
+  - Política de Privacidad y Términos pasan a `1.1.0` (`VERSION_DOCUMENTOS_ESTATICOS`); la semilla carga la `v1.1`.
+  - En producción la `v1.1` se publica por la API (no por la semilla, que no pisa la `v1.0` existente): al publicarla,
+    la app pide a cada usuario aceptar otra vez. Publicarla **con** `alcances: ["estadisticas_uso", "marketing",
+    "analisis_conducta_camara"]` (si no, queda sin opciones y se descarta todo lo que la app envíe), **después** de
+    publicar la app con el PR #21 (que incluye el #20) y con el backend de D35 ya desplegado: el texto promete cambiar
+    las opciones y retirar el consentimiento en Perfil, y eso llega con el #21.
+- **`estadisticas_uso` en vez de `analytics`**: la app de `dev` envía `analytics` **premarcado** (`ConsentViewModel`), así
+  que esa clave no prueba un opt-in real (Ley 21.719). Si la `v1.1` ofreciera `analytics`, quien la aceptara con esa app
+  quedaría guardado como que eligió las estadísticas y, al actualizar a la app con Firebase (PR #20), se encendería el
+  monitoreo. Con una clave que la app vieja nunca envía, su `analytics` se descarta, sin importar el orden de los
+  despliegues. La app (PR #20/#21, `ALCANCE_ANALYTICS`) debe pasar a `estadisticas_uso`; mientras no lo haga, Firebase
+  queda apagado (falla del lado seguro).
+- **Permiso aparte para la cámara (checklist C09)**: la `v1.1` ofrece además `analisis_conducta_camara`
+  (`ALCANCE_ANALISIS_CAMARA`): medir conductas con la cámara en la simulación tipo videollamada. El texto lo explica
+  ("te pedimos un permiso aparte la primera vez que activas la cámara") y el consentimiento general no lo marca. La app
+  debe registrarlo al tocar "Acepto, activar cámara": `POST /me/consent` con la misma versión, los alcances que ya
+  tenía la persona y este en `true` (y en `false` si lo retira), sin perderlo al cambiar las otras opciones. Va en la
+  misma `v1.1` para que nadie tenga que aceptar dos versiones seguidas. Exigirlo en `/metricas` y borrar las métricas al
+  retirarlo es la tarea C10 (cuando la app ya lo registre, para no rechazar las métricas de todos). Hecho en D38.
+- **Solo cuentan los alcances que ofrece la versión**: en `POST /me/consent` una clave que el texto no ofrece
+  (`ia_entrenamiento`, `analytics`, una inventada) **se descarta** y queda en el log; no se rechaza el pedido, para que
+  la app actual pueda seguir aceptando aunque en producción rija una versión sin sus opciones (un 400 la habría dejado
+  sin poder practicar). Y el mapa de `alcances` que devuelven `POST /me/consent` y `GET /me/consent/latest` trae **solo**
+  los que ofrece la versión: un `analytics` que se guardó antes de este filtro (sobre la `v1.0`, que no lo ofrece) ya
+  no sale en `true`. La app debe tomar el estado de ese mapa, no de lo que envió.
+- **Una versión ya aceptada no se cambia**: publicar una versión existente con otro título, cuerpo o alcances responde
+  `409 version_con_aceptaciones` si alguien ya la aceptó (cambiaría lo que esa persona aceptó: va en una versión nueva).
+  Republicarla igual solo la vuelve a dejar vigente, y una que nadie aceptó se puede corregir.
+- **EULA de respaldo `1.1.0`** (`docs/legal/EULA.md`, se publica solo si la BD no tiene ningún texto): ya no ofrece
+  usar los datos "con fines de mejora del modelo"; dice que no se entrena IA con las respuestas, la voz ni la imagen,
+  que la cámara no graba y que rige la Ley 19.628 modificada por la Ley 21.719.
+- **App**: Perfil › Privacidad y consentimiento permite cambiar las opciones (vuelve a aceptar la misma versión con
+  los alcances nuevos) y retirar el consentimiento (`POST /me/consent/revoke`; la app lo pide de nuevo antes de
+  seguir). Rama `feature/gestionar-consentimiento` de la app: publicar la `v1.1` después de instalar esa versión.
+- **Pendiente**: el correo `privacidad@entrevistaapp.com` debe ser uno real que el equipo revise; evaluación de impacto
+  breve según la Ley 21.719 y fecha de vigencia de esa ley (checklist C08); app: registrar el permiso de cámara (C09).
+- **Pruebas**: `PruebaServicioConsentimiento` (alcances guardados, conservados al republicar, mapa con los rechazados
+  en `false`, alcance vacío rechazado, claves no ofrecidas descartadas, `analytics` premarcado descartado en la `v1.1`,
+  fila anterior al filtro que no sale en el mapa, versión sin alcances, permiso de cámara aparte, 409 al cambiar una
+  versión aceptada y reactivación) y el flujo HTTP de `PruebaControladorFase4` (lo que manda la app
+  y el 409). `PROBAR_SEMILLA.ps1` con la `v1.1` cargada con saltos de línea y sus tres alcances.
+
 ## D36 · Feedback genérico por pregunta: correcto, medio y malo (2026-11)
 - **Pedido:** que cada pregunta generada traiga 3 feedbacks genéricos (correcto, medio, malo) y un método para completar
   las preguntas que ya están en el banco y no tienen alguno de los tres.
@@ -444,3 +502,146 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaFeedbackGenerico` (17 casos: modelo, esquema y prompt de IA, validación del admin, corrección
   abierta y de opción múltiple, completar por lote o por id, omitidos, fallo a mitad de camino, límites y permisos).
 
+## D37 · Sin clips de video en las respuestas y modelo de visión de ejemplo deprecado (2026-11)
+- **Contexto**: `POST /api/v1/entrevistas/{id}/respuestas` aceptaba y guardaba `videoClipUrl` (una URL https), y una
+  pregunta de simulación en video se podía responder solo con el clip. El consentimiento `v1.1` (D35) dice que no se
+  graba ni se envía video (RNF09) y la app no lo envía. La semilla registraba un modelo de visión `activo` que
+  "detecta expresiones faciales", con una precisión inventada, contra RNF10 y D22 (checklist C53 y parte de C47).
+- **Decisión**:
+  - `videoClipUrl` se sigue aceptando en el JSON (para no romper un cliente antiguo con 400) pero **se ignora y no se
+    guarda**. Toda pregunta abierta o de video se responde con `texto` (escrito o dictado); sin texto, `400
+    respuesta_requerida`. La columna `video_clip_url` queda para las respuestas anteriores (no se borran datos) y
+    `respuesta.videoClipUrl` sale `null` en las nuevas.
+  - La fila de ejemplo del modelo de visión queda `deprecado`, sin la etiqueta `expresion_dominante` ni métricas.
+    Semilla corregida y `migrations/028_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
+    (idempotente; el código no lee esa tabla, así que se puede aplicar antes o después de desplegar). Era la 023 en
+    el PR #7; pasó a 028 porque `main` ya traía `023_version_modelo.sql`. El modelo real llegó con `main`
+    (`motor-vision`) y se identifica con el texto `metrica_video.version_modelo` (opción (a) de C02), no con esta tabla.
+- **Contrato Android**: sin cambios (la app nunca envió `videoClipUrl`).
+- **Pruebas**: `PruebaServicioEntrevista` (la pregunta de video exige texto y no guarda el clip) y
+  `PruebaControladorEntrevista` (el JSON con `videoClipUrl` responde 200 y el clip no aparece).
+
+## D38 · Permiso de cámara exigido y plazo de 5 años para el consentimiento de una cuenta eliminada (2026-11)
+- **Contexto**: al juntar `main` con `DEV` (PR #10), la revisión encontró que el texto `v1.1` (D35) prometía dos cosas
+  que el código no cumplía, y el 409 de D35 impide corregirlo cuando alguien lo acepta:
+  - `POST /api/v1/vision/predecir` (de `main`) recibe puntos del cuerpo y de los ojos por cuadro, infiere en el
+    servidor y guarda en `prediccion_simulacion` sin mirar el permiso `analisis_conducta_camara`; y `/metricas` tampoco
+    lo miraba (era la tarea C10).
+  - La migración 024 conserva el consentimiento al borrar la cuenta (con el correo y la IP), sin plazo, y el texto
+    decía que se borraba todo.
+- **Decisión — permiso de cámara** (cierra C10 en el backend):
+  - `ServicioConsentimiento.permite(usuario)`: si la versión del consentimiento de la persona (o la vigente, si no
+    aceptó ninguna) ofrece `analisis_conducta_camara`, hace falta haberlo aceptado. Una versión que no lo ofrece (la
+    `v1.0` de Railway) sigue como antes, para no cortar las métricas de todos mientras rige.
+  - Sin el permiso, `POST /entrevistas/{id}/metricas` responde `201` con `insertadas: 0`, `/vision/predecir` responde
+    `403 permiso_camara_requerido` sin procesar los puntos, y `POST /llamadas` guarda la llamada solo con la duración y
+    las preguntas: la práctica sigue sin cámara, como dice el texto.
+  - **Qué cuenta como retirarlo:** `analisis_conducta_camara: false` en `POST /me/consent`, retirar el consentimiento,
+    o pasar de una versión sin el permiso aparte (v1.0, permiso implícito) a una que lo ofrece sin aceptarlo. Si el
+    pedido no trae la clave, se conserva el permiso que la persona ya tenía, también al aceptar una versión nueva que lo
+    ofrece: la pantalla general y la de Perfil no lo editan, se da y se quita aparte.
+  - Al retirarlo se borra lo medido con la cámara en todo lo de la persona (`BorradorDatosCamara`): métricas de video,
+    predicciones de la simulación, el resumen de sus llamadas en vivo (acciones, línea y feedback) y, en sus reportes,
+    el puntaje de lenguaje corporal y sus dos frases. Como en el borrado biométrico por sesión, el puntaje global y el
+    resumen del reporte se quedan.
+  - El borrado va **antes** de guardar el consentimiento o de revocarlo, y revocar borra siempre (también si responde
+    404): si algo falla, un reintento vuelve a borrar. Después de guardar métricas, predicciones o una llamada se vuelve
+    a mirar el permiso (`confirmarDespuesDeGuardar`): si se retiró mientras tanto, se borra lo recién guardado.
+  - El texto `v1.1` ya no dice "solo envía números resumidos": dice que el teléfono envía solo números (medidas o la
+    posición de algunos puntos del cuerpo y de los ojos, nunca imágenes), que esos puntos no se guardan y que al
+    retirar el permiso se borra lo medido. La Política (1.2.0) y el EULA de respaldo (1.2.0) dicen lo mismo, y el
+    punto 1 del texto `v1.1` nombra la IP del registro del consentimiento.
+- **Decisión — plazo del consentimiento de una cuenta eliminada: 5 años desde el borrado.** Investigado y verificado
+  en el texto publicado en el Diario Oficial (Ley 19.628 modificada por la Ley 21.719):
+  - La ley no fija años: los datos se guardan solo lo necesario y después se suprimen o anonimizan (art. 3 c). Guardar la
+    prueba es necesario porque el responsable debe probar que tuvo el consentimiento (art. 12, inciso final) y la
+    supresión no procede si hace falta para defender un reclamo (art. 7, excepción vi; art. 13 e).
+  - Los 5 años cubren los 4 que tiene la Agencia para perseguir una infracción (art. 40, desde que cesa: el borrado) y
+    los 5 de la acción ordinaria del Código Civil (art. 2515). Hasta que rija el régimen nuevo, el art. 2332 del Código
+    Civil da 4 años. Los 5 años del art. 47 corren desde una multa firme, así que se cubren con la retención legal.
+  - La Ley 21.855 (Diario Oficial del 23-11-2026) posterga la vigencia de la Ley 21.719 al **15-10-2027**. Se aplica
+    desde ya porque también cumple el régimen actual.
+  - Al borrar la cuenta se borra la IP (ninguna norma la exige para probar el consentimiento y el art. 3 c pide solo lo
+    necesario) y se cierra el consentimiento (`fecha_revocado`). Se guardan la versión, las opciones, las fechas y el
+    correo. `cuenta_eliminada_en` marca desde cuándo corre el plazo.
+  - `TareaPurgaConsentimientos` borra cada día los registros vencidos. `retencion_legal = TRUE` (a mano, por SQL) los
+    conserva mientras haya un reclamo, un procedimiento de la Agencia o un juicio. Una fila de cuenta borrada sin fecha
+    (borrada por SQL o por el backend anterior con la 029 ya aplicada) se completa en la purga como en la 029.
+  - El plazo está en el punto 5 del texto `v1.1`, en la Política de Privacidad 1.2.0 (el art. 14 ter i obliga a
+    informarlo) y en `DELETE /cuenta`.
+  - Lo que debe validar un abogado: que el plazo del art. 40 corra desde el borrado y que la vía contractual de 5 años
+    aplique. Con 4 años también se cumpliría la ley si se descarta la vía contractual.
+- **Migración 029** (idempotente): `cuenta_eliminada_en`, `retencion_legal` e índice; para las cuentas eliminadas antes
+  de ella borra la IP, cierra el consentimiento y cuenta el plazo desde el día en que se aplica.
+- **Contrato Android**: sin cambios de forma. Con la `v1.1` vigente, la app tiene que registrar
+  `analisis_conducta_camara` (C09) para que se guarden las métricas: sin eso `insertadas` sale en 0.
+- **Pruebas**: `PruebaPermisoCamara` (12: guardar sin permiso, qué cuenta como retirarlo, llamadas y reportes,
+  reintento del retiro), `PruebaPurgaConsentimientos` (2), `PruebaEliminarCuentaConsentimiento` (IP, cierre y fecha de
+  borrado), el 403 en `PruebaControladorVision`, versiones de la Política y el EULA, y `PROBAR_SEMILLA.ps1` con la 029.
+  Una revisión adversarial de 4 ángulos (lógica, BD, contrato con la app, textos legales) encontró las llamadas, los
+  reportes, el retiro implícito de la v1.0, la atomicidad del borrado y la IP del punto 1; todo quedó corregido.
+
+## D39 · `/pruebas/video` solo con una variable, apagada por defecto (2026-11)
+- **Contexto**: `POST /pruebas/video` y `GET /pruebas` (T4.6, de `main`) sirven para calibrar los umbrales del modelo de
+  visión: la app compilada con `-PgrabarPrueba=true` sube el `.mp4` de una llamada de prueba. Se montaban siempre, sin
+  sesión: cualquiera podía subir videos de hasta 200 MB a la carpeta `pruebas/` del servidor y listar los nombres. Eso
+  contradice D37 y el texto del consentimiento (no se graba ni se envía video) y abre la puerta a llenar el disco.
+- **Decisión**: las dos rutas se montan solo con `HABILITAR_PRUEBAS_VIDEO=true` (`ConfiguracionGeneral.pruebasVideoHabilitadas`,
+  `controladorPruebaVideoSiHabilitado`). Por defecto no existen (404) y en Railway la variable no se define. Al
+  arrancar con la variable activa queda un aviso en el log. Solo el literal `true` la activa, y dentro de Railway
+  (`RAILWAY_PROJECT_ID` o `RAILWAY_ENVIRONMENT_ID`) el servidor no arranca con ella activa. Se mantienen sin sesión
+  porque la app de calibración no manda token; son una herramienta local.
+- **Riesgo aceptado**: con la variable activa no hay sesión, tope de disco ni límite de frecuencia: cualquiera en la
+  misma red puede subir varios `.mp4` de 200 MB. Se acepta porque se activa solo mientras se calibra, en una máquina
+  propia, y `pruebas/` se vacía al terminar (`docs/04 Guias/Puesta en marcha.md`).
+- **Contrato Android**: sin cambios para la app normal; la grabación de prueba (`-PgrabarPrueba=true`) solo funciona
+  contra un backend propio fuera de Railway con la variable activa.
+- **Después de desplegar en Railway**: revisado el 2026-11-24, los despliegues de `main` con las rutas abiertas fallaron
+  por el puerto 8093 y nunca llegaron a producción. Igual, comprobar que
+  `POST /pruebas/video` responde 404 y, si el servicio tiene un volumen en el directorio de trabajo, borrar a mano
+  `pruebas/*.mp4` (sin volumen, el redeploy ya los elimina).
+- **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella) y
+  `PruebaConfiguracionPruebasVideo` (solo `true`, falla en Railway y las rutas de producción usan la condición).
+
+## D40 · Respuesta ideal en el formato que ordena la app (2026-11)
+- **Contexto**: la app (`RESPUESTA_IDEAL.kt`, en `DEV` de la app) ordena la tarjeta "Respuesta ideal": `S: … T: … A: … R: …`
+  como cuatro bloques y los pasos `1) 2) 3)` como viñetas; lo demás lo muestra como párrafo. En Railway (2026-11-24) casi
+  ninguna respuesta lo seguía: 0 de 73 blandas abiertas con STAR y 0 de 178 técnicas abiertas con pasos. La generación
+  con IA no lo pedía y el validador exigía las palabras "situación", "tarea", "acción" y "resultado".
+- **Decisión**:
+  - El prompt de `generar-ia` pide el formato en las abiertas y de video: blandas con `S:`, `T:`, `A:` y `R:` (pasos de
+    la acción numerados) y técnicas con una frase de resumen y pasos numerados, sin encabezados, flechas ni llaves.
+    Opción múltiple sigue igual.
+  - El validador normaliza lo que devuelve la IA (`FormatoRespuestaIdeal.normalizar`): quita el encabezado ("Respuesta
+    ideal:", "Respuesta ideal (STAR):", con o sin negrita), cambia "Situación:", "Tarea:", "Acción:" y "Resultado:" por
+    las letras si vienen las cuatro en orden (también "S: Situación:" y "**Situación:**"), y quita negritas y viñetas
+    alrededor de las marcas. En una blanda abierta o de video exige las cuatro marcas en orden y una sola vez cada una
+    (`respuesta_sin_formato_star`): una "R:" de más ("el lenguaje R: …") partiría mal la tarjeta. Con las marcas ya no
+    pide las palabras completas, y los pasos "1) 2)" cuentan como oraciones aunque no terminen en punto.
+  - Las preguntas que crea o edita el admin se guardan tal cual: cambiar su texto rompería la paridad del revisor local
+    con la app (casos dorados), que calculan sobre el mismo texto descargado.
+  - La corrección freemium compara **sin las marcas** (`sinMarcas`), en la ideal y en lo que escribe la persona (que
+    puede copiar el formato de la tarjeta): "S:" o "1)" no cuentan como palabras ni alargan el texto, así que el formato
+    no cambia el puntaje. Igual que la app, los números de paso se quitan por bloque y solo donde hay dos o más.
+- **Pendiente**: reescribir al formato las 255 respuestas abiertas que ya están en Railway (73 blandas, 4 de video y 178
+  técnicas), sin cambiar su contenido. El revisor local (`REVISOR_TEXTO_LIBRE`, backend y app) todavía cuenta las marcas
+  como palabras: quitarlas a la vez en los dos para no romper la paridad.
+- **Contrato Android**: sin cambios.
+- **Pruebas**: `PruebaFormatoRespuestaIdeal`, el validador (STAR con letras, palabras completas convertidas, rechazo sin
+  marcas, opción múltiple sin exigirlas, técnica con pasos sin punto), el prompt y la corrección freemium (mismo puntaje
+  con o sin marcas, también si la persona las copia). Una revisión adversarial de 3 ángulos (paridad con la app,
+  validador y generación, puntaje) encontró 9 casos, todos corregidos.
+
+
+## D41 · Voz en la llamada: transcripción por pregunta y diccionarios de terminología (2026-11)
+- **Qué**: `POST /api/v1/transcripciones` guarda el texto de lo que la persona respondió a cada pregunta de la llamada, y
+  `/api/v1/diccionarios` (+ `/admin/diccionarios`) sirve paquetes de terminología por área, editables desde un panel.
+  Migración `030`. Detalle y criterios VOZ-1 a VOZ-5 en [[Voz en la llamada]].
+- **Por qué texto y no audio**: RNF09/VOZ-5. El reconocimiento corre en el teléfono; el servidor no recibe voz, así que no hace
+  falta un consentimiento nuevo. Un ASR en servidor o nube sí lo necesitaría (T0.8) y no cambia este contrato.
+- **Por qué diccionarios en datos y versionados**: sumar áreas o términos no debe exigir una app nueva. La `version` sube en
+  cada edición y al desactivar; la app solo baja lo que cambió. `versionEsperada` evita pisar la edición de otra persona.
+- **Una fila por pregunta**: reenviar reemplaza; un parcial nunca pisa a un final (llegan fuera de orden si hay mala red).
+- **Privacidad**: las transcripciones entran en `purgarDatosBiometricos` junto con las de la entrevista.
+- **Contrato Android**: solo rutas nuevas; no se tocó ninguna existente.
+- **Pruebas**: `PruebaControladorVoz` (11).
