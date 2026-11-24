@@ -67,6 +67,7 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **IA para premium en práctica y nivelación** (hoy solo freemium; la interfaz `EvaluadorRespuesta` lo permite).
 - [ ] **Resumen de nivelación con IA** para premium (hoy determinista).
 - [ ] **Transcripción de audio (STT)** para preguntas de video: hoy un clip sin transcripción no se evalúa.
+  - Para la **llamada en vivo** ya existe el endpoint de transcripciones (D41, migración `030`); falta la app (pregunta visible, captura con `MotorDictado`, envío por respuesta y reporte) y aplicar la `030` en Railway.
 - [x] Endpoint para que un admin vea costos de IA (2026-11-06, rama `feature/costos-ia-admin`): `GET /api/v1/admin/costos-ia`
   por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. El panel lo muestra en Dashboard, Informes
   y Generar con IA (`getCostosIa`, commit `f912f63` del panel, rama `feature/panel-admin-v2`, sin integrar en `main`).

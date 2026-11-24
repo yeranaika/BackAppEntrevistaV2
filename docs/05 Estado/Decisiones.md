@@ -632,3 +632,16 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   con o sin marcas, también si la persona las copia). Una revisión adversarial de 3 ángulos (paridad con la app,
   validador y generación, puntaje) encontró 9 casos, todos corregidos.
 
+
+## D41 · Voz en la llamada: transcripción por pregunta y diccionarios de terminología (2026-11)
+- **Qué**: `POST /api/v1/transcripciones` guarda el texto de lo que la persona respondió a cada pregunta de la llamada, y
+  `/api/v1/diccionarios` (+ `/admin/diccionarios`) sirve paquetes de terminología por área, editables desde un panel.
+  Migración `030`. Detalle y criterios VOZ-1 a VOZ-5 en [[Voz en la llamada]].
+- **Por qué texto y no audio**: RNF09/VOZ-5. El reconocimiento corre en el teléfono; el servidor no recibe voz, así que no hace
+  falta un consentimiento nuevo. Un ASR en servidor o nube sí lo necesitaría (T0.8) y no cambia este contrato.
+- **Por qué diccionarios en datos y versionados**: sumar áreas o términos no debe exigir una app nueva. La `version` sube en
+  cada edición y al desactivar; la app solo baja lo que cambió. `versionEsperada` evita pisar la edición de otra persona.
+- **Una fila por pregunta**: reenviar reemplaza; un parcial nunca pisa a un final (llegan fuera de orden si hay mala red).
+- **Privacidad**: las transcripciones entran en `purgarDatosBiometricos` junto con las de la entrevista.
+- **Contrato Android**: solo rutas nuevas; no se tocó ninguna existente.
+- **Pruebas**: `PruebaControladorVoz` (11).

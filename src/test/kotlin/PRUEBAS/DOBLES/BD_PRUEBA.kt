@@ -20,7 +20,9 @@ import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorDiccionario
 import CONTROLADORES.controladorLlamada
+import CONTROLADORES.controladorTranscripcion
 import CONTROLADORES.controladorRevisionLocal
 import CONTROLADORES.controladorUsuario
 import CONTROLADORES.controladorVision
@@ -89,7 +91,9 @@ import SERVICIOS.EvaluadorEntrevistaFreemium
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.ServicioReporteEntrevista
 import MODELOS.TablaMetricaVideo
+import MODELOS.TablaDiccionarioTerminologia
 import MODELOS.TablaLlamada
+import MODELOS.TablaTranscripcionRespuesta
 import MODELOS.TablaPrediccionSimulacion
 import MODELOS.TablaRevisionTexto
 import MODELOS.RepositorioPrediccionSimulacionExposed
@@ -150,6 +154,7 @@ object BdPrueba {
                 TablaCargo, TablaSkill, TablaSkillTendencia, TablaCargoSkill, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa,
                 TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion,
                 TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo, TablaPrediccionSimulacion, TablaLlamada, TablaRevisionTexto,
+                TablaTranscripcionRespuesta, TablaDiccionarioTerminologia,
                 TablaTestNivelacion, TablaIntentoTest, TablaResultadoNivelacion, TablaSesionPractica, TablaRespuestaPractica,
                 TablaNivelSkillUsuario, TablaReporteEntrevista, TablaReporteSkillDetalle
             )
@@ -306,6 +311,10 @@ class SistemaPrueba(
     val simulacion = ServicioSimulacion(prediccionesSimulacion, sesionesEntrevista, reloj, consentimiento)
     val llamadasRepo = MODELOS.RepositorioLlamadaExposed()
     val llamadas = SERVICIOS.ServicioLlamada(llamadasRepo, simulacion, consentimiento)
+    val transcripcionesRepo = MODELOS.RepositorioTranscripcionExposed()
+    val transcripciones = SERVICIOS.ServicioTranscripcion(transcripcionesRepo, sesionesEntrevista)
+    val diccionarioRepo = MODELOS.RepositorioDiccionarioExposed()
+    val diccionarios = SERVICIOS.ServicioDiccionario(diccionarioRepo)
 
     // Reporte de feedback (reportesRepo está más arriba). En las pruebas se llama a reporte.procesar(...) a mano para que
     // sea determinista.
@@ -371,6 +380,8 @@ class SistemaPrueba(
             controladorEntrevista(entrevista)
             controladorVision(vision, simulacion)
             controladorLlamada(llamadas)
+            controladorTranscripcion(transcripciones)
+            controladorDiccionario(diccionarios)
             controladorFeedback(reporte)
             controladorPractica(practica, pruebasApp, evaluador)
             controladorRevisionLocal(revisionLocal)

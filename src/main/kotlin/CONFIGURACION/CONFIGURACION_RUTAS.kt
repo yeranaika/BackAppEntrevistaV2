@@ -12,7 +12,9 @@ import CONTROLADORES.controladorNivelacion
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPractica
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorDiccionario
 import CONTROLADORES.controladorLlamada
+import CONTROLADORES.controladorTranscripcion
 import CONTROLADORES.controladorRevisionLocal
 import CONTROLADORES.controladorPruebaPractica
 import CONTROLADORES.controladorPruebaVideoSiHabilitado
@@ -50,6 +52,8 @@ fun Application.configurarRutas(d: ContenedorDependencias, disponibilidad: Estad
         controladorEntrevista(d.servicioEntrevista)
         controladorVision(d.clienteMotorVision, d.servicioSimulacion)
         controladorLlamada(d.servicioLlamada)
+        controladorTranscripcion(d.servicioTranscripcion)
+        controladorDiccionario(d.servicioDiccionario)
         controladorFeedback(d.servicioReporte)
         controladorPractica(d.servicioPractica, d.servicioPruebasApp, d.evaluadorRespuesta)
         controladorRevisionLocal(d.servicioRevisionLocal)

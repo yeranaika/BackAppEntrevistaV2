@@ -1075,3 +1075,43 @@ CREATE INDEX IF NOT EXISTS idx_llamada_usuario_fecha ON llamada(usuario_id, fech
 --   test:{test_id}:preguntas         TTL 12h
 --   modelo:vision:activo             TTL 1h (refresh cada sesión)
 -- =============================================================================
+
+-- Voz en la llamada: transcripción por pregunta y diccionarios de terminología. Ver migrations/030.
+CREATE TABLE IF NOT EXISTS transcripcion_respuesta (
+    id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id   UUID         NOT NULL REFERENCES usuario(usuario_id) ON DELETE CASCADE,
+    sesion_id    UUID         NOT NULL REFERENCES sesion_entrevista(sesion_id) ON DELETE CASCADE,
+    pregunta_id  UUID         NOT NULL,
+    inicio_ms    BIGINT       NOT NULL CHECK (inicio_ms >= 0),
+    fin_ms       BIGINT       NOT NULL CHECK (fin_ms >= inicio_ms),
+    texto        TEXT         NOT NULL,
+    idioma       VARCHAR(10)  NOT NULL DEFAULT 'es',
+    confianza    REAL         CHECK (confianza IS NULL OR (confianza >= 0 AND confianza <= 1)),
+    parcial      BOOLEAN      NOT NULL DEFAULT FALSE,
+    recibida_en  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT transcripcion_respuesta_unica UNIQUE (usuario_id, sesion_id, pregunta_id)
+);
+CREATE INDEX IF NOT EXISTS idx_transcripcion_sesion ON transcripcion_respuesta(sesion_id);
+
+CREATE TABLE IF NOT EXISTS diccionario_terminologia (
+    area           VARCHAR(40)  PRIMARY KEY,
+    nombre         VARCHAR(80)  NOT NULL,
+    version        INTEGER      NOT NULL DEFAULT 1 CHECK (version >= 1),
+    activo         BOOLEAN      NOT NULL DEFAULT TRUE,
+    terminos       JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    correcciones   JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    actualizado_en TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Paquetes iniciales (tecnología). Se pueden editar desde el panel: ON CONFLICT no pisa lo que ya se editó.
+INSERT INTO diccionario_terminologia (area, nombre, terminos, correcciones) VALUES
+ ('base', 'Base común',
+  '["API","REST","JSON","Git","GitHub","SQL","backend","frontend","framework","deploy","pull request","testing","CI/CD","Docker","scrum","sprint"]',
+  '[{"de":"yeison","a":"JSON"},{"de":"guit","a":"Git"},{"de":"dóquer","a":"Docker"},{"de":"escrum","a":"Scrum"}]'),
+ ('programador-front', 'Programador Front-end',
+  '["JavaScript","TypeScript","React","Vue","Angular","HTML","CSS","Tailwind","Redux","Next.js","Vite","webpack","DOM","componentes","hooks","responsive","accesibilidad","Jest","Cypress"]',
+  '[{"de":"java escript","a":"JavaScript"},{"de":"taipscript","a":"TypeScript"},{"de":"riact","a":"React"},{"de":"tailwin","a":"Tailwind"},{"de":"redax","a":"Redux"},{"de":"cipres","a":"Cypress"}]'),
+ ('programador-back', 'Programador Back-end',
+  '["Kotlin","Ktor","Spring","Node.js","PostgreSQL","Redis","microservicios","ORM","JWT","OAuth","endpoint","middleware","Kafka","RabbitMQ","GraphQL","migración","índice","transacción"]',
+  '[{"de":"cotlin","a":"Kotlin"},{"de":"postgres ql","a":"PostgreSQL"},{"de":"micro servicios","a":"microservicios"},{"de":"graf ql","a":"GraphQL"}]')
+ON CONFLICT (area) DO NOTHING;

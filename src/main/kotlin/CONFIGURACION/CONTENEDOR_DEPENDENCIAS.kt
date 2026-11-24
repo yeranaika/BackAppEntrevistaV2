@@ -62,7 +62,9 @@ import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
 import MODELOS.BorradorDatosCamaraExposed
 import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioDiccionarioExposed
 import MODELOS.RepositorioLlamadaExposed
+import MODELOS.RepositorioTranscripcionExposed
 import MODELOS.RepositorioPrediccionSimulacionExposed
 import MODELOS.RepositorioRevisionTextoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
@@ -91,7 +93,9 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import SERVICIOS.ServicioDiccionario
 import SERVICIOS.ServicioLlamada
+import SERVICIOS.ServicioTranscripcion
 import SERVICIOS.ServicioRevisionLocal
 import SERVICIOS.ServicioSimulacion
 import MODELOS.LectorCostosIaExposed
@@ -292,6 +296,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         repositorioPrediccionSimulacion, repositorioSesionEntrevista, permisoCamara = servicioConsentimiento
     )
     val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion, servicioConsentimiento)
+    val servicioTranscripcion = ServicioTranscripcion(RepositorioTranscripcionExposed(), repositorioSesionEntrevista)
+    val servicioDiccionario = ServicioDiccionario(RepositorioDiccionarioExposed())
     val servicioRevisionLocal = ServicioRevisionLocal(repositorioPregunta, RepositorioRevisionTextoExposed())
     private val corrector = CorrectorRespuestas(evaluadorRespuesta)
     private val repositorioPractica = RepositorioPracticaExposed()
