@@ -1061,3 +1061,122 @@ Corrida iniciada: 23-nov-2026 17:49 (-03)
 * Antecedente del turno anterior (no verificado en esta corrida)
   - Docker/PostgreSQL quedaron caídos tras el reinicio del PC y se levantaron con schtasks + bats iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat.
 * Sin commits, sin tocar código y sin reiniciar servicios durante esta guardia.
+
+
+---
+
+## 2026-11-23 22:24 (-03) — guardia nocturna
+
+# Bitácora nocturna — DivLara
+
+## Hora
+- Recopilación: 23-nov-2026 22:24:59 -03 (corte 22:24).
+
+## Tareas
+
+### Completadas recientes
+- T4.1 modelo mlp_d35 → divlara-d35-mlp en backend (worker claude)
+- T4.2 app con recuadros multi-evento y línea de tiempo con colores
+- T4.3 pulido v14 (píldora tapa recuadro, gramática, manos juntas)
+- T5.4b integración DEV + merge a main
+- T5.7 fix multipart 50MB y constante e14
+- T5.10 review antigravity backend + integración
+- T5.4 snapshot + rama actualizada
+- Reentreno d36 en 4 fases (datos/etiquetado, reentreno GPU con foco en 6 eventos, calibración de umbrales con video, integración backend d36)
+- E10 pg_dump previo + migración 024
+- T3.13 BD local offline Room
+- T3.17 ventana de reporte post-llamada
+
+### Listas (ready)
+- T4.4 umbral recuadros en vivo 3.5
+- T4.5 app graba video de prueba
+- T4.6 endpoint POST /pruebas/video
+- T4.7 umbrales por evento
+- T5.1 prueba en vivo con grabación (v16)
+- T5.3 claude pensador: plan de integración
+- T5.5 OmniRoute documentador nocturno
+- T5.6 calibrar umbrales con video e informe mañana
+- T5.8 archivos d35 faltantes + gitignore tests + verde + commit
+- T5.9 backend persiste promedios y segmentos de /api/v1/llamadas
+- E6-prep dataset de verdad R1+R2
+
+### Bloqueadas (2)
+- T3.5 métricas de rendimiento en la app
+- T3.6 validación en vivo vs offline (ambas R-2)
+
+## Hallazgos técnicos
+
+### Motor de visión
+- Reiniciado proceso puerto 8094 con MODELO_VERSION=divlara-d35-mlp
+- GET /health responde modeloDivlara.version=divlara-d35-mlp, cargado=true
+- POST /predict con golden_features.json devuelve 20 scores enteros en escala 0-8
+- 522 tests en verde (cleanTest test)
+- Default en CONSTANTES_VISION.kt sigue siendo e14
+
+### Umbrales en vivo
+- Mapa por evento: arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5 (UMBRAL_CAJA_VIVA)
+- Reporte "Eventos en el tiempo" 4.0
+- Archivo nuevo UmbralesCajaVivaTest.kt con 4 tests
+- Build verde con testReleaseUnitTest y assembleReleaseLocal (versionCode=16, versionName=1.9.7, puerto 8093, mostrarOverlayVision=true, grabarPrueba=true)
+
+### Grabación de prueba en la app (GRABADOR_PRUEBA.kt)
+- Flag -PgrabarPrueba=true
+- Guarda en getExternalFilesDir/pruebas/prueba-<timestamp>.mp4 sin audio
+- Indicador rojo "● GRABANDO PRUEBA"
+- POST multipart a /pruebas/video al Detener
+- Aviso sin crash si falla
+- 3 tests nuevos
+- Si la cámara no soporta Preview+ImageAnalysis+VideoCapture a la vez, esa sesión no graba
+
+### Backend POST /pruebas/video
+- Multipart, guarda en <raíz>/pruebas/ con nombre generado por el servidor
+- Valida extensión .mp4
+- Tope 200 MB con borrado de parciales
+- GET /pruebas lista archivos
+- 3 tests (incluye path traversal ../../evil.mp4)
+- Pendiente: las dos rutas no exigen sesión — protegerlas con authenticate antes de cualquier despliegue
+
+### Overlay e informe
+- Recuadros en vivo con nombre, valor y color
+- Tarjeta "Eventos en el tiempo" con barra de tiempo por evento, conteo y duración máxima
+- Llamadas viejas sin segmentos muestran mensaje neutro (DetalleLlamadaDto no los incluye)
+- 453 tests pasando
+
+### Pulido v14
+- textoVeces(n) para "1 vez"/"N veces"
+- Debounce de 3 fotogramas (DebounceBinario) para segmentos de "manos juntas"
+- Color 0xFFFFD600
+- Aviso: la cubierta de 9 recuadros solo está verificada que compila, no en pantalla
+
+### Integración origin/DEV (plan T5.3)
+- 9 archivos en conflicto en backend
+- BD_PRUEBA.kt choca seguro (línea 179, ambos añaden parámetros a SistemaPrueba)
+- Probables aditivos en CONTENEDOR_DEPENDENCIAS.kt, CONFIGURACION_RUTAS.kt, CONFIGURACION_GENERAL.kt y 5 docs
+- Riesgo semántico en la constante TipoProveedorIa.MIMO dentro de when exhaustivos
+- Android sin conflictos
+- Orden: commit en feature → traer origin/DEV → merge a main, con tag de respaldo
+
+### Snapshot
+- Creadas feature/llamada-vivo-d35 (backend f8d6d86) y feature/llamada-overlay-grabacion (Android 7ddb558)
+- git status limpio en ambos
+- main sin cambios (70f4b6c y d033f82)
+- Limpieza: .gitignore con .opencode/, dumps/, APKs/, *.apk
+- Borrado el archivo vacío =5.26
+
+### Problemas
+- Sesión no interactiva de claude bloqueó git tag/fetch/switch/merge/gradlew
+- T5.4b/integración no ejecutó el paso 1 (tag de respaldo)
+- Backend sigue en feature/llamada-vivo-d35 sin tocar main
+- Los logs de videob, d35 y andr terminaron con exit 255 por timeout/not responding en 192.168.0.181 (la tarea reportó COMPLETADA antes de cortar)
+- Aviso de auth de claude: vigencia entre 2026-11-29 y 2026-12-02
+
+### Seguridad
+- opencode.json commiteado solo referencia {env:GITHUB_TOKEN}, sin secretos
+- git avisó conversión LF→CRLF sin cambiar contenido
+
+## Próximos pasos
+- T5.8 archivos d35 faltantes + gitignore tests + verde + commit
+- T5.9 persistir promedios y segmentos
+- T5.6 calibrar umbrales con video e informe a la mañana
+- Aprobar permisos git/gradlew para la integración DEV
+- Proteger /pruebas con authenticate

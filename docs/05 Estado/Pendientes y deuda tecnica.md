@@ -46,9 +46,12 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   instrucciones sobre plazos cuando empiece a operar (la Ley 21.719 rige desde el 15-10-2027, Ley 21.855).
 - [x] ~~**`POST /pruebas/video` sin sesión**~~ (de `main`): ahora solo existe con `HABILITAR_PRUEBAS_VIDEO=true`,
   apagada por defecto y prohibida en Railway (D39, 2026-11-24).
-- [ ] **Llevar D39 a `main` y limpiar `pruebas/` en Railway**: hasta que el arreglo llegue a `main`, la versión
-  desplegada sigue aceptando videos sin sesión. Después de desplegar, comprobar el 404 y, si el servicio tiene un
-  volumen montado en el directorio de trabajo, borrar a mano `pruebas/*.mp4` y anotar la fecha.
+- [x] ~~**Puerto 8093 en `application.yaml`**~~ (commit `f8d6d86` de `main`): Railway revisa `/ready` en el 8080, así
+  que los 3 despliegues de `main` del 2026-11-23 fallaron y producción siguió con el PR #6 (`/pruebas/video` nunca
+  llegó a producción). Vuelve a 8080 (2026-11-24); en local se usa `-P:ktor.deployment.port=8093`.
+- [ ] **Antes de llevar `DEV` a `main`**: con el puerto correcto Railway sí despliega `main`. Aplicar antes en Railway las
+  migraciones 023 a 029 en orden. Después de desplegar, comprobar que `POST /pruebas/video` responde 404 y, si el
+  servicio tiene un volumen en el directorio de trabajo, revisar que `pruebas/` esté vacío.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.

@@ -596,7 +596,8 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   propia, y `pruebas/` se vacía al terminar (`docs/04 Guias/Puesta en marcha.md`).
 - **Contrato Android**: sin cambios para la app normal; la grabación de prueba (`-PgrabarPrueba=true`) solo funciona
   contra un backend propio fuera de Railway con la variable activa.
-- **Después de desplegar en Railway**: mientras `main` montó las rutas sin condición pudo recibir videos. Comprobar que
+- **Después de desplegar en Railway**: revisado el 2026-11-24, los despliegues de `main` con las rutas abiertas fallaron
+  por el puerto 8093 y nunca llegaron a producción. Igual, comprobar que
   `POST /pruebas/video` responde 404 y, si el servicio tiene un volumen en el directorio de trabajo, borrar a mano
   `pruebas/*.mp4` (sin volumen, el redeploy ya los elimina).
 - **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella) y
