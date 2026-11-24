@@ -64,7 +64,8 @@ class ServicioEntrevista(
     private val contexto: ResolutorContextoPrueba,
     private val procesador: ProcesadorEntrevistaFinalizada,
     private val tareasSegundoPlano: CoroutineScope,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    private val permisoCamara: PermisoCamara = PermisoCamara.SIEMPRE
 ) {
     private val log = LoggerFactory.getLogger(ServicioEntrevista::class.java)
 
@@ -154,13 +155,20 @@ class ServicioEntrevista(
         }
         lote.forEach(::validarMetrica)
         activa(usuarioId, sesionId)
+        // Sin el permiso de cámara no se guarda nada, pero la práctica sigue: responde 0 en vez de un error (D38).
+        if (!permisoCamara.permite(usuarioId)) {
+            log.info("Métricas de video de la sesión {} descartadas: falta el permiso de cámara", sesionId)
+            return 0
+        }
         val sanitizadas = lote.map {
             it.copy(
                 gestos = soloGestosObservables(it.gestos),
                 versionModelo = VERSION_MODELO_DIVLARA
             )
         }
-        return metricas.insertarLote(sesionId, sanitizadas)
+        val insertadas = metricas.insertarLote(sesionId, sanitizadas)
+        // Si el permiso se retiró mientras se insertaba, el lote ya se borró: no cuenta (D38).
+        return if (permisoCamara.confirmarDespuesDeGuardar(usuarioId)) insertadas else 0
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */

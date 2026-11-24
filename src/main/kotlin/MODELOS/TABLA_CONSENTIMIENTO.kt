@@ -35,7 +35,12 @@ object TablaConsentimiento : Table("consentimiento") {
     val aceptaEntrenamientoIa = bool("acepta_entrenamiento_ia").default(false)
     val fechaOtorgado = timestamp("fecha_otorgado")
     val fechaRevocado = timestamp("fecha_revocado").nullable()
+    /** NULL al eliminar la cuenta: para probar que aceptó basta lo demás (D38). */
     val ipOrigen = varchar("ip_origen", 45).nullable()
+    /** Cuándo se eliminó la cuenta: desde ahí corre el plazo de conservación (D38, migración 029). */
+    val cuentaEliminadaEn = timestamp("cuenta_eliminada_en").nullable()
+    /** TRUE mientras un reclamo, procedimiento o juicio necesite esta prueba: no se borra aunque venza el plazo. */
+    val retencionLegal = bool("retencion_legal").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }

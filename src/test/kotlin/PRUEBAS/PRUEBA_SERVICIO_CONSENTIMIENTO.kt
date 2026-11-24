@@ -43,7 +43,7 @@ class PruebaServicioConsentimiento {
     @Test
     fun `sin texto en la BD se publica el EULA del repositorio como 1_1_0`() = runBlocking<Unit> {
         val vigente = servicio.textoVigente()
-        assertEquals("1.1.0", vigente.version)
+        assertEquals("1.2.0", vigente.version)
         assertTrue(vigente.cuerpo.contains("ACUERDO DE LICENCIA"))
         // D35: el EULA de respaldo ya no ofrece usar los datos para "mejora del modelo".
         assertTrue("mejora del modelo" !in vigente.cuerpo && "Ley 21.719" in vigente.cuerpo)
