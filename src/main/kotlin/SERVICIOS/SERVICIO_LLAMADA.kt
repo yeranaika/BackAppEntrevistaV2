@@ -38,7 +38,7 @@ class ServicioLlamada(
             id = UUID.randomUUID(), idLocal = solicitud.idLocal, sesionId = sesionId,
             fechaInicio = Instant.ofEpochMilli(solicitud.fechaInicioMs),
             duracionSeg = solicitud.duracionSeg, preguntasCnt = solicitud.preguntasCnt,
-            resumen = resumenDe(usuarioId, sesionId, solicitud)
+            resumen = conFeedback(resumenDe(usuarioId, sesionId, solicitud), solicitud)
         )
         if (llamadas.registrar(usuarioId, llamada)) return LlamadaRegistrada(llamada, true)
         // Perdió la carrera contra otro envío de la misma llamada: devolver la que quedó.
@@ -69,6 +69,12 @@ class ServicioLlamada(
         )
     }
 
+    /** El feedback se calcula una sola vez, al guardar, y queda en el mismo JSONB del resumen (sin migración). */
+    private fun conFeedback(resumen: ResumenLlamada, s: SolicitudRegistrarLlamada): ResumenLlamada {
+        val segmentos = s.resumen?.segmentos.orEmpty()
+        return resumen.copy(feedback = EvaluadorLlamada.evaluar(s.duracionSeg, resumen, segmentos))
+    }
+
     private fun leerSesion(texto: String): UUID =
         runCatching { UUID.fromString(texto) }.getOrElse { throw ErrorValidacion("id_invalido", "sesionId no es un UUID válido") }
 
@@ -84,11 +90,13 @@ class ServicioLlamada(
             throw ErrorValidacion("preguntas_invalidas", "preguntasCnt debe estar entre 0 y $PREGUNTAS_MAXIMAS")
         }
         val resumen = s.resumen ?: return
-        if (resumen.linea.size > ELEMENTOS_MAXIMOS_RESUMEN || resumen.acciones.size > ELEMENTOS_MAXIMOS_RESUMEN) {
+        val segmentos = resumen.segmentos.orEmpty()
+        if (listOf(resumen.linea.size, resumen.acciones.size, segmentos.size).any { it > ELEMENTOS_MAXIMOS_RESUMEN }) {
             throw ErrorValidacion("resumen_demasiado_grande", "El resumen no puede superar $ELEMENTOS_MAXIMOS_RESUMEN elementos")
         }
         val malo = resumen.acciones.any { it.veces < 0 || it.totalMs < 0 || it.maximoMs < 0 } ||
-            resumen.linea.any { it.inicioMs < 0 || it.finMs < it.inicioMs }
+            resumen.linea.any { it.inicioMs < 0 || it.finMs < it.inicioMs } ||
+            segmentos.any { it.inicioMs < 0 || it.finMs < it.inicioMs }
         if (malo) throw ErrorValidacion("resumen_invalido", "El resumen trae tiempos o conteos negativos")
     }
 }

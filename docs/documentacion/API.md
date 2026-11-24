@@ -1128,7 +1128,7 @@ T3.13, **sin IA**. Solo texto (nunca audio ni video). El servidor repite la revi
 
 `POST /api/v1/llamadas` · Usuario · responde `200`, `201`
 
-T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.
+T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.
 
 ```json
 {
@@ -1171,7 +1171,7 @@ T3.15. Llamadas del usuario, la más reciente primero. Responde `{ elementos: [{
 
 `GET /api/v1/llamadas/{{llamadaId}}` · Usuario · responde `200`
 
-T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo). `404 llamada_no_encontrada` si no existe o es de otro usuario.
+T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo) y, en las guardadas desde el feedback N1, `feedback: { ejes: [{ id, score, segundos, pctLlamada, veredicto }], resumen, peorEje }` (campo agregado: ausente en llamadas antiguas). Ejes `manos_cara`, `mirada`, `presencia_cuerpo`, `apoyo_mesa`; `score = clamp(0..10, 10 − k × tasa)` con `tasa = segundos / duración`; bajo 10 s de llamada `score` y `pctLlamada` no viajan (solo los segundos). `peorEje` (el de menor score bajo 8; ante empate, en ese orden) da 1-2 frases en `resumen`; si no hay ninguno, un mensaje positivo y `peorEje` ausente. Sin IA. `404 llamada_no_encontrada` si no existe o es de otro usuario.
 
 ### Evaluar texto (freemium)
 

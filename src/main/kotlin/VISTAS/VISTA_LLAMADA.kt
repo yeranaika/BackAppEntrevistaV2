@@ -14,7 +14,7 @@ fun Llamada.aResumen() = RespuestaResumenLlamada(
 fun Llamada.aDetalle() = RespuestaDetalleLlamada(
     id = id.toString(), idLocal = idLocal, sesionId = sesionId?.toString(), fechaInicioMs = fechaInicio.toEpochMilli(),
     duracionSeg = duracionSeg, preguntasCnt = preguntasCnt, accionesCnt = resumen.totalOcurrencias,
-    acciones = resumen.acciones, linea = resumen.linea
+    acciones = resumen.acciones, linea = resumen.linea, feedback = resumen.feedback
 )
 
 fun PaginaLlamadas.aRespuesta() = RespuestaHistorialLlamadas(elementos.map { it.aResumen() }, total, pagina, tamano)

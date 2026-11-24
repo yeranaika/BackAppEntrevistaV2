@@ -3454,7 +3454,7 @@
                 "llamadas"
               ]
             },
-            "description": "T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.",
+            "description": "T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idLocal\": \"llamada-{{$timestamp}}\",\n  \"fechaInicioMs\": 1700000000000,\n  \"duracionSeg\": 120,\n  \"preguntasCnt\": 3,\n  \"resumen\": {\n    \"acciones\": [\n      {\n        \"accion\": \"head_nodding\",\n        \"veces\": 2,\n        \"totalMs\": 9000,\n        \"maximoMs\": 6000\n      }\n    ],\n    \"linea\": [\n      {\n        \"inicioMs\": 0,\n        \"finMs\": 3000,\n        \"accion\": \"sin_accion\"\n      },\n      {\n        \"inicioMs\": 3000,\n        \"finMs\": 9000,\n        \"accion\": \"head_nodding\"\n      }\n    ]\n  }\n}",
@@ -3519,7 +3519,7 @@
                 "{{llamadaId}}"
               ]
             },
-            "description": "T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo). `404 llamada_no_encontrada` si no existe o es de otro usuario."
+            "description": "T3.15. Agrega `sesionId`, `acciones` (ocurrencias, tiempo total y máximo por pose) y `linea` (línea de tiempo) y, en las guardadas desde el feedback N1, `feedback: { ejes: [{ id, score, segundos, pctLlamada, veredicto }], resumen, peorEje }` (campo agregado: ausente en llamadas antiguas). Ejes `manos_cara`, `mirada`, `presencia_cuerpo`, `apoyo_mesa`; `score = clamp(0..10, 10 − k × tasa)` con `tasa = segundos / duración`; bajo 10 s de llamada `score` y `pctLlamada` no viajan (solo los segundos). `peorEje` (el de menor score bajo 8; ante empate, en ese orden) da 1-2 frases en `resumen`; si no hay ninguno, un mensaje positivo y `peorEje` ausente. Sin IA. `404 llamada_no_encontrada` si no existe o es de otro usuario."
           }
         },
         {

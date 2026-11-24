@@ -195,6 +195,61 @@ class PruebaControladorLlamada {
         assertTrue(detalle["linea"]!!.jsonArray.isNotEmpty())
     }
 
+    // ---------- Feedback por reglas (N1): campo agregado, no rompe el contrato ----------
+
+    @Test
+    fun `al guardar con segmentos el detalle trae el feedback por eje junto a sus segundos`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val token = tokenDe(sistema, "feedback@ejemplo.com")
+        // La app también manda `promedios`: el servidor lo ignora sin fallar.
+        val conSegmentos = ""","resumen":{"linea":[{"inicioMs":0,"finMs":109000,"accion":"sin_accion"}],""" +
+            """"promedios":{"hand_to_face_adaptors":3.1},""" +
+            """"segmentos":[{"idTarget":"hand_to_face_adaptors","inicioMs":10000,"finMs":34000,"valorMax":6.5}]}"""
+
+        val creada = post("/api/v1/llamadas", cuerpo("local-fb", duracionSeg = 109, extra = conSegmentos), token)
+        assertEquals(HttpStatusCode.Created, creada.status)
+        val id = creada.objeto()["id"]!!.jsonPrimitive.content
+        listOf(creada.objeto(), get("/api/v1/llamadas/$id", token).objeto()).forEach { detalle ->
+            val feedback = detalle["feedback"]!!.jsonObject
+            val ejes = feedback["ejes"]!!.jsonArray.map { it.jsonObject }
+            assertEquals(listOf("manos_cara", "mirada", "presencia_cuerpo", "apoyo_mesa"), ejes.map { it["id"]!!.jsonPrimitive.content })
+            ejes.forEach { eje -> listOf("score", "segundos", "pctLlamada", "veredicto").forEach { assertTrue(it in eje, "$it en $eje") } }
+            assertEquals("4", ejes.first()["score"]!!.jsonPrimitive.content)
+            assertEquals("24.0", ejes.first()["segundos"]!!.jsonPrimitive.content)
+            assertEquals("manos_cara", feedback["peorEje"]!!.jsonPrimitive.content)
+            assertTrue(feedback["resumen"]!!.jsonPrimitive.content.isNotBlank())
+            // Los campos previos siguen intactos.
+            assertEquals(1, detalle["linea"]!!.jsonArray.size)
+        }
+    }
+
+    @Test
+    fun `una llamada guardada antes del feedback no trae el campo`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val token = tokenDe(sistema, "vieja@ejemplo.com")
+        val usuarioId = runBlocking { sistema.usuarios.buscarPorCorreo("vieja@ejemplo.com")!!.id }
+        val vieja = Llamada(
+            UUID.randomUUID(), "vieja", null, Instant.ofEpochMilli(1_000), 60, 0,
+            ResumenLlamada(listOf(AccionLlamada("table_rest", 1, 5000, 5000)))
+        )
+        runBlocking { sistema.llamadasRepo.registrar(usuarioId, vieja) }
+
+        val detalle = get("/api/v1/llamadas/${vieja.id}", token).objeto()
+        assertFalse("feedback" in detalle, "un reporte histórico no inventa feedback")
+        assertEquals("table_rest", detalle["acciones"]!!.jsonArray.single().jsonObject["accion"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `segmentos invalidos responden 400`() = testApplication {
+        val sistema = SistemaPrueba()
+        application { sistema.montar(this) }
+        val token = tokenDe(sistema, "segmalo@ejemplo.com")
+        val invertido = ""","resumen":{"segmentos":[{"idTarget":"table_rest","inicioMs":5000,"finMs":1000,"valorMax":5.0}]}"""
+        assertEquals(HttpStatusCode.BadRequest, post("/api/v1/llamadas", cuerpo("x", extra = invertido), token).status)
+    }
+
     @Test
     fun `una llamada sin resumen ni sesion queda con resumen vacio`() = testApplication {
         val sistema = SistemaPrueba()
