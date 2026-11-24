@@ -36,6 +36,19 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   025 `prediccion_simulacion`, 026 `revision_texto_local`, 027 `llamada`): confirmar cuáles ya están en Railway y
   aplicar las que falten, en orden y antes de desplegar `DEV`. La de D37 pasó a ser la **028** para no repetir el
   número 023.
+- [ ] **Bloquea publicar la v1.1 del consentimiento** (revisión de la integración de `main`, 2026-11-23). El texto v1.1
+  ya no se puede corregir cuando alguien lo acepta (409 de D35), y hoy promete dos cosas que el código de `main` no
+  cumple:
+  - Dice que la app "lo calcula en tu teléfono y solo envía números resumidos". Pero `POST /api/v1/vision/predecir`
+    acepta `frames` con landmarks de pose e iris por frame, infiere en el servidor y, con `sesionId`, guarda en
+    `prediccion_simulacion`, sin revisar `analisis_conducta_camara`. Hay que restringir el endpoint a `features` o
+    corregir el texto, y sumar `/vision/predecir` y `prediccion_simulacion` a la tarea C10, junto con `/metricas`.
+  - Dice que al eliminar la cuenta "se borran tu cuenta y tus prácticas". Pero la 024 conserva el consentimiento con
+    el correo (`identidad_ref`) y la IP. Hay que decirlo en el texto, en la Política de Privacidad y en
+    `DELETE /cuenta`, y fijar cuánto tiempo se guarda.
+- [ ] **`POST /pruebas/video` sin sesión** (de `main`): guarda `.mp4` de hasta 200 MB en la carpeta `pruebas/` del
+  servidor, sin autenticación y en todas las instancias. Contradice D37. Montarlo solo con una variable apagada por
+  defecto, o detrás del rol admin, antes de desplegar.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.
