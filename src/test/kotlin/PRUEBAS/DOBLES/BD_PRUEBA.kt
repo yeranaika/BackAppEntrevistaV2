@@ -20,7 +20,10 @@ import CONTROLADORES.controladorContrasena
 import CONTROLADORES.controladorLogin
 import CONTROLADORES.controladorOnboarding
 import CONTROLADORES.controladorPregunta
+import CONTROLADORES.controladorLlamada
+import CONTROLADORES.controladorRevisionLocal
 import CONTROLADORES.controladorUsuario
+import CONTROLADORES.controladorVision
 import INTEGRACIONES.ContadorIntentosEnMemoria
 import INTEGRACIONES.FuenteDocumentosLegalesArchivo
 import INTEGRACIONES.TipoProveedorIa
@@ -86,6 +89,11 @@ import SERVICIOS.EvaluadorEntrevistaFreemium
 import SERVICIOS.EvaluadorEntrevistaIa
 import SERVICIOS.ServicioReporteEntrevista
 import MODELOS.TablaMetricaVideo
+import MODELOS.TablaLlamada
+import MODELOS.TablaPrediccionSimulacion
+import MODELOS.TablaRevisionTexto
+import MODELOS.RepositorioPrediccionSimulacionExposed
+import SERVICIOS.ServicioSimulacion
 import MODELOS.TablaNivelSkillUsuario
 import MODELOS.TablaRespuestaPractica
 import MODELOS.TablaResultadoNivelacion
@@ -141,7 +149,7 @@ object BdPrueba {
                 TablaUsuario, TablaPerfil, TablaObjetivoCarrera, TablaRefreshToken, TablaCuentaOAuth, TablaRecuperacionContrasena,
                 TablaCargo, TablaSkill, TablaSkillTendencia, TablaCargoSkill, TablaPregunta, TablaOpcionPregunta, TablaGeneracionPreguntaIa,
                 TablaTextoConsentimiento, TablaConsentimiento, TablaRecordatorio, TablaCodigoSuscripcion, TablaSuscripcion,
-                TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo,
+                TablaSesionEntrevista, TablaSesionPreguntaRespuesta, TablaMetricaVideo, TablaPrediccionSimulacion, TablaLlamada, TablaRevisionTexto,
                 TablaTestNivelacion, TablaIntentoTest, TablaResultadoNivelacion, TablaSesionPractica, TablaRespuestaPractica,
                 TablaNivelSkillUsuario, TablaReporteEntrevista, TablaReporteSkillDetalle
             )
@@ -177,6 +185,23 @@ class SistemaPrueba(
      * con una generación real, que se audita con la hora real.
      */
     relojTopeGeneracionIa: java.time.Clock = java.time.Clock.systemUTC(),
+    /** Estado del modelo de visión DivLara para `/health` (aislado del disco real por defecto). */
+    val modeloDivlara: CONFIGURACION.ProveedorEstadoModeloDivlara =
+        CONFIGURACION.ProveedorEstadoModeloDivlara { CONFIGURACION.EstadoModeloDivlara.noDisponible() },
+    /** Motor de inferencia DivLara para `/api/v1/vision/predecir` (no disponible por defecto para aislar pruebas). */
+    val motorVision: CONFIGURACION.MotorInferenciaDivlara = object : CONFIGURACION.MotorInferenciaDivlara {
+        override fun cantidadFeaturesEsperadas(): Int? = null
+        override fun predecir(features: List<Double>): CONFIGURACION.ResultadoPrediccionDivlara =
+            throw ERRORES.ErrorServicioExterno(
+                "modelo_no_disponible",
+                "El modelo de visión (${CONFIGURACION.VERSION_MODELO_DIVLARA}) no está disponible en este momento"
+            )
+    },
+    /**
+     * Cómo llega la solicitud de visión al motor. null = el servicio de visión en proceso sobre [motorVision] (sin red);
+     * una prueba de la cadena real pasa un `ClienteMotorVision` contra un motor levantado de verdad.
+     */
+    predictorVision: SERVICIOS.PredictorVision? = null,
     /** Token Plan de MiMo (D31); 0 = sin Token Plan, como por defecto. Usa [relojTopeGeneracionIa]. */
     creditosTokenPlanMimo: Long = 0,
     diaRenovacionTokenPlanMimo: Int = 1
@@ -268,6 +293,15 @@ class SistemaPrueba(
     )
     val testsNivelacion = ServicioTestNivelacion(testsNivelacionRepo, preguntas, mercadoRepo)
     val pruebasApp = ServicioPruebasApp(entrevista, practica, nivelacion, sesionesEntrevista, practicasRepo, nivelacionesRepo)
+    val extractorFeaturesDivlara = CONFIGURACION.ExtractorFeaturesDivlara()
+    private val servicioVisionLocal = SERVICIOS.ServicioVision(motorVision, extractorFeaturesDivlara)
+    val vision: SERVICIOS.PredictorVision = predictorVision ?: SERVICIOS.PredictorVision { servicioVisionLocal.predecir(it) }
+    val prediccionesSimulacion = RepositorioPrediccionSimulacionExposed()
+    val revisionesTexto = MODELOS.RepositorioRevisionTextoExposed()
+    val revisionLocal = SERVICIOS.ServicioRevisionLocal(preguntas, revisionesTexto)
+    val simulacion = ServicioSimulacion(prediccionesSimulacion, sesionesEntrevista, reloj)
+    val llamadasRepo = MODELOS.RepositorioLlamadaExposed()
+    val llamadas = SERVICIOS.ServicioLlamada(llamadasRepo, simulacion)
 
     // Reporte de feedback (reportesRepo está más arriba). En las pruebas se llama a reporte.procesar(...) a mano para que
     // sea determinista.
@@ -329,10 +363,13 @@ class SistemaPrueba(
             controladorConsentimiento(consentimiento, documentos)
             controladorRecordatorio(recordatorio)
             controladorSuscripcion(suscripcion)
-            controladorSalud(CONFIGURACION.EstadoFreemiumReadiness(0))
+            controladorSalud(CONFIGURACION.EstadoFreemiumReadiness(0), modeloDivlara)
             controladorEntrevista(entrevista)
+            controladorVision(vision, simulacion)
+            controladorLlamada(llamadas)
             controladorFeedback(reporte)
             controladorPractica(practica, pruebasApp, evaluador)
+            controladorRevisionLocal(revisionLocal)
             controladorNivelacion(nivelacion, testsNivelacion)
             controladorPruebaPractica(pruebasApp)
         }

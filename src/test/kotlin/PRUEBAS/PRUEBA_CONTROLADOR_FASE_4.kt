@@ -295,6 +295,8 @@ class PruebaControladorFase4 {
         application { sistema.montar(this) }
         val salud = enviar("GET", "/health")
         assertEquals(HttpStatusCode.OK, salud.status)
-        assertEquals("OK", salud.bodyAsText())
+        val cuerpo = salud.objeto()
+        assertEquals("OK", cuerpo.texto("status"))
+        assertEquals(CONFIGURACION.VERSION_MODELO_DIVLARA, cuerpo["modeloDivlara"]?.jsonObject?.texto("version"))
     }
 }

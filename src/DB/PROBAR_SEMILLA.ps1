@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
 $esquema = Join-Path $aqui "BasedeDatos.EntrevistaApp.sql"
 $semilla = Join-Path $aqui "BasedeDatos.EntrevistaApp.Seeds.sql"
-$migracion023 = Join-Path (Split-Path -Parent (Split-Path -Parent $aqui)) "migrations\023_modelo_vision_semilla_sin_expresiones.sql"
+$migracion028 = Join-Path (Split-Path -Parent (Split-Path -Parent $aqui)) "migrations\028_modelo_vision_semilla_sin_expresiones.sql"
 $env:PGPORT = "$Puerto"
 $env:PGCLIENTENCODING = "UTF8"
 # Sin avisos NOTICE: en PowerShell 5.1 cualquier línea de psql en stderr con 2>&1 se vuelve un error y corta el script.
@@ -64,12 +64,12 @@ try {
     Esperar "el texto v1.1 explica el permiso de cámara" (Valor "select count(*) from consentimiento_texto where version = 'v1.1' and cuerpo like '%permiso aparte%'") "1"
     Esperar "modelo de ejemplo deprecado y sin expresiones" (Valor "select estado || ' ' || (labels_detectados ? 'expresion_dominante')::text from modelo_vision_ia") "deprecado false"
 
-    # La 023 corrige una BD sembrada con la semilla vieja y se puede correr dos veces.
+    # La 028 corrige una BD sembrada con la semilla vieja y se puede correr dos veces.
     # (JSON armado en SQL: PowerShell 5.1 quita las comillas dobles al pasarlas a psql.)
     Valor "update modelo_vision_ia set estado = 'activo', labels_detectados = jsonb_build_array('contacto_visual', 'expresion_dominante'), metricas_rendimiento = jsonb_build_object('precision_expresion', 0.78); select 1" | Out-Null
-    Sql $migracion023
-    Sql $migracion023
-    Esperar "la 023 deja el modelo deprecado, sin expresiones ni métricas" (Valor "select estado || ' ' || (labels_detectados ? 'expresion_dominante')::text || ' ' || coalesce(metricas_rendimiento::text, 'null') from modelo_vision_ia") "deprecado false null"
+    Sql $migracion028
+    Sql $migracion028
+    Esperar "la 028 deja el modelo deprecado, sin expresiones ni métricas" (Valor "select estado || ' ' || (labels_detectados ? 'expresion_dominante')::text || ' ' || coalesce(metricas_rendimiento::text, 'null') from modelo_vision_ia") "deprecado false null"
 }
 finally {
     & "$Bin\dropdb.exe" --if-exists --force $Bd

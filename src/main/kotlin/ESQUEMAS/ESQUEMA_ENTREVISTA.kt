@@ -35,7 +35,9 @@ data class MetricaVideoEntrada(
     val confianza: Double? = null,
     val gestos: JsonObject? = null,
     /** Obsoleto: se acepta por compatibilidad y se ignora (RNF10: no se infieren emociones, D22). */
-    val expresion: String? = null
+    val expresion: String? = null,
+    /** Opcional por compatibilidad; el backend persiste siempre la versión configurada del modelo (RNF08). */
+    val versionModelo: String? = null
 )
 
 @Serializable
@@ -43,9 +45,19 @@ data class SolicitudMetricasVideo(
     val metricas: List<MetricaVideoEntrada>
 )
 
+/** Lo que borró POST /api/v1/entrevistas/{id}/borrar. Sin valores por defecto para que los ceros también viajen. */
+@Serializable
+data class RespuestaBorradoBiometrico(
+    val clipsBorrados: Int,
+    val transcripcionesBorradas: Int,
+    val metricasBorradas: Int
+)
+
 @Serializable
 data class RespuestaMetricasRegistradas(
-    val insertadas: Int
+    val insertadas: Int,
+    /** Versión del modelo de visión asociada a las métricas persistidas (RNF08). */
+    val versionModelo: String? = null
 )
 
 @Serializable

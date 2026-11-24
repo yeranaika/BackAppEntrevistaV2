@@ -513,9 +513,10 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
     respuesta_requerida`. La columna `video_clip_url` queda para las respuestas anteriores (no se borran datos) y
     `respuesta.videoClipUrl` sale `null` en las nuevas.
   - La fila de ejemplo del modelo de visión queda `deprecado`, sin la etiqueta `expresion_dominante` ni métricas.
-    Semilla corregida y `migrations/023_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
-    (idempotente; el código no lee esa tabla, así que se puede aplicar antes o después de desplegar). El modelo real
-    se registra cuando el compañero lo entregue (C02).
+    Semilla corregida y `migrations/028_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
+    (idempotente; el código no lee esa tabla, así que se puede aplicar antes o después de desplegar). Era la 023 en
+    el PR #7; pasó a 028 porque `main` ya traía `023_version_modelo.sql`. El modelo real llegó con `main`
+    (`motor-vision`) y se identifica con el texto `metrica_video.version_modelo` (opción (a) de C02), no con esta tabla.
 - **Contrato Android**: sin cambios (la app nunca envió `videoClipUrl`).
 - **Pruebas**: `PruebaServicioEntrevista` (la pregunta de video exige texto y no guarda el clip) y
   `PruebaControladorEntrevista` (el JSON con `videoClipUrl` responde 200 y el clip no aparece).

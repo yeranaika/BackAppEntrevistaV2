@@ -26,11 +26,32 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en Railway (en la BD local ya está), con
   respaldo, **antes** de desplegar esa rama (sin la columna fallan los endpoints de entrevista y el reporte), y volver
   a correrla una vez desplegada.
-- [ ] **Al unir `feature/consentimiento-v1-1`** (D35, D37): aplicar `migrations/023_modelo_vision_semilla_sin_expresiones.sql`
+- [ ] **Al unir `feature/consentimiento-v1-1`** (D35, D37): aplicar `migrations/028_modelo_vision_semilla_sin_expresiones.sql`
   en Railway (idempotente, cuando quieran). Publicar la `v1.1` por la API con sus tres alcances
   (`estadisticas_uso`, `marketing`, `analisis_conducta_camara`; ver `docs/legal/CONSENTIMIENTO.md`) **después** de
   desplegar este backend y de publicar la app con el PR #21 (que incluye el #20). Antes, en la app: cambiar
-  `ALCANCE_ANALYTICS` a `estadisticas_uso` en el PR #20.
+  `ALCANCE_ANALYTICS` a `estadisticas_uso` en el PR #20 (hecho en las ramas locales de los PR #20 y #21 el
+  2026-11-23, falta subirlo).
+- [ ] **Migraciones que trajo `main`** (023 `version_modelo`, 024 consentimiento que sobrevive al borrar la cuenta,
+  025 `prediccion_simulacion`, 026 `revision_texto_local`, 027 `llamada`): confirmar cuáles ya están en Railway y
+  aplicar las que falten, en orden y antes de desplegar `DEV`. La de D37 pasó a ser la **028** para no repetir el
+  número 023.
+- [ ] **Bloquea publicar la v1.1 del consentimiento** (revisión de la integración de `main`, 2026-11-23). El texto v1.1
+  ya no se puede corregir cuando alguien lo acepta (409 de D35), y hoy promete dos cosas que el código de `main` no
+  cumple:
+  - Dice que la app "lo calcula en tu teléfono y solo envía números resumidos". Pero `POST /api/v1/vision/predecir`
+    acepta `frames` con landmarks de pose e iris por frame, infiere en el servidor y, con `sesionId`, guarda en
+    `prediccion_simulacion`, sin revisar `analisis_conducta_camara`. Hay que restringir el endpoint a `features` o
+    corregir el texto, y sumar `/vision/predecir` y `prediccion_simulacion` a la tarea C10, junto con `/metricas`.
+  - Dice que al eliminar la cuenta "se borran tu cuenta y tus prácticas". Pero la 024 conserva el consentimiento con
+    el correo (`identidad_ref`) y la IP. Hay que decirlo en el texto, en la Política de Privacidad y en
+    `DELETE /cuenta`, y fijar cuánto tiempo se guarda.
+- [ ] **`POST /pruebas/video` sin sesión** (de `main`): guarda `.mp4` de hasta 200 MB en la carpeta `pruebas/` del
+  servidor, sin autenticación y en todas las instancias. Contradice D37. Montarlo solo con una variable apagada por
+  defecto, o detrás del rol admin, antes de desplegar.
+- [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
+  E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
+  modelo se descarga con un script o si esas pruebas se saltan cuando falta.
 - [x] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): 7/7 en verde contra PostgreSQL 16 (2026-11-07).
 
 ## Media

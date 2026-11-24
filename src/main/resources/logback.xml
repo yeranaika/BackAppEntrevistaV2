@@ -18,11 +18,16 @@
     </encoder>
   </appender>
 
-  <!-- Niveles por paquete -->
+  <!-- Niveles por paquete: evitar DEBUG en ORM/red para no volcar payloads ni parámetros SQL -->
   <logger name="io.ktor" level="INFO"/>
+  <logger name="io.ktor.client" level="INFO"/>
   <logger name="io.netty" level="WARN"/>
-  <!-- Cambia a tu paquete raíz para ver tus logs en DEBUG -->
-  <logger name="com.example" level="DEBUG"/>
+  <logger name="Exposed" level="WARN"/>
+  <logger name="org.jetbrains.exposed" level="WARN"/>
+  <logger name="org.postgresql" level="WARN"/>
+  <logger name="com.zaxxer.hikari" level="INFO"/>
+  <logger name="jakarta.mail" level="WARN"/>
+  <logger name="com.sun.mail" level="WARN"/>
 
   <!-- Root -->
   <root level="INFO">
