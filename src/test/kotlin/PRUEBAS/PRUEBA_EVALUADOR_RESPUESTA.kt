@@ -86,4 +86,31 @@ class PruebaEvaluadorRespuesta {
         assertEquals(listOf("inmutabilidad", "referencia", "estado", "deferred"), palabrasClaveDe(soloCriterios))
         assertEquals(emptyList(), palabrasClaveDe(null))
     }
+
+    /** Las marcas de formato de la app ("S:", "1)") no son contenido: no cambian el puntaje (D40). */
+    @Test
+    fun `las marcas S T A R y los pasos numerados no cambian el puntaje`() {
+        val contenido = listOf(
+            "Un sistema crítico cayó en producción con usuarios afectados.",
+            "Debía diagnosticarlo y restaurarlo en el menor tiempo.",
+            "Revisé los logs.", "Identifiqué el último despliegue.", "Ejecuté el rollback.",
+            "El sistema quedó restaurado y documenté la lección."
+        )
+        val enParrafo = contenido.joinToString(" ")
+        val conFormato = "S: ${contenido[0]} T: ${contenido[1]} A: 1) ${contenido[2]} 2) ${contenido[3]} 3) ${contenido[4]} R: ${contenido[5]}"
+        val texto = "Cuando cayó producción revisé logs, vi el último despliegue, hice rollback y dejé todo documentado."
+        val claves = listOf("logs", "rollback", "despliegue")
+
+        assertEquals(evaluador.evaluar(texto, enParrafo, claves), evaluador.evaluar(texto, conFormato, claves))
+    }
+
+    @Test
+    fun `quien copia el formato de la tarjeta no pierde puntos por las marcas`() {
+        val ideal = "S: Hubo caída en producción. T: Restaurar el servicio. A: 1) Revisé logs. 2) Hice rollback. R: Servicio restaurado."
+        val claves = listOf("logs", "rollback")
+        val conMarcas = evaluador.evaluar(ideal, ideal, claves)
+        val sinMarcas = evaluador.evaluar("Hubo caída en producción. Restaurar el servicio. Revisé logs. Hice rollback. Servicio restaurado.", ideal, claves)
+        assertEquals(sinMarcas.puntaje, conMarcas.puntaje)
+    }
 }
+

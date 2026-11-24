@@ -61,12 +61,28 @@ data class ResultadoGeneracionIa(
     val mercado: ResultadoContextoMercado
 )
 
+/** Respuesta ideal de una blanda abierta o de video: el formato STAR que ordena la app (D40). */
+internal const val REGLA_RESPUESTA_IDEAL_STAR =
+    "Cada respuesta_ideal va en método STAR con este formato exacto y sin encabezados (nada de \"Respuesta ideal:\"): " +
+        "\"S: <situación, 1 o 2 frases> T: <tarea, 1 frase> A: <acción, 2 o 3 frases> R: <resultado, 1 frase>\". " +
+        "Las letras S, T, A y R van en mayúscula, en ese orden, seguidas de dos puntos y un espacio. " +
+        "Si la acción tiene varios pasos, numéralos \"1) 2) 3)\". Frases cortas: máximo unas 80 palabras por parte. " +
+        "No uses flechas, llaves ni Markdown, ni escribas \"S:\", \"T:\", \"A:\" o \"R:\" con otro sentido dentro del " +
+        "texto (por ejemplo, el lenguaje R va sin dos puntos)."
+
+/** Respuesta ideal de una técnica abierta: resumen y pasos numerados, sin STAR (D40). */
+internal const val REGLA_RESPUESTA_IDEAL_TECNICA =
+    "Cada respuesta_ideal empieza con una frase de resumen (qué es o qué propones) y sigue con los pasos o puntos " +
+        "clave numerados \"1) 2) 3)\", sin encabezados como \"Propuesta ideal:\" y sin el formato STAR. " +
+        "Frases cortas, máximo unas 400 palabras, sin flechas ni llaves."
+
 /**
  * Genera preguntas con un LLM y las deja en el banco como pendientes de revisión.
  * Toda llamada queda auditada en pregunta_generacion_ia, incluso las que fallan, y el gasto del mes (también el de
  * las fallidas) se compara con un tope antes de cada llamada (D23). Si hay cargo o skill, el prompt lleva lo que piden
  * las ofertas de empleo reales de ese cargo (D26); el prompt auditado guarda esas ofertas.
  */
+
 class ServicioGeneracionPregunta(
     private val proveedores: Map<TipoProveedorIa, ProveedorPreguntasIa>,
     private val repositorio: RepositorioGeneracionPreguntaIa,
@@ -232,10 +248,14 @@ class ServicioGeneracionPregunta(
             - Categoría: ${pedido.categoria.valorBd}
         """.trimIndent()
         // Solo las de comportamiento llevan STAR; forzarlo en una pregunta técnica da respuestas ideales artificiales.
-        val reglaRespuestaIdeal = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
-            "Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado."
-        } else {
-            "Cada respuesta_ideal debe ser completa y precisa: qué es, cómo funciona y cuándo se usa, sin forzar el formato STAR."
+        // En las abiertas y de video, el formato es el que ordena la app en la tarjeta "Respuesta ideal" (D40).
+        val conFormato = pedido.tipo != TipoPregunta.OPCION_MULTIPLE
+        val reglaRespuestaIdeal = when {
+            pedido.categoria == CategoriaHabilidad.BLANDA && conFormato -> REGLA_RESPUESTA_IDEAL_STAR
+            pedido.categoria == CategoriaHabilidad.BLANDA ->
+                "Cada respuesta_ideal debe ser completa y cubrir Situación, Tarea, Acción y Resultado."
+            conFormato -> REGLA_RESPUESTA_IDEAL_TECNICA
+            else -> "Cada respuesta_ideal debe ser completa y precisa: qué es, cómo funciona y cuándo se usa, sin forzar el formato STAR."
         }
         val reglaRubrica = if (pedido.categoria == CategoriaHabilidad.BLANDA) {
             "La rúbrica debe usar metodo STAR y criterios explícitos para Situación, Tarea, Acción y Resultado."

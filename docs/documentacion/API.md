@@ -689,7 +689,7 @@ Nace aprobada. Opción múltiple: 2 a 6 opciones y exactamente una correcta. Req
 
 `POST /api/v1/admin/preguntas` · Admin · responde `201`
 
-Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium.
+Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium. **Formato de la respuesta ideal (D40)**, el que ordena la app en la tarjeta: técnica, una frase de resumen y los pasos `1) 2) 3)`; blanda, `S: … T: … A: … R: …` (letras en mayúscula, en ese orden, con dos puntos y un espacio). Sin encabezados como `Respuesta ideal:`. El backend guarda el texto tal cual; si no sigue el formato, la app lo muestra como párrafo.
 
 ```json
 {
@@ -698,7 +698,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
   "categoria": "tecnica",
   "nivel": "junior",
   "enunciado": "Explica qué es una corrutina {{$timestamp}}",
-  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo y se reanuda después.",
+  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo. 1) Se lanza en un scope. 2) Se suspende en un punto de suspensión. 3) Se reanuda después.",
   "rubrica": {
     "criterios": [
       "explica_suspension"
@@ -722,7 +722,7 @@ Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la 
   "categoria": "blanda",
   "nivel": "junior",
   "enunciado": "Cuéntame de un conflicto en tu equipo {{$timestamp}}",
-  "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."
+  "respuestaIdeal": "S: Dos compañeros discutían por el diseño. T: Debía destrabar la decisión. A: 1) Los escuché por separado. 2) Propuse criterios comunes. R: Se eligió un diseño y el equipo siguió avanzando."
 }
 ```
 

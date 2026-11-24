@@ -400,8 +400,23 @@ class PruebaServicioGeneracionPregunta {
 
         val contenido = repositorio.lotes.single().second.single().contenido
         assertEquals(TipoPregunta.ABIERTA_TEXTO, contenido.tipo)
-        assertEquals(LoteLlmDePrueba.RESPUESTA_STAR, contenido.respuestaIdeal)
+        // "Situación: … Tarea: …" se guarda en el formato que ordena la app (D40).
+        assertEquals(
+            "S: existía un problema relevante. T: debía resolverlo. A: apliqué una estrategia concreta. R: logré una mejora medible.",
+            contenido.respuestaIdeal
+        )
         assertEquals("\"STAR\"", contenido.rubrica!!["metodo"].toString())
+    }
+
+    @Test
+    fun `el prompt pide el formato de la app solo en las abiertas y de video`() = runBlocking<Unit> {
+        val abierta = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "abierta_texto"))
+        servicio(abierta, GeneracionEnMemoria()).generar(solicitud())
+        assertTrue(SERVICIOS.REGLA_RESPUESTA_IDEAL_STAR in abierta.solicitudes.single().prompt, "blanda abierta: S: T: A: R:")
+
+        val multiple = ProveedorIaGrabador(LoteLlmDePrueba.json(1, "opcion_multiple"))
+        servicio(multiple, GeneracionEnMemoria()).generar(solicitud(tipo = "opcion_multiple"))
+        assertFalse(SERVICIOS.REGLA_RESPUESTA_IDEAL_STAR in multiple.solicitudes.single().prompt, "opción múltiple: sin formato")
     }
 
     @Test

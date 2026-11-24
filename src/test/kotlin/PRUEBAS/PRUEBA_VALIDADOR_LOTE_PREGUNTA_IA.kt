@@ -85,4 +85,55 @@ class PruebaValidadorLotePreguntaIa {
         assertTrue(blanda.contains("\"const\":\"STAR\"") && !blanda.contains("\"const\":\"TECNICA\""))
         assertTrue(tecnica.contains("\"const\":\"TECNICA\"") && !tecnica.contains("\"const\":\"STAR\""))
     }
+
+    // ---------- Formato de la app (D40) ----------
+
+    private val criteriosStar = listOf("Situación clara", "Tarea concreta", "Acción propia", "Resultado medible")
+
+    @Test
+    fun `una blanda abierta con S T A R pasa y se guarda tal cual`() {
+        val respuesta = "S: Un sistema crítico cayó en producción. T: Debía restaurarlo pronto. A: 1) Revisé los logs. 2) Hice rollback. R: Quedó restaurado y documentado."
+        val validada = validar(lote("STAR", respuesta, criteriosStar), CategoriaHabilidad.BLANDA).single()
+        assertEquals(respuesta, validada.respuestaIdeal)
+    }
+
+    @Test
+    fun `una blanda abierta con las palabras completas se pasa a letras`() {
+        val respuesta = "Respuesta ideal: Situación: Un sistema crítico cayó. Tarea: Debía restaurarlo pronto. Acción: Revisé los logs e hice rollback. Resultado: Quedó restaurado."
+        val validada = validar(lote("STAR", respuesta, criteriosStar), CategoriaHabilidad.BLANDA).single()
+        assertEquals("S: Un sistema crítico cayó. T: Debía restaurarlo pronto. A: Revisé los logs e hice rollback. R: Quedó restaurado.", validada.respuestaIdeal)
+    }
+
+    @Test
+    fun `una blanda abierta sin las marcas STAR se rechaza`() {
+        val enParrafo = "Ante una situación crítica tuve la tarea de restaurar el sistema. Mi acción fue revisar logs y hacer rollback. El resultado fue un sistema estable."
+        val error = assertFailsWith<LoteInvalidoException> { validar(lote("STAR", enParrafo, criteriosStar), CategoriaHabilidad.BLANDA) }
+        assertEquals("respuesta_sin_formato_star", error.message)
+    }
+
+    @Test
+    fun `una blanda de opcion multiple no necesita las marcas`() {
+        val enParrafo = "Ante una situación crítica tuve la tarea de restaurar el sistema. Mi acción fue revisar logs y hacer rollback. El resultado fue un sistema estable."
+        val multiple = json.encodeToString(
+            LoteLlm(
+                listOf(
+                    PreguntaLlm(
+                        enunciado = "¿Qué harías ante una caída en producción?",
+                        tipoPregunta = "opcion_multiple",
+                        respuestaIdeal = enParrafo,
+                        rubrica = RubricaLlm("STAR", criteriosStar, listOf("rollback", "logs", "sistema"), 60),
+                        opciones = listOf("a", "b", "c", "d").mapIndexed { i, t -> ESQUEMAS.OpcionLlm("Opción $t", i == 0, "Porque $t") }
+                    )
+                )
+            )
+        )
+        assertEquals(1, ValidadorLotePreguntaIa.parsearYValidar(multiple, 1, TipoPregunta.OPCION_MULTIPLE, CategoriaHabilidad.BLANDA).size)
+    }
+
+    @Test
+    fun `una tecnica abierta con resumen y pasos sin punto final pasa`() {
+        val pasos = "Un índice acelera las búsquedas en una tabla grande: 1) se crea sobre las columnas que más se filtran 2) el motor lo usa en vez de recorrer toda la tabla 3) conviene comprobarlo con EXPLAIN"
+        assertEquals(1, validar(lote("TECNICA", pasos, criteriosTecnicos), CategoriaHabilidad.TECNICA).size)
+    }
 }
+
