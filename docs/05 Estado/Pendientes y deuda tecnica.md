@@ -47,6 +47,10 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **`POST /pruebas/video` sin sesión** (de `main`): guarda `.mp4` de hasta 200 MB en la carpeta `pruebas/` del
   servidor, sin autenticación y en todas las instancias. Contradice D37. Montarlo solo con una variable apagada por
   defecto, o detrás del rol admin, antes de desplegar.
+- [x] ~~**Puerto 8093 en `application.yaml`**~~ (commit `f8d6d86` de `main`): Railway revisa `/ready` en el 8080, así
+  que los 3 despliegues de `main` del 2026-11-23 fallaron y producción siguió con el PR #6. Vuelve a 8080 (2026-11-24);
+  en local se usa `-P:ktor.deployment.port=8093`. Antes de llevar `DEV` a `main`: D39 unido y migraciones 023 a 029
+  aplicadas en Railway, porque con el puerto correcto `main` sí se despliega.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.
