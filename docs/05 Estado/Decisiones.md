@@ -612,17 +612,23 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   - El prompt de `generar-ia` pide el formato en las abiertas y de video: blandas con `S:`, `T:`, `A:` y `R:` (pasos de
     la acción numerados) y técnicas con una frase de resumen y pasos numerados, sin encabezados, flechas ni llaves.
     Opción múltiple sigue igual.
-  - El validador normaliza lo que devuelve la IA (`FormatoRespuestaIdeal.normalizar`): quita "Respuesta ideal:" y cambia
-    "Situación:", "Tarea:", "Acción:" y "Resultado:" por las letras si vienen las cuatro en orden. En una blanda abierta
-    o de video exige las cuatro marcas en orden (`respuesta_sin_formato_star`); con las marcas ya no pide las palabras.
+  - El validador normaliza lo que devuelve la IA (`FormatoRespuestaIdeal.normalizar`): quita el encabezado ("Respuesta
+    ideal:", "Respuesta ideal (STAR):", con o sin negrita), cambia "Situación:", "Tarea:", "Acción:" y "Resultado:" por
+    las letras si vienen las cuatro en orden (también "S: Situación:" y "**Situación:**"), y quita negritas y viñetas
+    alrededor de las marcas. En una blanda abierta o de video exige las cuatro marcas en orden y una sola vez cada una
+    (`respuesta_sin_formato_star`): una "R:" de más ("el lenguaje R: …") partiría mal la tarjeta. Con las marcas ya no
+    pide las palabras completas, y los pasos "1) 2)" cuentan como oraciones aunque no terminen en punto.
   - Las preguntas que crea o edita el admin se guardan tal cual: cambiar su texto rompería la paridad del revisor local
     con la app (casos dorados), que calculan sobre el mismo texto descargado.
-  - La corrección freemium compara contra la respuesta ideal **sin las marcas** (`sinMarcas`): "S:" o "1)" no cuentan
-    como palabras ni alargan la ideal, así que el formato no cambia el puntaje.
+  - La corrección freemium compara **sin las marcas** (`sinMarcas`), en la ideal y en lo que escribe la persona (que
+    puede copiar el formato de la tarjeta): "S:" o "1)" no cuentan como palabras ni alargan el texto, así que el formato
+    no cambia el puntaje. Igual que la app, los números de paso se quitan por bloque y solo donde hay dos o más.
 - **Pendiente**: reescribir al formato las 255 respuestas abiertas que ya están en Railway (73 blandas, 4 de video y 178
   técnicas), sin cambiar su contenido. El revisor local (`REVISOR_TEXTO_LIBRE`, backend y app) todavía cuenta las marcas
   como palabras: quitarlas a la vez en los dos para no romper la paridad.
 - **Contrato Android**: sin cambios.
 - **Pruebas**: `PruebaFormatoRespuestaIdeal`, el validador (STAR con letras, palabras completas convertidas, rechazo sin
-  marcas, opción múltiple sin exigirlas), el prompt y la corrección freemium (mismo puntaje con o sin marcas).
+  marcas, opción múltiple sin exigirlas, técnica con pasos sin punto), el prompt y la corrección freemium (mismo puntaje
+  con o sin marcas, también si la persona las copia). Una revisión adversarial de 3 ángulos (paridad con la app,
+  validador y generación, puntaje) encontró 9 casos, todos corregidos.
 

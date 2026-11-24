@@ -64,8 +64,10 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
         if (texto.isBlank()) {
             return EvaluacionTexto(0.0, 0.0, 0.0, emptyList(), palabrasClave, "No se ingresó ninguna respuesta.")
         }
-        val usuario = ComparadorTextos.normalizar(texto)
-        // Las marcas de formato ("S:", "1)") no son contenido: no deben contar como palabras ni alargar la ideal (D40).
+        // Las marcas de formato ("S:", "1)") no son contenido, ni en la ideal ni en lo que escribe la persona copiando el
+        // formato de la tarjeta: no cuentan como palabras ni alargan el texto (D40).
+        val respuesta = FormatoRespuestaIdeal.sinMarcas(texto)
+        val usuario = ComparadorTextos.normalizar(respuesta)
         val ideal = FormatoRespuestaIdeal.sinMarcas(respuestaIdeal)
         val referencias = listOf(ideal) + alternativas.map(FormatoRespuestaIdeal::sinMarcas)
         val encontradas = palabrasClave.filter { clave -> formasDe(clave, sinonimos).any { aparece(usuario, it) } }
@@ -74,9 +76,9 @@ class EvaluadorRespuestaFreemium : EvaluadorRespuesta {
         // Se queda con la mejor medida: los trigramas (parecido de letras con la ideal) o el comparador (varias referencias y sinónimos).
         val similitud = maxOf(
             similitudCoseno(usuario, ComparadorTextos.normalizar(ideal)),
-            ComparadorTextos.similitud(texto, referencias, sinonimos)
+            ComparadorTextos.similitud(respuesta, referencias, sinonimos)
         ) * 100.0
-        val largo = (contarPalabras(texto).toDouble() / contarPalabras(ideal).coerceAtLeast(1)).coerceIn(0.0, 1.0) * 100.0
+        val largo = (contarPalabras(respuesta).toDouble() / contarPalabras(ideal).coerceAtLeast(1)).coerceIn(0.0, 1.0) * 100.0
 
         val puntaje = if (palabrasClave.isEmpty()) {
             similitud * (PESO_SIMILITUD + PESO_PALABRAS_CLAVE) + largo * PESO_LARGO

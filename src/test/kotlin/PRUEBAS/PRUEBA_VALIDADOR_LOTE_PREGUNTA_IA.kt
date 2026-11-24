@@ -129,4 +129,11 @@ class PruebaValidadorLotePreguntaIa {
         )
         assertEquals(1, ValidadorLotePreguntaIa.parsearYValidar(multiple, 1, TipoPregunta.OPCION_MULTIPLE, CategoriaHabilidad.BLANDA).size)
     }
+
+    @Test
+    fun `una tecnica abierta con resumen y pasos sin punto final pasa`() {
+        val pasos = "Un índice acelera las búsquedas en una tabla grande: 1) se crea sobre las columnas que más se filtran 2) el motor lo usa en vez de recorrer toda la tabla 3) conviene comprobarlo con EXPLAIN"
+        assertEquals(1, validar(lote("TECNICA", pasos, criteriosTecnicos), CategoriaHabilidad.TECNICA).size)
+    }
 }
+

@@ -103,5 +103,14 @@ class PruebaEvaluadorRespuesta {
 
         assertEquals(evaluador.evaluar(texto, enParrafo, claves), evaluador.evaluar(texto, conFormato, claves))
     }
+
+    @Test
+    fun `quien copia el formato de la tarjeta no pierde puntos por las marcas`() {
+        val ideal = "S: Hubo caída en producción. T: Restaurar el servicio. A: 1) Revisé logs. 2) Hice rollback. R: Servicio restaurado."
+        val claves = listOf("logs", "rollback")
+        val conMarcas = evaluador.evaluar(ideal, ideal, claves)
+        val sinMarcas = evaluador.evaluar("Hubo caída en producción. Restaurar el servicio. Revisé logs. Hice rollback. Servicio restaurado.", ideal, claves)
+        assertEquals(sinMarcas.puntaje, conMarcas.puntaje)
+    }
 }
 

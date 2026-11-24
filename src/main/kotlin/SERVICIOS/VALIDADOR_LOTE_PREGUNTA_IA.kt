@@ -102,7 +102,7 @@ object ValidadorLotePreguntaIa {
     }
 
     private fun segmentosTipoOracion(texto: String): Int = texto
-        .split(Regex("[.!?]+|(?<![\\p{L}\\p{N}])(?=[STAR]:\\s)|(?i)(?=\\b(?:situación|tarea|acción|resultado)\\s*:)"))
+        .split(Regex("[.!?]+|(?<![\\p{L}\\p{N}])(?=[STAR]:\\s)|(?<![\\p{L}\\p{N}])(?=\\d{1,2}\\)\\s)|(?i)(?=\\b(?:situación|tarea|acción|resultado)\\s*:)"))
         .count { it.trim().length >= LARGO_MINIMO_ORACION }
 
     private fun identidad(texto: String): String = normalizar(texto).replace(Regex("\\s+"), " ").trim()

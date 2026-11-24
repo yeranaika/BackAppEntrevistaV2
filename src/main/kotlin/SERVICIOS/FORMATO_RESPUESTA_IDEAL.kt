@@ -11,54 +11,80 @@ object FormatoRespuestaIdeal {
     private const val ORDEN_STAR = "STAR"
     private val MARCA_STAR = Regex("(?<![\\p{L}\\p{N}])([STAR]):\\s")
     private val NUMERO_PASO = Regex("(?<![\\p{L}\\p{N}])\\d{1,2}\\)\\s")
+    private val ESPACIOS = Regex("\\s+")
 
-    /** "Respuesta ideal:", "Respuesta STAR ideal:" o "Propuesta ideal:" al inicio: la tarjeta de la app ya pone el título. */
-    private val ENCABEZADO = Regex("^(respuesta|propuesta)(\\s+star)?\\s+ideal\\s*:\\s*", RegexOption.IGNORE_CASE)
+    /**
+     * Encabezado al inicio que la tarjeta de la app ya pone como título: "Respuesta ideal:", "Respuesta STAR ideal:",
+     * "Respuesta ideal (STAR):", "**Propuesta ideal:**". Exige la palabra "ideal" para no borrar "Propuesta de valor: …".
+     */
+    private val ENCABEZADO = Regex(
+        "^[*_#\\s]*(respuesta|propuesta)\\b[^:\\n]{0,40}?\\bideal\\b[^:\\n]{0,30}:[*_\\s]*",
+        RegexOption.IGNORE_CASE
+    )
 
-    /** "Situación:", "Tarea:", "Acción:" y "Resultado:" escritos con la palabra completa. */
+    /** Viñeta de Markdown al inicio de línea delante de una marca: "- S:", "* Situación:", "• **T:**". */
+    private val VINETA_DE_MARCA = Regex(
+        "(?m)^[ \\t]*[-*•][ \\t]+(?=[*_]{0,2}(?:[STAR]|situaci[oó]n|tarea|acci[oó]n|resultado)[*_]{0,2}\\s*:)",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** Marca corta con énfasis de Markdown: "**S:**", "**S**:", "_T:_" → "S: ". */
+    private val MARCA_CON_ENFASIS = Regex("(?<![\\p{L}\\p{N}])[*_]{0,2}([STAR])[*_]{0,2}:[*_]{0,2}\\s*")
+
+    /**
+     * "Situación:", "Tarea:", "Acción:" y "Resultado:" con la palabra completa, con o sin énfasis, y con la marca corta
+     * delante si la IA puso las dos ("S: Situación:"): todo se reemplaza por una sola marca.
+     */
     private val ETIQUETA_LARGA = Regex(
-        "(?<![\\p{L}\\p{N}])(situaci[oó]n|tarea|acci[oó]n|resultado)\\s*:\\s*",
+        "(?<![\\p{L}\\p{N}])[*_]{0,2}(?:[STAR]:\\s*[*_]{0,2})?(situaci[oó]n|tarea|acci[oó]n|resultado)[*_]{0,2}\\s*:[*_]{0,2}\\s*",
         RegexOption.IGNORE_CASE
     )
 
     /**
-     * Deja la respuesta ideal en el formato de la app sin cambiar su contenido: quita el encabezado y, si trae las cuatro
-     * partes STAR escritas con la palabra completa y en orden ("Situación: … Tarea: …"), las cambia por "S:", "T:", "A:"
-     * y "R:".
+     * Deja la respuesta ideal en el formato de la app sin cambiar su contenido: quita el encabezado y, si es una respuesta
+     * STAR (con las palabras completas, con Markdown o con las marcas cortas), la deja con "S:", "T:", "A:" y "R:" limpias.
+     * Si después de limpiar no queda un STAR completo, devuelve el texto solo sin el encabezado.
      */
     fun normalizar(texto: String): String {
-        val sinEncabezado = texto.trim().replaceFirst(ENCABEZADO, "")
-        val etiquetas = ETIQUETA_LARGA.findAll(sinEncabezado).toList()
-        val letras = etiquetas.map { inicial(it.groupValues[1]) }.joinToString("")
-        if (letras != ORDEN_STAR) return sinEncabezado
-        return ETIQUETA_LARGA.replace(sinEncabezado) { "${inicial(it.groupValues[1])}: " }
+        val sinEncabezado = texto.trim().replaceFirst(ENCABEZADO, "").trim()
+        var candidato = VINETA_DE_MARCA.replace(sinEncabezado, "")
+        val letrasLargas = ETIQUETA_LARGA.findAll(candidato).map { inicial(it.groupValues[1]) }.joinToString("")
+        if (letrasLargas == ORDEN_STAR) {
+            candidato = ETIQUETA_LARGA.replace(candidato) { "${inicial(it.groupValues[1])}: " }
+        }
+        candidato = MARCA_CON_ENFASIS.replace(candidato) { "${it.groupValues[1]}: " }.trim()
+        return if (tieneStar(candidato)) candidato else sinEncabezado
     }
 
-    /** Las cuatro marcas S, T, A y R, en ese orden (como pide la guía del equipo). */
-    fun tieneStar(texto: String): Boolean = marcasEnOrden(texto).size == ORDEN_STAR.length
+    /**
+     * Las cuatro marcas S, T, A y R en ese orden y una sola vez cada una (como pide la guía del equipo): una "R:" de más
+     * dentro del texto, como "el lenguaje R: …", partiría mal la tarjeta.
+     */
+    fun tieneStar(texto: String): Boolean =
+        marcasEnOrden(texto).size == ORDEN_STAR.length && MARCA_STAR.findAll(texto).count() == ORDEN_STAR.length
 
     /** Al menos dos pasos numerados "1) … 2) …". */
     fun tienePasos(texto: String): Boolean = NUMERO_PASO.findAll(texto).count() >= 2
 
     /**
-     * El texto sin las marcas de formato, para compararlo con lo que escribió la persona: así "S:" o "1)" no cuentan como
-     * palabras ni alargan la respuesta ideal. Quita las marcas STAR solo si la app las tomaría como tales (al menos S, T y A
-     * en orden) y los números de paso solo si hay dos o más.
+     * El texto sin las marcas de formato, para compararlo: así "S:" o "1)" no cuentan como palabras ni alargan el texto.
+     * Igual que la app: las marcas STAR solo si hay al menos S, T y A en orden, y los números de paso bloque por bloque,
+     * solo en los bloques con dos o más pasos ("la versión 2) del SDK" suelta no se toca).
      */
     fun sinMarcas(texto: String): String {
         val marcas = marcasEnOrden(texto)
-        var limpio = if (marcas.size >= 3) {
-            val rangos = marcas.map { it.range }
-            buildString {
-                var desde = 0
-                rangos.forEach { r -> append(texto, desde, r.first); append(' '); desde = r.last + 1 }
-                append(texto, desde, texto.length)
+        val bloques = if (marcas.size >= 3) {
+            buildList {
+                add(texto.substring(0, marcas.first().range.first))
+                marcas.forEachIndexed { i, marca ->
+                    add(texto.substring(marca.range.last + 1, marcas.getOrNull(i + 1)?.range?.first ?: texto.length))
+                }
             }
         } else {
-            texto
+            listOf(texto)
         }
-        if (tienePasos(limpio)) limpio = NUMERO_PASO.replace(limpio, " ")
-        return limpio.replace(Regex("\\s+"), " ").trim()
+        return bloques.joinToString(" ") { if (tienePasos(it)) NUMERO_PASO.replace(it, " ") else it }
+            .replace(ESPACIOS, " ").trim()
     }
 
     /** Igual que la app: recorre las marcas y se queda con las que siguen el orden S, T, A, R. */
