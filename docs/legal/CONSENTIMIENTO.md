@@ -14,7 +14,8 @@ Al publicar una versión nueva, la app le pide a cada usuario que la acepte otra
   - `marketing` (punto 4, comunicaciones) lo envía `ConsentViewModel` desmarcado por defecto.
   - `analisis_conducta_camara` es el permiso aparte para medir conductas con la cámara: la app debe registrarlo (misma
     versión, con los demás alcances que ya tenía la persona) al tocar "Acepto, activar cámara" en el consentimiento de
-    video. Hoy ninguna versión de la app lo envía (checklist C09).
+    video. Hoy ninguna versión de la app lo envía (checklist C09). Con la `v1.1` vigente, sin ese permiso el backend
+    no guarda métricas ni predicciones de la cámara, y al retirarlo borra lo medido (D38).
   - Una clave que la versión no ofrece se descarta al aceptar, y `GET /me/consent/latest` y la respuesta de
     `POST /me/consent` solo traen las que ofrece: la app debe tomar el estado de esa respuesta, no de lo que envió (D35).
 
@@ -23,8 +24,11 @@ contradecían RNF09 (el video no se graba y el dictado se hace en el teléfono) 
 qué va al proveedor de IA y qué no; explica las dos opciones; y lleva a Perfil › Privacidad y consentimiento, donde la app (rama
 `feature/gestionar-consentimiento`) permite cambiar las opciones y retirar el consentimiento. Publicar esta versión
 **después** de que esa versión de la app (PR #21, que incluye el #20, ya con `estadisticas_uso`) esté publicada, porque el
-texto promete esas pantallas. Publicarla con los tres alcances y con el backend de D35 ya desplegado (filtra las claves
-y el mapa). Antes de eso no hay riesgo de opt-ins falsos: la app actual no envía `estadisticas_uso`.
+texto promete esas pantallas. Publicarla con los tres alcances y con el backend de D35 y D38 ya desplegado (filtra
+las claves y el mapa, exige el permiso de cámara y tiene la migración 029 aplicada), y con una app que ya registre
+`analisis_conducta_camara` (C09): si no, nadie tendrá métricas de cámara. Antes de eso no hay riesgo de opt-ins falsos:
+la app actual no envía `estadisticas_uso`. El punto 5 fija el plazo de 5 años del registro de una cuenta eliminada
+(D38).
 
 ---8<---
 Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus datos. Aquí te contamos cuáles, para qué y qué no hacemos con ellos.
@@ -37,9 +41,9 @@ Para practicar entrevistas en EntrevistaApp necesitamos tratar algunos de tus da
 2. La cámara en la simulación de entrevista
 • La cámara solo se usa en la simulación tipo videollamada y solo si le das permiso a tu teléfono.
 • No grabamos ni enviamos video ni fotos.
-• Cuando la app mide conductas, como si tus manos están a la vista o cuánto mueves la cabeza, lo calcula en tu teléfono y solo envía números resumidos.
+• Cuando la app mide conductas, como si tus manos están a la vista o cuánto mueves la cabeza, tu teléfono envía solo números: medidas ya calculadas o la posición de algunos puntos del cuerpo y de los ojos, nunca imágenes ni video. Esos puntos se procesan al momento y no se guardan; solo guardamos los resultados numéricos de tu práctica.
 • No reconocemos tu rostro ni deducimos tus emociones.
-• Para medir esas conductas te pedimos un permiso aparte la primera vez que activas la cámara. Si no lo das, puedes practicar sin cámara; si lo das, lo retiras junto con este consentimiento (punto 6).
+• Para medir esas conductas te pedimos un permiso aparte la primera vez que activas la cámara. Si no lo das, puedes practicar sin cámara y no guardamos nada medido con ella. Si lo retiras, o retiras este consentimiento (punto 6), borramos lo que se había medido con la cámara.
 
 3. Para qué los usamos
 • Para evaluar tus respuestas y darte un reporte con tus fortalezas, lo que te falta reforzar y recomendaciones.
@@ -54,7 +58,7 @@ Si no las aceptas, la app funciona igual. Puedes cambiarlas cuando quieras en Pe
 
 5. Seguridad y conservación
 • Tus datos viajan cifrados y solo tú puedes ver tu historial.
-• Los guardamos mientras tengas tu cuenta. Si la eliminas (Perfil › Editar perfil › Eliminar cuenta), se borran tu cuenta y tus prácticas.
+• Los guardamos mientras tengas tu cuenta. Si la eliminas (Perfil › Editar perfil › Eliminar cuenta), se borran tu cuenta y tus prácticas. Solo guardamos el registro de que aceptaste este consentimiento (versión, opciones, fechas y tu correo) durante 5 años desde que eliminas la cuenta, como prueba ante un posible reclamo, y después lo borramos. Si hay un reclamo en curso, lo guardamos hasta que termine.
 
 6. Tus derechos
 Puedes retirar este consentimiento cuando quieras en Perfil › Privacidad y consentimiento; para seguir practicando tendrás que aceptarlo de nuevo. También puedes pedir acceso, corrección o eliminación de tus datos, u oponerte a su uso, según la ley chilena de protección de datos personales (Ley 19.628, modificada por la Ley 21.719), escribiendo a privacidad@entrevistaapp.com.

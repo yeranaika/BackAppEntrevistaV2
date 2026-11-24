@@ -27,7 +27,8 @@ private const val NIVEL_MAXIMO_ESCALA = 8
 class ServicioSimulacion(
     private val predicciones: RepositorioPrediccionSimulacion,
     private val sesiones: RepositorioSesionEntrevista,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    private val permisoCamara: PermisoCamara = PermisoCamara { true }
 ) {
     /**
      * Sin [sesionId] no hace nada (la predicción sigue siendo solo de consulta). [timestampMs] son los ms desde el
@@ -39,6 +40,8 @@ class ServicioSimulacion(
             throw ErrorValidacion("timestamp_invalido", "timestampMs debe ser mayor o igual a cero")
         }
         val sesion = buscarPropia(usuarioId, sesionId)
+        // Sin el permiso de cámara la predicción se responde pero no se guarda (D38).
+        if (!permisoCamara.permite(usuarioId)) return
         val ts = timestampMs ?: (reloj.millis() - sesion.fechaInicio.toEpochMilli()).coerceAtLeast(0)
         val variables = resultado.predicciones.map { (variable, valor) ->
             PrediccionSimulacion(ts, variable, valor, nivelDe(valor))

@@ -134,10 +134,16 @@ CREATE TABLE IF NOT EXISTS consentimiento (
     acepta_entrenamiento_ia BOOLEAN NOT NULL DEFAULT FALSE,
     fecha_otorgado    TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_revocado    TIMESTAMPTZ,
-    ip_origen         VARCHAR(45)  -- IPv4 o IPv6
+    ip_origen         VARCHAR(45), -- IPv4 o IPv6; NULL al borrar la cuenta (D38)
+    -- Cuándo se borró la cuenta: el registro se guarda 5 años desde ahí y luego se borra (D38, migración 029)
+    cuenta_eliminada_en TIMESTAMPTZ,
+    -- TRUE mientras un reclamo, procedimiento o juicio necesite esta prueba: no se borra aunque venza el plazo
+    retencion_legal   BOOLEAN     NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_consentimiento_usuario
     ON consentimiento(usuario_id, version);
+CREATE INDEX IF NOT EXISTS idx_consentimiento_cuenta_eliminada
+    ON consentimiento(cuenta_eliminada_en) WHERE usuario_id IS NULL;
 
 -- =============================================================================
 -- BLOQUE 3: PERFIL, CARRERA Y PREFERENCIAS

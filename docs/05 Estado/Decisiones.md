@@ -449,7 +449,7 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   debe registrarlo al tocar "Acepto, activar cámara": `POST /me/consent` con la misma versión, los alcances que ya
   tenía la persona y este en `true` (y en `false` si lo retira), sin perderlo al cambiar las otras opciones. Va en la
   misma `v1.1` para que nadie tenga que aceptar dos versiones seguidas. Exigirlo en `/metricas` y borrar las métricas al
-  retirarlo es la tarea C10 (cuando la app ya lo registre, para no rechazar las métricas de todos).
+  retirarlo es la tarea C10 (cuando la app ya lo registre, para no rechazar las métricas de todos). Hecho en D38.
 - **Solo cuentan los alcances que ofrece la versión**: en `POST /me/consent` una clave que el texto no ofrece
   (`ia_entrenamiento`, `analytics`, una inventada) **se descarta** y queda en el log; no se rechaza el pedido, para que
   la app actual pueda seguir aceptando aunque en producción rija una versión sin sus opciones (un 400 la habría dejado
@@ -520,3 +520,48 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Contrato Android**: sin cambios (la app nunca envió `videoClipUrl`).
 - **Pruebas**: `PruebaServicioEntrevista` (la pregunta de video exige texto y no guarda el clip) y
   `PruebaControladorEntrevista` (el JSON con `videoClipUrl` responde 200 y el clip no aparece).
+
+## D38 · Permiso de cámara exigido y plazo de 5 años para el consentimiento de una cuenta eliminada (2026-11)
+- **Contexto**: al juntar `main` con `DEV` (PR #10), la revisión encontró que el texto `v1.1` (D35) prometía dos cosas
+  que el código no cumplía, y el 409 de D35 impide corregirlo cuando alguien lo acepta:
+  - `POST /api/v1/vision/predecir` (de `main`) recibe puntos del cuerpo y de los ojos por cuadro, infiere en el
+    servidor y guarda en `prediccion_simulacion` sin mirar el permiso `analisis_conducta_camara`; y `/metricas` tampoco
+    lo miraba (era la tarea C10).
+  - La migración 024 conserva el consentimiento al borrar la cuenta (con el correo y la IP), sin plazo, y el texto
+    decía que se borraba todo.
+- **Decisión — permiso de cámara** (cierra C10 en el backend):
+  - `ServicioConsentimiento.permite(usuario)`: si la versión del consentimiento de la persona (o la vigente, si no
+    aceptó ninguna) ofrece `analisis_conducta_camara`, hace falta haberlo aceptado. Una versión que no lo ofrece (la
+    `v1.0` de Railway) sigue como antes, para no cortar las métricas de todos mientras rige.
+  - Sin el permiso, `POST /entrevistas/{id}/metricas` responde `201` con `insertadas: 0` y `/vision/predecir` responde
+    la predicción pero no la guarda: la práctica sigue sin cámara, como dice el texto.
+  - Al retirar el permiso (un consentimiento nuevo sin él) o el consentimiento (`/me/consent/revoke`) se borran las
+    métricas de video y las predicciones de la simulación de todas las sesiones de la persona (`BorradorDatosCamara`).
+  - El texto `v1.1` ya no dice "solo envía números resumidos": dice que el teléfono envía solo números (medidas o la
+    posición de algunos puntos del cuerpo y de los ojos, nunca imágenes), que esos puntos no se guardan y que al
+    retirar el permiso se borra lo medido. La Política (1.2.0) dice lo mismo.
+- **Decisión — plazo del consentimiento de una cuenta eliminada: 5 años desde el borrado.** Investigado y verificado
+  en el texto publicado en el Diario Oficial (Ley 19.628 modificada por la Ley 21.719):
+  - La ley no fija años: los datos se guardan solo lo necesario y después se suprimen o anonimizan (art. 3 c). Guardar la
+    prueba es necesario porque el responsable debe probar que tuvo el consentimiento (art. 12, inciso final) y la
+    supresión no procede si hace falta para defender un reclamo (art. 7, excepción vi; art. 13 e).
+  - Los 5 años cubren los 4 que tiene la Agencia para perseguir una infracción (art. 40, desde que cesa: el borrado) y
+    los 5 de la acción ordinaria del Código Civil (art. 2515). Hasta que rija el régimen nuevo, el art. 2332 del Código
+    Civil da 4 años. Los 5 años del art. 47 corren desde una multa firme, así que se cubren con la retención legal.
+  - La Ley 21.855 (Diario Oficial del 23-11-2026) posterga la vigencia de la Ley 21.719 al **15-10-2027**. Se aplica
+    desde ya porque también cumple el régimen actual.
+  - Al borrar la cuenta se borra la IP (ninguna norma la exige para probar el consentimiento y el art. 3 c pide solo lo
+    necesario) y se cierra el consentimiento (`fecha_revocado`). Se guardan la versión, las opciones, las fechas y el
+    correo. `cuenta_eliminada_en` marca desde cuándo corre el plazo.
+  - `TareaPurgaConsentimientos` borra cada día los registros vencidos. `retencion_legal = TRUE` (a mano, por SQL) los
+    conserva mientras haya un reclamo, un procedimiento de la Agencia o un juicio.
+  - El plazo está en el punto 5 del texto `v1.1`, en la Política de Privacidad 1.2.0 (el art. 14 ter i obliga a
+    informarlo) y en `DELETE /cuenta`.
+  - Lo que debe validar un abogado: que el plazo del art. 40 corra desde el borrado y que la vía contractual de 5 años
+    aplique. Con 4 años también se cumpliría la ley si se descarta la vía contractual.
+- **Migración 029** (idempotente): `cuenta_eliminada_en`, `retencion_legal` e índice; para las cuentas eliminadas antes
+  de ella borra la IP, cierra el consentimiento y cuenta el plazo desde el día en que se aplica.
+- **Contrato Android**: sin cambios de forma. Con la `v1.1` vigente, la app tiene que registrar
+  `analisis_conducta_camara` (C09) para que se guarden las métricas: sin eso `insertadas` sale en 0.
+- **Pruebas**: `PruebaPermisoCamara` (6), `PruebaPurgaConsentimientos`, `PruebaEliminarCuentaConsentimiento` (IP,
+  cierre y fecha de borrado), versión de la Política en `PruebaControladorFase4`, y `PROBAR_SEMILLA.ps1` con la 029.

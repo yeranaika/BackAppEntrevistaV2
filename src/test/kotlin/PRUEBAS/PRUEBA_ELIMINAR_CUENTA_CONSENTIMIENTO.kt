@@ -78,6 +78,11 @@ class PruebaEliminarCuentaConsentimiento {
             assertEquals(listOf("ia_entrenamiento", "uso_datos"), fila[TablaConsentimiento.alcancesAceptados])
             assertTrue(fila[TablaConsentimiento.aceptaEntrenamientoIa])
             assertNotNull(fila[TablaConsentimiento.fechaOtorgado])
+            // D38: la IP no se guarda, el consentimiento queda cerrado y desde ahí corre el plazo de conservación
+            assertNull(fila[TablaConsentimiento.ipOrigen])
+            assertNotNull(fila[TablaConsentimiento.fechaRevocado])
+            assertNotNull(fila[TablaConsentimiento.cuentaEliminadaEn])
+            assertEquals(false, fila[TablaConsentimiento.retencionLegal])
             // Los textos legales (globales) siguen ahí
             assertTrue(TablaTextoConsentimiento.selectAll().count() > 0)
             // Lo de otra persona no se toca

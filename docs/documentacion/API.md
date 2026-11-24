@@ -294,7 +294,7 @@ Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollado
 
 `DELETE /cuenta` · Usuario · responde `200`
 
-⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{"confirmar": "eliminar"}`.
+⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{"confirmar": "eliminar"}`. Solo se conserva el registro de consentimiento (versión, alcances, fechas y correo, sin la IP) durante 5 años desde el borrado, como prueba (D38); después una tarea diaria lo borra.
 
 ```json
 {
@@ -392,7 +392,7 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 
 `POST /me/consent` · Usuario · responde `201`
 
-`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona.
+`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, con la misma versión y los alcances que ya tenía la persona. Si la persona tenía `analisis_conducta_camara` y el consentimiento nuevo no lo trae, se borran sus métricas de video y predicciones de la simulación (D38).
 
 ```json
 {
@@ -411,6 +411,8 @@ Desactiva el cargo meta (la entrevista y la práctica lo usan por defecto).
 ### Revocar consentimiento
 
 `POST /me/consent/revoke` · Usuario · responde `200`, `404`
+
+Retirar el consentimiento retira también el permiso de cámara: si estaba aceptado, se borran las métricas de video y las predicciones de la simulación de todas las sesiones de la persona (D38). `404` si no había uno vigente.
 
 ### EULA vigente
 
@@ -895,7 +897,7 @@ En alternativas se usa `opcionId`; en abiertas y de video `texto` (`videoClipUrl
 
 `POST /api/v1/entrevistas/{{sesionId}}/metricas` · Usuario · responde `201`
 
-Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`.
+Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `201` con `insertadas: 0` y no guarda nada (la práctica sigue sin cámara).
 
 ```json
 {
@@ -925,7 +927,7 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
 
 `POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `503`
 
-El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. Sin el permiso de cámara (si la versión del consentimiento lo ofrece) la predicción se responde igual pero no se guarda (D38). `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
 
 ```json
 {

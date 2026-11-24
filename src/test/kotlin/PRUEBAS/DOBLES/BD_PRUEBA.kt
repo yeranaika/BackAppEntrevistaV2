@@ -258,7 +258,10 @@ class SistemaPrueba(
     val mercado = ServicioMercado(mercadoRepo, mercadoRepo, requisitos, cache)
     val tendencias = ServicioTendenciasSkill(mercadoRepo, mercadoRepo, ofertas, requisitos) { mercado.invalidarCache() }
     val documentos = FuenteDocumentosLegalesArchivo()
-    val consentimiento = ServicioConsentimiento(RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos)
+    /** Como en producción: el permiso de cámara decide si se guardan métricas y predicciones, y retirarlo las borra (D38). */
+    val consentimiento = ServicioConsentimiento(
+        RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentos, MODELOS.BorradorDatosCamaraExposed()
+    )
     val recordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
     val suscripciones = RepositorioSuscripcionExposed()
     // Antes que la suscripción, que lee de él el cupo de reportes con IA (D29): declarado después quedaría en null.
@@ -278,7 +281,8 @@ class SistemaPrueba(
         contexto = resolutorContexto,
         procesador = procesadorEntrevista,
         tareasSegundoPlano = CoroutineScope(Dispatchers.Unconfined),
-        reloj = reloj
+        reloj = reloj,
+        permisoCamara = consentimiento
     )
 
     val evaluador = EvaluadorRespuestaFreemium()
@@ -299,7 +303,7 @@ class SistemaPrueba(
     val prediccionesSimulacion = RepositorioPrediccionSimulacionExposed()
     val revisionesTexto = MODELOS.RepositorioRevisionTextoExposed()
     val revisionLocal = SERVICIOS.ServicioRevisionLocal(preguntas, revisionesTexto)
-    val simulacion = ServicioSimulacion(prediccionesSimulacion, sesionesEntrevista, reloj)
+    val simulacion = ServicioSimulacion(prediccionesSimulacion, sesionesEntrevista, reloj, consentimiento)
     val llamadasRepo = MODELOS.RepositorioLlamadaExposed()
     val llamadas = SERVICIOS.ServicioLlamada(llamadasRepo, simulacion)
 

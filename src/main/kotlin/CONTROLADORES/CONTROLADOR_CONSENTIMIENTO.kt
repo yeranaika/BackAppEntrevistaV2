@@ -23,7 +23,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-private const val VERSION_DOCUMENTOS_ESTATICOS = "1.1.0"
+/** Deben coincidir con la "Versión" de docs/legal/TERMINOS_DE_SERVICIO.md y POLITICA_DE_PRIVACIDAD.md. */
+private const val VERSION_TERMINOS = "1.1.0"
+/** 1.2.0: plazo de conservación del consentimiento de una cuenta eliminada y métricas de cámara (D38). */
+private const val VERSION_POLITICA_PRIVACIDAD = "1.2.0"
 
 /**
  * GET  /consent/current              texto legal vigente (Android)
@@ -88,11 +91,11 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
         }
 
         get("/terms") {
-            call.respond(documentoEstatico(documentos, DOCUMENTO_TERMINOS, "Términos y Condiciones de Servicio", "terms"))
+            call.respond(documentoEstatico(documentos, DOCUMENTO_TERMINOS, "Términos y Condiciones de Servicio", "terms", VERSION_TERMINOS))
         }
 
         get("/privacy") {
-            call.respond(documentoEstatico(documentos, DOCUMENTO_PRIVACIDAD, "Política de Privacidad y Protección de Datos", "privacy"))
+            call.respond(documentoEstatico(documentos, DOCUMENTO_PRIVACIDAD, "Política de Privacidad y Protección de Datos", "privacy", VERSION_POLITICA_PRIVACIDAD))
         }
 
         route("/admin") {
@@ -110,10 +113,10 @@ fun Route.controladorConsentimiento(servicio: ServicioConsentimiento, documentos
     }
 }
 
-private suspend fun documentoEstatico(documentos: FuenteDocumentosLegales, archivo: String, titulo: String, tipo: String) =
+private suspend fun documentoEstatico(documentos: FuenteDocumentosLegales, archivo: String, titulo: String, tipo: String, version: String) =
     RespuestaDocumentoLegal(
         title = titulo,
-        version = VERSION_DOCUMENTOS_ESTATICOS,
+        version = version,
         type = tipo,
         contentMarkdown = documentos.leer(archivo)
             ?: throw ErrorServicioExterno("documento_no_disponible", "El documento legal no está disponible"),

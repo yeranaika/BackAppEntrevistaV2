@@ -4,7 +4,10 @@ import UTILIDADES.transaccion
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -63,6 +66,12 @@ interface RepositorioConsentimiento {
 
     /** Cuántos consentimientos (vigentes o revocados) se otorgaron sobre [version]. */
     suspend fun contarAceptaciones(version: String): Long
+
+    /**
+     * Borra los registros de cuentas eliminadas antes de [eliminadasAntesDe], salvo los marcados con retención legal
+     * (D38). Devuelve cuántos borró.
+     */
+    suspend fun purgarCuentasEliminadas(eliminadasAntesDe: Instant): Int
 }
 
 class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
@@ -155,6 +164,12 @@ class RepositorioConsentimientoExposed : RepositorioConsentimiento {
 
     override suspend fun contarAceptaciones(version: String): Long = transaccion {
         TablaConsentimiento.selectAll().where { TablaConsentimiento.version eq version }.count()
+    }
+
+    override suspend fun purgarCuentasEliminadas(eliminadasAntesDe: Instant): Int = transaccion {
+        TablaConsentimiento.deleteWhere {
+            usuarioId.isNull() and (cuentaEliminadaEn less eliminadasAntesDe) and (retencionLegal eq false)
+        }
     }
 
     private fun revocar(usuarioId: UUID, ahora: Instant): Int =

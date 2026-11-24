@@ -164,7 +164,11 @@ class PruebaControladorFase4 {
         val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
 
         assertEquals("terms", enviar("GET", "/api/v1/legal/terms").objeto().texto("type"))
-        assertEquals("privacy", enviar("GET", "/api/v1/legal/privacy").objeto().texto("type"))
+        val privacidad = enviar("GET", "/api/v1/legal/privacy").objeto()
+        assertEquals("privacy", privacidad.texto("type"))
+        assertEquals("1.2.0", privacidad.texto("version"))
+        assertTrue(privacidad.texto("contentMarkdown")!!.contains("**Versión:** 1.2.0"), "la versión de la API y la del archivo coinciden")
+        assertEquals("1.1.0", enviar("GET", "/api/v1/legal/terms").objeto().texto("version"))
         assertTrue(enviar("GET", "/api/v1/legal/eula").objeto().texto("contentMarkdown")!!.isNotBlank())
 
         val nueva = """{"version":"2.0.0","title":"EULA v2","body":"Texto"}"""
