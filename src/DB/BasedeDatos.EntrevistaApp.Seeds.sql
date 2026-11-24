@@ -698,7 +698,7 @@ WHERE p.enunciado = '¿Qué es el ciclo de vida de un Activity en Android y cuá
 
 -- Fila de ejemplo heredada (D37): no es un modelo real ni lo usa el backend. Queda 'deprecado', sin expresiones
 -- faciales ni métricas inventadas (RNF10, D22). El modelo real se registra cuando el compañero lo entregue.
--- En una BD ya sembrada la corrige migrations/023_modelo_vision_semilla_sin_expresiones.sql.
+-- En una BD ya sembrada la corrige migrations/028_modelo_vision_semilla_sin_expresiones.sql.
 INSERT INTO modelo_vision_ia (nombre, version, descripcion, tipo_arquitectura,
     labels_detectados, metricas_rendimiento, estado)
 VALUES (

@@ -513,7 +513,7 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
     respuesta_requerida`. La columna `video_clip_url` queda para las respuestas anteriores (no se borran datos) y
     `respuesta.videoClipUrl` sale `null` en las nuevas.
   - La fila de ejemplo del modelo de visión queda `deprecado`, sin la etiqueta `expresion_dominante` ni métricas.
-    Semilla corregida y `migrations/023_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
+    Semilla corregida y `migrations/028_modelo_vision_semilla_sin_expresiones.sql` para una BD ya sembrada
     (idempotente; el código no lee esa tabla, así que se puede aplicar antes o después de desplegar). El modelo real
     se registra cuando el compañero lo entregue (C02).
 - **Contrato Android**: sin cambios (la app nunca envió `videoClipUrl`).
