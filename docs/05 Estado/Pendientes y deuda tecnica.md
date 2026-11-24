@@ -45,7 +45,10 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
   vía contractual (art. 2515 del Código Civil) aplique. Revisar si la Agencia de Protección de Datos dicta
   instrucciones sobre plazos cuando empiece a operar (la Ley 21.719 rige desde el 15-10-2027, Ley 21.855).
 - [x] ~~**`POST /pruebas/video` sin sesión**~~ (de `main`): ahora solo existe con `HABILITAR_PRUEBAS_VIDEO=true`,
-  apagada por defecto (D39, 2026-11-24). No definir esa variable en Railway.
+  apagada por defecto y prohibida en Railway (D39, 2026-11-24).
+- [ ] **Llevar D39 a `main` y limpiar `pruebas/` en Railway**: hasta que el arreglo llegue a `main`, la versión
+  desplegada sigue aceptando videos sin sesión. Después de desplegar, comprobar el 404 y, si el servicio tiene un
+  volumen montado en el directorio de trabajo, borrar a mano `pruebas/*.mp4` y anotar la fecha.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.

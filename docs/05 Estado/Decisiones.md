@@ -588,9 +588,17 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   contradice D37 y el texto del consentimiento (no se graba ni se envía video) y abre la puerta a llenar el disco.
 - **Decisión**: las dos rutas se montan solo con `HABILITAR_PRUEBAS_VIDEO=true` (`ConfiguracionGeneral.pruebasVideoHabilitadas`,
   `controladorPruebaVideoSiHabilitado`). Por defecto no existen (404) y en Railway la variable no se define. Al
-  arrancar con la variable activa queda un aviso en el log. Se mantienen sin sesión porque la app de calibración no
-  manda token; son una herramienta local.
-- **Contrato Android**: sin cambios para la app normal; la grabación de prueba solo funciona contra un backend local
-  con la variable activa.
-- **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella).
+  arrancar con la variable activa queda un aviso en el log. Solo el literal `true` la activa, y dentro de Railway
+  (`RAILWAY_PROJECT_ID` o `RAILWAY_ENVIRONMENT_ID`) el servidor no arranca con ella activa. Se mantienen sin sesión
+  porque la app de calibración no manda token; son una herramienta local.
+- **Riesgo aceptado**: con la variable activa no hay sesión, tope de disco ni límite de frecuencia: cualquiera en la
+  misma red puede subir varios `.mp4` de 200 MB. Se acepta porque se activa solo mientras se calibra, en una máquina
+  propia, y `pruebas/` se vacía al terminar (`docs/04 Guias/Puesta en marcha.md`).
+- **Contrato Android**: sin cambios para la app normal; la grabación de prueba (`-PgrabarPrueba=true`) solo funciona
+  contra un backend propio fuera de Railway con la variable activa.
+- **Después de desplegar en Railway**: mientras `main` montó las rutas sin condición pudo recibir videos. Comprobar que
+  `POST /pruebas/video` responde 404 y, si el servicio tiene un volumen en el directorio de trabajo, borrar a mano
+  `pruebas/*.mp4` (sin volumen, el redeploy ya los elimina).
+- **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella) y
+  `PruebaConfiguracionPruebasVideo` (solo `true`, falla en Railway y las rutas de producción usan la condición).
 
