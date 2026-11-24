@@ -603,3 +603,26 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella) y
   `PruebaConfiguracionPruebasVideo` (solo `true`, falla en Railway y las rutas de producción usan la condición).
 
+## D40 · Respuesta ideal en el formato que ordena la app (2026-11)
+- **Contexto**: la app (`RESPUESTA_IDEAL.kt`, en `DEV` de la app) ordena la tarjeta "Respuesta ideal": `S: … T: … A: … R: …`
+  como cuatro bloques y los pasos `1) 2) 3)` como viñetas; lo demás lo muestra como párrafo. En Railway (2026-11-24) casi
+  ninguna respuesta lo seguía: 0 de 73 blandas abiertas con STAR y 0 de 178 técnicas abiertas con pasos. La generación
+  con IA no lo pedía y el validador exigía las palabras "situación", "tarea", "acción" y "resultado".
+- **Decisión**:
+  - El prompt de `generar-ia` pide el formato en las abiertas y de video: blandas con `S:`, `T:`, `A:` y `R:` (pasos de
+    la acción numerados) y técnicas con una frase de resumen y pasos numerados, sin encabezados, flechas ni llaves.
+    Opción múltiple sigue igual.
+  - El validador normaliza lo que devuelve la IA (`FormatoRespuestaIdeal.normalizar`): quita "Respuesta ideal:" y cambia
+    "Situación:", "Tarea:", "Acción:" y "Resultado:" por las letras si vienen las cuatro en orden. En una blanda abierta
+    o de video exige las cuatro marcas en orden (`respuesta_sin_formato_star`); con las marcas ya no pide las palabras.
+  - Las preguntas que crea o edita el admin se guardan tal cual: cambiar su texto rompería la paridad del revisor local
+    con la app (casos dorados), que calculan sobre el mismo texto descargado.
+  - La corrección freemium compara contra la respuesta ideal **sin las marcas** (`sinMarcas`): "S:" o "1)" no cuentan
+    como palabras ni alargan la ideal, así que el formato no cambia el puntaje.
+- **Pendiente**: reescribir al formato las 255 respuestas abiertas que ya están en Railway (73 blandas, 4 de video y 178
+  técnicas), sin cambiar su contenido. El revisor local (`REVISOR_TEXTO_LIBRE`, backend y app) todavía cuenta las marcas
+  como palabras: quitarlas a la vez en los dos para no romper la paridad.
+- **Contrato Android**: sin cambios.
+- **Pruebas**: `PruebaFormatoRespuestaIdeal`, el validador (STAR con letras, palabras completas convertidas, rechazo sin
+  marcas, opción múltiple sin exigirlas), el prompt y la corrección freemium (mismo puntaje con o sin marcas).
+

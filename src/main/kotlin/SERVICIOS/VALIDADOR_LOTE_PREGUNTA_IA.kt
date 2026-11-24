@@ -47,8 +47,10 @@ object ValidadorLotePreguntaIa {
         }
         exigir(preguntas.size == cantidadEsperada, "cantidad_incorrecta")
         exigir(preguntas.map { identidad(it.enunciado) }.toSet().size == preguntas.size, "enunciado_duplicado")
-        preguntas.forEach { validarPregunta(it, tipoEsperado, categoria) }
-        return preguntas
+        // Encabezados fuera y "Situación:" → "S:" antes de validar: así se guarda en el formato de la app (D40).
+        val normalizadas = preguntas.map { it.copy(respuestaIdeal = FormatoRespuestaIdeal.normalizar(it.respuestaIdeal)) }
+        normalizadas.forEach { validarPregunta(it, tipoEsperado, categoria) }
+        return normalizadas
     }
 
     private fun validarPregunta(pregunta: PreguntaLlm, tipoEsperado: TipoPregunta, categoria: CategoriaHabilidad) {
@@ -65,10 +67,14 @@ object ValidadorLotePreguntaIa {
             exigir(rubrica.metodo == "STAR", "metodo_incorrecto")
             val criterios = normalizar(rubrica.criterios.joinToString(" "))
             val respuesta = normalizar(pregunta.respuestaIdeal)
+            val conMarcas = FormatoRespuestaIdeal.tieneStar(pregunta.respuestaIdeal)
             componentesStar.forEach { componente ->
                 exigir(criterios.contains(componente), "rubrica_sin_$componente")
-                exigir(respuesta.contains(componente), "respuesta_sin_$componente")
+                // Con las marcas S:, T:, A: y R: la parte ya está nombrada; sin ellas tiene que aparecer la palabra.
+                exigir(conMarcas || respuesta.contains(componente), "respuesta_sin_$componente")
             }
+            // En las abiertas y de video la app ordena la respuesta por esas marcas: sin ellas se vería como un párrafo.
+            if (tipoEsperado != TipoPregunta.OPCION_MULTIPLE) exigir(conMarcas, "respuesta_sin_formato_star")
         } else {
             exigir(segmentosTipoOracion(pregunta.respuestaIdeal) >= ORACIONES_MINIMAS_RESPUESTA_TECNICA, "respuesta_sin_dos_oraciones")
             exigir(rubrica.metodo == metodoDe(categoria) || rubrica.metodo == "STAR", "metodo_incorrecto")
@@ -96,7 +102,7 @@ object ValidadorLotePreguntaIa {
     }
 
     private fun segmentosTipoOracion(texto: String): Int = texto
-        .split(Regex("[.!?]+|(?i)(?=\\b(?:situación|tarea|acción|resultado)\\s*:)"))
+        .split(Regex("[.!?]+|(?<![\\p{L}\\p{N}])(?=[STAR]:\\s)|(?i)(?=\\b(?:situación|tarea|acción|resultado)\\s*:)"))
         .count { it.trim().length >= LARGO_MINIMO_ORACION }
 
     private fun identidad(texto: String): String = normalizar(texto).replace(Regex("\\s+"), " ").trim()

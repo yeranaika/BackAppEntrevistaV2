@@ -2031,7 +2031,7 @@
                 "preguntas"
               ]
             },
-            "description": "Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium.",
+            "description": "Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium. **Formato de la respuesta ideal (D40)**, el que ordena la app en la tarjeta: técnica, una frase de resumen y los pasos `1) 2) 3)`; blanda, `S: … T: … A: … R: …` (letras en mayúscula, en ese orden, con dos puntos y un espacio). Sin encabezados como `Respuesta ideal:`. El backend guarda el texto tal cual; si no sigue el formato, la app lo muestra como párrafo.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2044,7 +2044,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Explica qué es una corrutina {{$timestamp}}\",\n  \"respuestaIdeal\": \"Una corrutina se suspende sin bloquear el hilo y se reanuda después.\",\n  \"rubrica\": {\n    \"criterios\": [\n      \"explica_suspension\"\n    ],\n    \"palabras_clave\": [\n      \"corrutina\",\n      \"hilo\"\n    ]\n  }\n}",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"tecnica\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Explica qué es una corrutina {{$timestamp}}\",\n  \"respuestaIdeal\": \"Una corrutina se suspende sin bloquear el hilo. 1) Se lanza en un scope. 2) Se suspende en un punto de suspensión. 3) Se reanuda después.\",\n  \"rubrica\": {\n    \"criterios\": [\n      \"explica_suspension\"\n    ],\n    \"palabras_clave\": [\n      \"corrutina\",\n      \"hilo\"\n    ]\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2101,7 +2101,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"blanda\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Cuéntame de un conflicto en tu equipo {{$timestamp}}\",\n  \"respuestaIdeal\": \"Situación, tarea, acción y resultado del conflicto.\"\n}",
+              "raw": "{\n  \"cargoId\": \"{{cargoId}}\",\n  \"tipo\": \"abierta_texto\",\n  \"categoria\": \"blanda\",\n  \"nivel\": \"junior\",\n  \"enunciado\": \"Cuéntame de un conflicto en tu equipo {{$timestamp}}\",\n  \"respuestaIdeal\": \"S: Dos compañeros discutían por el diseño. T: Debía destrabar la decisión. A: 1) Los escuché por separado. 2) Propuse criterios comunes. R: Se eligió un diseño y el equipo siguió avanzando.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

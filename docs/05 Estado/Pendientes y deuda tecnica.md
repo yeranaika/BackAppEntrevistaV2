@@ -52,6 +52,11 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Antes de llevar `DEV` a `main`**: con el puerto correcto Railway sí despliega `main`. Aplicar antes en Railway las
   migraciones 023 a 029 en orden. Después de desplegar, comprobar que `POST /pruebas/video` responde 404 y, si el
   servicio tiene un volumen en el directorio de trabajo, revisar que `pruebas/` esté vacío.
+- [ ] **Reescribir las respuestas ideales del banco al formato de la app** (D40): 255 abiertas en Railway (73 blandas
+  y 4 de video con `S: T: A: R:`, 178 técnicas con resumen y pasos `1) 2)`), sin cambiar el contenido. Cambia datos de
+  producción: con el visto bueno del usuario.
+- [ ] **Revisor local sin las marcas de formato** (D40): `REVISOR_TEXTO_LIBRE` (backend) y su copia en la app cuentan
+  "S:" o "1)" como palabras. Cambiarlos juntos (y los casos dorados) para no romper la paridad.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.

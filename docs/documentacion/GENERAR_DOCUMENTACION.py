@@ -209,13 +209,16 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Crear pregunta abierta (admin)", "POST", "/api/v1/admin/preguntas", ADMIN,
             body={"cargoId": "{{cargoId}}", "tipo": "abierta_texto", "categoria": "tecnica", "nivel": "junior",
                   "enunciado": "Explica qué es una corrutina {{$timestamp}}",
-                  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo y se reanuda después.",
+                  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo. 1) Se lanza en un scope. 2) Se suspende en un punto de suspensión. 3) Se reanuda después.",
                   "rubrica": {"criterios": ["explica_suspension"], "palabras_clave": ["corrutina", "hilo"]}}, espera=[201],
-            desc="Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium."),
+            desc="Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium. "
+                 "**Formato de la respuesta ideal (D40)**, el que ordena la app en la tarjeta: técnica, una frase de resumen y los pasos "
+                 "`1) 2) 3)`; blanda, `S: … T: … A: … R: …` (letras en mayúscula, en ese orden, con dos puntos y un espacio). Sin encabezados "
+                 "como `Respuesta ideal:`. El backend guarda el texto tal cual; si no sigue el formato, la app lo muestra como párrafo."),
         req("Crear pregunta de comportamiento (admin)", "POST", "/api/v1/admin/preguntas", ADMIN,
             body={"cargoId": "{{cargoId}}", "tipo": "abierta_texto", "categoria": "blanda", "nivel": "junior",
                   "enunciado": "Cuéntame de un conflicto en tu equipo {{$timestamp}}",
-                  "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."}, espera=[201]),
+                  "respuestaIdeal": "S: Dos compañeros discutían por el diseño. T: Debía destrabar la decisión. A: 1) Los escuché por separado. 2) Propuse criterios comunes. R: Se eligió un diseño y el equipo siguió avanzando."}, espera=[201]),
         req("Listar preguntas (admin)", "GET", "/api/v1/admin/preguntas", ADMIN,
             consulta=[("estado", "aprobada"), ("cargoId", "{{cargoId}}"), ("pagina", "1"), ("tamano", "20")],
             desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano."),
