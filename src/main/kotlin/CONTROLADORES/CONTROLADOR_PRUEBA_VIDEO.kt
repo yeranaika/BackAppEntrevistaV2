@@ -32,6 +32,19 @@ const val LIMITE_MULTIPART_VIDEO_PRUEBA: Long = 210L * 1024 * 1024
 private val FORMATO_MARCA_TIEMPO: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
 
 /**
+ * Monta [controladorPruebaVideo] solo si [habilitado] (HABILITAR_PRUEBAS_VIDEO=true). Apagado, `/pruebas/video` y
+ * `/pruebas` no existen (404): guardan video sin sesión en el disco del servidor y eso contradice D37 y el texto del
+ * consentimiento, así que no deben estar en Railway (D39).
+ */
+fun Route.controladorPruebaVideoSiHabilitado(
+    habilitado: Boolean,
+    carpeta: File = File("pruebas"),
+    maximoBytes: Long = MAXIMO_BYTES_VIDEO_PRUEBA
+) {
+    if (habilitado) controladorPruebaVideo(carpeta, maximoBytes)
+}
+
+/**
  * Recepción de vídeos de prueba (one-off para calibrar umbrales del modelo). Sin sesión, solo para entorno de pruebas.
  * POST /pruebas/video  multipart, campo `video` (.mp4, máx. 200 MB) → { ok, archivo, bytes }
  * GET  /pruebas        lista los vídeos guardados: [{ archivo, bytes, fecha }]

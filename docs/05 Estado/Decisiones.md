@@ -580,3 +580,17 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   borrado), el 403 en `PruebaControladorVision`, versiones de la Política y el EULA, y `PROBAR_SEMILLA.ps1` con la 029.
   Una revisión adversarial de 4 ángulos (lógica, BD, contrato con la app, textos legales) encontró las llamadas, los
   reportes, el retiro implícito de la v1.0, la atomicidad del borrado y la IP del punto 1; todo quedó corregido.
+
+## D39 · `/pruebas/video` solo con una variable, apagada por defecto (2026-11)
+- **Contexto**: `POST /pruebas/video` y `GET /pruebas` (T4.6, de `main`) sirven para calibrar los umbrales del modelo de
+  visión: la app compilada con `-PgrabarPrueba=true` sube el `.mp4` de una llamada de prueba. Se montaban siempre, sin
+  sesión: cualquiera podía subir videos de hasta 200 MB a la carpeta `pruebas/` del servidor y listar los nombres. Eso
+  contradice D37 y el texto del consentimiento (no se graba ni se envía video) y abre la puerta a llenar el disco.
+- **Decisión**: las dos rutas se montan solo con `HABILITAR_PRUEBAS_VIDEO=true` (`ConfiguracionGeneral.pruebasVideoHabilitadas`,
+  `controladorPruebaVideoSiHabilitado`). Por defecto no existen (404) y en Railway la variable no se define. Al
+  arrancar con la variable activa queda un aviso en el log. Se mantienen sin sesión porque la app de calibración no
+  manda token; son una herramienta local.
+- **Contrato Android**: sin cambios para la app normal; la grabación de prueba solo funciona contra un backend local
+  con la variable activa.
+- **Pruebas**: `PruebaControladorPruebaVideo` (404 y nada escrito sin la variable; montadas con ella).
+

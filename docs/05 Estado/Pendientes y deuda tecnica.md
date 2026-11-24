@@ -44,9 +44,8 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Validar con un abogado el plazo de 5 años** (D38): que el art. 40 corra desde el borrado de la cuenta y que la
   vía contractual (art. 2515 del Código Civil) aplique. Revisar si la Agencia de Protección de Datos dicta
   instrucciones sobre plazos cuando empiece a operar (la Ley 21.719 rige desde el 15-10-2027, Ley 21.855).
-- [ ] **`POST /pruebas/video` sin sesión** (de `main`): guarda `.mp4` de hasta 200 MB en la carpeta `pruebas/` del
-  servidor, sin autenticación y en todas las instancias. Contradice D37. Montarlo solo con una variable apagada por
-  defecto, o detrás del rol admin, antes de desplegar.
+- [x] ~~**`POST /pruebas/video` sin sesión**~~ (de `main`): ahora solo existe con `HABILITAR_PRUEBAS_VIDEO=true`,
+  apagada por defecto (D39, 2026-11-24). No definir esa variable en Railway.
 - [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
   E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
   modelo se descarga con un script o si esas pruebas se saltan cuando falta.

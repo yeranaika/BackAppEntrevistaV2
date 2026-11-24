@@ -138,7 +138,12 @@ data class ConfiguracionGeneral(
     val llm: ConfiguracionLlm,
     val limites: ConfiguracionLimites,
     val apagado: ConfiguracionApagado = ConfiguracionApagado(),
-    val motorVision: ConfiguracionMotorVision = ConfiguracionMotorVision()
+    val motorVision: ConfiguracionMotorVision = ConfiguracionMotorVision(),
+    /**
+     * HABILITAR_PRUEBAS_VIDEO=true monta `POST /pruebas/video` y `GET /pruebas` (calibración del modelo de visión, sin
+     * sesión: guardan .mp4 en el disco del servidor). Apagado por defecto y nunca en Railway (D39).
+     */
+    val pruebasVideoHabilitadas: Boolean = false
 )
 
 private val ClaveConfiguracion = AttributeKey<ConfiguracionGeneral>("configuracion-general")
@@ -261,7 +266,8 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         apagado = ConfiguracionApagado(
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).
             esperaTareas = lector.entero("APAGADO_ESPERA_TAREAS_SEGUNDOS", ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO).coerceIn(0, 600).seconds
-        )
+        ),
+        pruebasVideoHabilitadas = lector.booleano("HABILITAR_PRUEBAS_VIDEO")
     )
 }
 
