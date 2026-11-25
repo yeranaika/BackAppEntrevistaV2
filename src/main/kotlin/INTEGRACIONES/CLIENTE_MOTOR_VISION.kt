@@ -19,6 +19,9 @@ import UTILIDADES.PoliticaResiliencia
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
+import java.net.InetSocketAddress
+import java.net.Proxy
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -84,13 +87,28 @@ class ClienteMotorVision(
 
     private val log = LoggerFactory.getLogger(ClienteMotorVision::class.java)
 
-    private val http = HttpClient(motor ?: CIO.create()) {
+    private val http = HttpClient(motor ?: motorEngine()) {
         install(HttpTimeout) {
             requestTimeoutMillis = config.tiempoMaximoMs
             connectTimeoutMillis = minOf(TIEMPO_CONEXION_MOTOR_MS, config.tiempoMaximoMs)
         }
         expectSuccess = false
     }
+
+    /**
+     * D49: con `MOTOR_SOCKS_PROXY` (Tailscale en userspace dentro del contenedor de Railway), las llamadas al motor
+     * y al WOL salen por ese proxy SOCKS5 con resolución remota (socks5h); sin la variable, conexión directa con CIO
+     * como siempre. OkHttp porque CIO no soporta SOCKS según la tabla de engines de la documentación de Ktor.
+     */
+    private fun motorEngine(): HttpClientEngine =
+        if (config.socksProxy.isEmpty()) CIO.create()
+        else {
+            val partes = config.socksProxy.removePrefix("socks5://").split(":")
+            val puerto = partes.getOrNull(1)?.toIntOrNull() ?: 1055
+            OkHttp.create {
+                proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(partes[0], puerto))
+            }
+        }
 
     private val politica = PoliticaResiliencia(
         nombre = "motor",
