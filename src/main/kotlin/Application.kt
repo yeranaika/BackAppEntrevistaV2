@@ -30,7 +30,12 @@ fun Application.module() {
     val dependencias = ContenedorDependencias(configuracion)
     // Después de crear la caché (el contador se comparte entre instancias por Redis) y antes de las rutas.
     configurarLimiteSolicitudes(configuracion.limites, dependencias.cache)
-    dependencias.iniciarTareasSegundoPlano()
+    if (configuracion.tareasSegundoPlanoActivas) {
+        dependencias.iniciarTareasSegundoPlano()
+    } else {
+        // D43: backend local sobre la BD compartida. Las tareas las corre el backend de Railway.
+        log.warn("TAREAS_SEGUNDO_PLANO=false: sin sincronización de mercado, rescate de reportes ni purga de consentimientos en este proceso. Solo para un backend local conectado a la BD compartida.")
+    }
     monitor.subscribe(ApplicationStopped) { dependencias.close() }
     // Apagado ordenado (D20). ApplicationStopping se emite una sola vez, con Netty ya sin aceptar solicitudes y ANTES de
     // ApplicationStopped, donde se cierran el pool de la BD y Redis: aquí se esperan los reportes y correos en curso.
