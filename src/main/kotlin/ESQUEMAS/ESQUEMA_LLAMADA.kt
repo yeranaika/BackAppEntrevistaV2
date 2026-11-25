@@ -1,6 +1,7 @@
 package ESQUEMAS
 
 import MODELOS.AccionLlamada
+import MODELOS.EventoLlamada
 import MODELOS.FeedbackLlamada
 import MODELOS.SegmentoEventoLlamada
 import MODELOS.TramoLlamada
@@ -10,7 +11,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * Reporte tabulado de la llamada. Si falta y viene `sesionId`, el servidor lo arma con las predicciones de esa sesión.
- * [segmentos] (opcional, la app lo manda desde T3.18) solo se usa para calcular el feedback: no se guarda.
+ * [segmentos] (opcional, la app lo manda desde T3.18) se usa para el feedback y para persistir el máximo por evento
+ * (`eventos`, D46); los segmentos crudos no se guardan.
  */
 @Serializable
 data class ResumenLlamadaApp(
@@ -63,5 +65,7 @@ data class RespuestaDetalleLlamada(
     val acciones: List<AccionLlamada>,
     val linea: List<TramoLlamada>,
     /** Campo agregado: ausente en llamadas guardadas antes del feedback (la app ignora claves que no conoce). */
-    val feedback: FeedbackLlamada? = null
+    val feedback: FeedbackLlamada? = null,
+    /** Campo agregado (D46): veces, total y duración máxima por evento de la app; vacío en llamadas antiguas. */
+    val eventos: List<EventoLlamada> = emptyList()
 )
