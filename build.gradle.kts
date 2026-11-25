@@ -50,6 +50,8 @@ dependencies {
     implementation("io.ktor:ktor-server-auth:3.3.1")
     implementation("io.ktor:ktor-server-sessions:3.3.1")
     implementation("io.ktor:ktor-client-cio:3.3.1")
+    // D49: engine con soporte SOCKS5 para salir por Tailscale (userspace) hacia el motor y el WOL en Railway.
+    implementation("io.ktor:ktor-client-okhttp:3.3.1")
     implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
 

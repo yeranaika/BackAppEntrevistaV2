@@ -774,3 +774,18 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas:** `MigracionBaseLocalTest` con la versión en6 y el caso v5→v6 (base sin la tabla → migrar →
   `guardarBorrador` funciona); `gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL.
 
+## D49 · Tailscale en userspace dentro de Railway para el motor y el WOL (2026-11)
+- **Contexto:** Railway (nube) no puede hablar con `100.94.73.121:8094` ni `100.66.238.50:17474` sin estar en la
+  tailnet: con las variables bien puestas, `/health` de producción respondía `cargado: false, MOTOR_NO_DISPONIBLE`.
+- **Decisión:** el contenedor arranca `tailscaled --tun=userspace-networking --socks5-server=localhost:1055` y
+  `tailscale up --authkey=$TS_AUTHKEY --hostname=railway-backend --accept-dns=false`; solo cuando quedó conectado,
+  `start.sh` exporta `MOTOR_SOCKS_PROXY=socks5://localhost:1055` y el backend saca por ESE proxy las llamadas al motor
+  y al WOL (cliente OkHttp con `Proxy(Type.SOCKS, createUnresolved)` = resolución remota; CIO no soporta SOCKS según
+  la tabla de engines de Ktor). El resto del tráfico (BD, APIs, IA) va directo. `TS_AUTHKEY` vacía o ausente = el
+  backend arranca sin Tailscale, como antes.
+- **Contenedor:** `Dockerfile` propio reemplaza a RailPack (build con JDK21 vía `installDist`, igual que antes; los
+  binarios `tailscaled`/`tailscale` se copian de la imagen `tailscale/tailscale:stable`) + `start.sh` como ENTRYPOINT.
+- **Seguridad:** `TS_AUTHKEY` y `WOL_TOKEN` nunca se escriben en logs.
+- **Pruebas:** `PruebaProxySocksMotor` (directa por defecto, engine OkHttp con `socks5://` válido, `http://` rechazado
+  por la configuración).
+
