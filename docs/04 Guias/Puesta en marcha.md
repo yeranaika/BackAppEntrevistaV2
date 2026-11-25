@@ -37,6 +37,7 @@ Copiar `.env.example` a `.env` (está en `.gitignore`; **nunca** subirlo) y comp
 | `CABECERA_IP_CLIENTE` | No (vacía) | Cabecera con la IP real del cliente puesta por el proxy. En Railway `X-Real-IP`, **solo tras la prueba de humo** (abajo) |
 | `FREEMIUM_HTTP_WARMUP` | No (2000) | Cantidad de solicitudes locales de calentamiento HTTP al arrancar; `0` lo desactiva |
 | `HABILITAR_PRUEBAS_VIDEO` | No (false) | `true` monta `POST /pruebas/video` y `GET /pruebas` (calibración del modelo de visión, **sin sesión**, guardan `.mp4` en `pruebas/`). Solo en una máquina propia: en Railway el servidor no arranca con ella activa (D39) |
+| `TAREAS_SEGUNDO_PLANO` | No (true) | `false` no arranca la sincronización de mercado, el rescate de reportes ni la purga de consentimientos. **Obligatorio en un backend local conectado a la BD de Railway** (ver abajo). En Railway el servidor no arranca con `false` (D43) |
 
 Si falta una obligatoria, el servidor **no arranca** y dice cuál falta.
 
@@ -56,11 +57,56 @@ idempotente y completa las copias y trazas que el código anterior dejó mientra
 La semilla se puede correr varias veces sin duplicar preguntas ni opciones. `src/DB/PROBAR_SEMILLA.ps1` lo comprueba
 en una BD desechable (`semilla_prueba`, que crea y borra; no toca `DBentrevista`): corre la semilla tres veces y
 espera 14 preguntas / 24 opciones, sin repetidas, y que una pregunta rechazada o con opciones editadas no se toque.
+
+### Semilla de áreas TI (D44)
+`src/DB/BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql` suma 6 áreas (QA/Testing, Ciberseguridad, Diseño UX/UI, Soporte TI y
+Redes, Datos/BI y Cloud): 13 skills, 12 cargos con sus skills y 234 preguntas aprobadas (18 por skill nueva, 6 por nivel).
+Va **después** de la semilla base (usa sus skills; si falta una, no carga nada) y es re-ejecutable. Docker la carga sola
+en una BD nueva (`003-seeds-areas-ti.sql`); en una BD que ya existe:
+```powershell
+psql -v ON_ERROR_STOP=1 -d DBentrevista -f src/DB/BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql
+```
+`PROBAR_SEMILLA.ps1` también la corre dos veces y espera 13 skills / 12 cargos / 234 preguntas / 468 opciones.
+**Ya aplicada en Railway (producción) el 2026-11-24** con `CARGAR_SQL_EN_RAILWAY.ps1`: pasó de 36 skills / 16 cargos /
+514 preguntas a 49 / 28 / 748 (respaldo previo en `~/respaldos_railway/2026-11-24_224038` del PC que la aplicó).
 Necesita los binarios de PostgreSQL (`psql`, `createdb`, `dropdb`) y `PGUSER`/`PGPASSWORD` definidos:
 ```powershell
 pwsh src/DB/PROBAR_SEMILLA.ps1 -Bin C:\ruta\pgsql\bin -Puerto 5432   # termina con "Semilla re-ejecutable: todo OK"
 ```
 > [!note] Aún no se ha ejecutado (2026-11-07). Una BD que ya tenga duplicados de la semilla vieja no se limpia sola.
+
+### Usar la BD de Railway desde tu PC (mismo banco de preguntas, D43)
+Para que todo el equipo trabaje con el mismo banco, el backend local puede conectarse a la BD de producción de Railway
+por **Tailscale**: el servicio `tailscale-rw` del proyecto EntrevistaAPPBack (plantilla «Tailscale Subnet Router») publica
+la red privada de Railway en la tailnet del proyecto, así la BD no queda expuesta a internet. Son datos reales: lo que
+crees desde tu PC (usuarios, entrevistas) queda en producción.
+1. Pide que te inviten a la tailnet del proyecto, instala Tailscale y entra con esa cuenta (en Windows, con «Use
+   Tailscale subnets» activo). Prueba: `Test-NetConnection postgres.entrevistaappback-production-railway.internal -Port 5432`
+   debe dar `TcpTestSucceeded : True`.
+2. En `.env`:
+   ```properties
+   DB_URL=jdbc:postgresql://postgres.entrevistaappback-production-railway.internal:5432/railway?currentSchema=app
+   DB_USER=postgres
+   DB_PASS=<PGPASSWORD del servicio Postgres en Railway → Variables; nunca al repo ni al chat>
+   TAREAS_SEGUNDO_PLANO=false
+   ```
+3. `TAREAS_SEGUNDO_PLANO=false` es **obligatorio**: con las tareas encendidas, tu PC rescataría los reportes de usuarios
+   reales (con tu configuración, sin IA), llamaría a las APIs de empleo y purgaría consentimientos. Las tareas las corre
+   el backend de Railway.
+4. Nunca corras migraciones ni `UPDATE`/`DELETE` a mano contra esa BD sin acordarlo con el equipo, y no uses
+   `e2e_*` ni `PROBAR_SEMILLA.ps1` contra ella. Para aplicar una semilla o migración acordada:
+   `powershell -ExecutionPolicy Bypass -File src/DB/CARGAR_SQL_EN_RAILWAY.ps1 -Archivo <archivo.sql>` (pide la contraseña sin
+   mostrarla, respalda el banco en CSV en `~/respaldos_railway`, muestra los conteos y pide escribir `SI`).
+
+Montaje de Tailscale (una vez, ya hecho el 2026-11-24): en la política de la tailnet, `tagOwners` con `tag:railway` y
+`autoApprovers` de `fd00::/8` y `10.0.0.0/8` para `tag:railway`; clave de acceso reutilizable y efímera **con la etiqueta
+`tag:railway`** en la variable `TAILSCALE_AUTHKEY` de `tailscale-rw` (sin la etiqueta, cada redeploy deja las rutas
+pendientes de aprobar a mano en Machines); y en DNS un servidor `100.102.137.20` (la IP de `tailscale-rw` en la tailnet;
+el volumen la mantiene entre despliegues) restringido al dominio `entrevistaappback-production-railway.internal`.
+En `tailscale-rw` va también `TS_DEBUG_MTU=1200`: entre la PC y Railway se pierden los paquetes del túnel de más de
+~1250 bytes (medido el 2026-11-24: un `INSERT` de 1,4 KB cortaba la conexión y el saludo SSL se colgaba); con MTU 1200
+el puente pide segmentos TCP más chicos y pasan. Si vuelve a pasar, probar con un `ping -f -l 1220 <IP de tailscale-rw>`.
+Antes de invitar al equipo, limitar en la política el acceso a esas rutas al puerto 5432.
 
 ## 3. Ejecutar
 ```bash
