@@ -4,7 +4,10 @@ import UTILIDADES.transaccion
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -13,6 +16,18 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 const val ALCANCE_ENTRENAMIENTO_IA = "ia_entrenamiento"
+
+/**
+ * Permiso aparte para medir conductas con la cámara en la simulación tipo videollamada (D35). La app lo registra al
+ * tocar "Acepto, activar cámara"; el consentimiento general no lo marca.
+ */
+const val ALCANCE_ANALISIS_CAMARA = "analisis_conducta_camara"
+
+/**
+ * Estadísticas de uso y errores (Firebase en la app, RF09). Reemplaza a "analytics" en la v1.1: la app anterior lo
+ * enviaba premarcado, así que esa clave no prueba que la persona lo haya elegido y se descarta (D35).
+ */
+const val ALCANCE_ESTADISTICAS_USO = "estadisticas_uso"
 
 data class TextoConsentimiento(
     val version: String,
@@ -37,8 +52,8 @@ interface RepositorioTextoConsentimiento {
     suspend fun buscar(version: String): TextoConsentimiento?
     suspend fun listar(): List<TextoConsentimiento>
 
-    /** Deja [version] como la única vigente (la crea o actualiza su contenido). */
-    suspend fun publicar(version: String, titulo: String, cuerpo: String): TextoConsentimiento
+    /** Deja [version] como la única vigente (la crea o actualiza su contenido). [alcances] null conserva los que tenía. */
+    suspend fun publicar(version: String, titulo: String, cuerpo: String, alcances: List<String>? = null): TextoConsentimiento
 }
 
 interface RepositorioConsentimiento {
@@ -48,6 +63,15 @@ interface RepositorioConsentimiento {
 
     /** false si no había uno vigente. */
     suspend fun revocarVigente(usuarioId: UUID): Boolean
+
+    /** Cuántos consentimientos (vigentes o revocados) se otorgaron sobre [version]. */
+    suspend fun contarAceptaciones(version: String): Long
+
+    /**
+     * Borra los registros de cuentas eliminadas antes de [eliminadasAntesDe], salvo los marcados con retención legal
+     * (D38). Devuelve cuántos borró.
+     */
+    suspend fun purgarCuentasEliminadas(eliminadasAntesDe: Instant): Int
 }
 
 class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
@@ -66,12 +90,13 @@ class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
         TablaTextoConsentimiento.selectAll().orderBy(TablaTextoConsentimiento.fechaPublicacion to SortOrder.DESC).map { it.aTexto() }
     }
 
-    override suspend fun publicar(version: String, titulo: String, cuerpo: String): TextoConsentimiento = transaccion {
+    override suspend fun publicar(version: String, titulo: String, cuerpo: String, alcances: List<String>?): TextoConsentimiento = transaccion {
         val ahora = OffsetDateTime.now()
         TablaTextoConsentimiento.update({ TablaTextoConsentimiento.vigente eq true }) { it[vigente] = false }
         val actualizadas = TablaTextoConsentimiento.update({ TablaTextoConsentimiento.version eq version }) {
             it[TablaTextoConsentimiento.titulo] = titulo
             it[TablaTextoConsentimiento.cuerpo] = cuerpo
+            if (alcances != null) it[alcancesPosibles] = alcances
             it[vigente] = true
             it[fechaPublicacion] = ahora
         }
@@ -80,6 +105,7 @@ class RepositorioTextoConsentimientoExposed : RepositorioTextoConsentimiento {
                 it[TablaTextoConsentimiento.version] = version
                 it[TablaTextoConsentimiento.titulo] = titulo
                 it[TablaTextoConsentimiento.cuerpo] = cuerpo
+                it[alcancesPosibles] = alcances.orEmpty()
                 it[vigente] = true
                 it[fechaPublicacion] = ahora
             }
@@ -135,6 +161,26 @@ class RepositorioConsentimientoExposed : RepositorioConsentimiento {
     }
 
     override suspend fun revocarVigente(usuarioId: UUID): Boolean = transaccion { revocar(usuarioId, Instant.now()) > 0 }
+
+    override suspend fun contarAceptaciones(version: String): Long = transaccion {
+        TablaConsentimiento.selectAll().where { TablaConsentimiento.version eq version }.count()
+    }
+
+    override suspend fun purgarCuentasEliminadas(eliminadasAntesDe: Instant): Int = transaccion {
+        // Una cuenta borrada sin pasar por RepositorioUsuario.eliminar (por SQL, o por la versión anterior del backend
+        // con la 029 ya aplicada) deja la fila sin fecha: se completa como en la 029 y el plazo corre desde hoy.
+        val ahora = Instant.now()
+        TablaConsentimiento.update({ TablaConsentimiento.usuarioId.isNull() and TablaConsentimiento.cuentaEliminadaEn.isNull() }) {
+            it[cuentaEliminadaEn] = ahora
+            it[ipOrigen] = null
+        }
+        TablaConsentimiento.update({ TablaConsentimiento.usuarioId.isNull() and TablaConsentimiento.fechaRevocado.isNull() }) {
+            it[fechaRevocado] = ahora
+        }
+        TablaConsentimiento.deleteWhere {
+            usuarioId.isNull() and (cuentaEliminadaEn less eliminadasAntesDe) and (retencionLegal eq false)
+        }
+    }
 
     private fun revocar(usuarioId: UUID, ahora: Instant): Int =
         TablaConsentimiento.update({ (TablaConsentimiento.usuarioId eq usuarioId) and TablaConsentimiento.fechaRevocado.isNull() }) {

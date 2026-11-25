@@ -1,5 +1,7 @@
 package SERVICIOS
 
+import MODELOS.FRASE_FORTALEZA_CORPORAL
+import MODELOS.FRASE_MEJORA_CORPORAL
 import CONFIGURACION.EVALUACIONES_IA_MENSUALES_POR_DEFECTO
 import CONFIGURACION.HISTORIAL_PRUEBAS_LIMITE
 import CONFIGURACION.INTENTOS_MAXIMOS_REPORTE
@@ -361,7 +363,7 @@ class ServicioReporteEntrevista(
         val porReglas = detalles.filter { it.skillId != null && it.puntaje.toDouble() >= UMBRAL_FORTALEZA }.map { "Dominio de ${it.nombre}" } +
             listOfNotNull("Respuestas de comportamiento bien estructuradas".takeIf { (blando ?: 0.0) >= UMBRAL_FORTALEZA })
         // La IA no ve las métricas de video: lo corporal siempre sale de las reglas.
-        val corporales = listOfNotNull("Buen lenguaje corporal y contacto visual".takeIf { (corporal ?: 0.0) >= UMBRAL_FORTALEZA })
+        val corporales = listOfNotNull(FRASE_FORTALEZA_CORPORAL.takeIf { (corporal ?: 0.0) >= UMBRAL_FORTALEZA })
         return (evaluacion.fortalezas.ifEmpty { porReglas } + corporales).distinct().take(ITEMS_MAXIMOS_REPORTE)
     }
 
@@ -376,7 +378,7 @@ class ServicioReporteEntrevista(
         val sinResponder = sesion.preguntas.count { !it.estaRespondida }
         val siempre = listOfNotNull(
             "Respondiste ${sesion.respondidas} de ${sesion.preguntas.size} preguntas: intenta responder todas".takeIf { sinResponder > 0 },
-            "Trabaja el contacto visual y la postura frente a la cámara".takeIf { corporal != null && corporal < UMBRAL_NIVEL_LOGRADO },
+            FRASE_MEJORA_CORPORAL.takeIf { corporal != null && corporal < UMBRAL_NIVEL_LOGRADO },
             "$sinTranscripcion respuesta(s) en video no tenían transcripción y no se pudieron evaluar".takeIf { sinTranscripcion > 0 }
         )
         return (evaluacion.areasMejora.ifEmpty { porReglas } + siempre).distinct().take(ITEMS_MAXIMOS_REPORTE)

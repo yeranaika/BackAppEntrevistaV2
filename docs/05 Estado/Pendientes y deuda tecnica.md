@@ -26,6 +26,40 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **Aplicar la migración 022** (`rubrica_snap`, D24, rama `fix/banco-preguntas`) en Railway (en la BD local ya está), con
   respaldo, **antes** de desplegar esa rama (sin la columna fallan los endpoints de entrevista y el reporte), y volver
   a correrla una vez desplegada.
+- [ ] **Al unir `feature/consentimiento-v1-1`** (D35, D37): aplicar `migrations/028_modelo_vision_semilla_sin_expresiones.sql`
+  en Railway (idempotente, cuando quieran). Publicar la `v1.1` por la API con sus tres alcances
+  (`estadisticas_uso`, `marketing`, `analisis_conducta_camara`; ver `docs/legal/CONSENTIMIENTO.md`) **después** de
+  desplegar este backend y de publicar la app con el PR #21 (que incluye el #20). Antes, en la app: cambiar
+  `ALCANCE_ANALYTICS` a `estadisticas_uso` en el PR #20 (hecho en las ramas locales de los PR #20 y #21 el
+  2026-11-23, falta subirlo).
+- [ ] **Migraciones que trajo `main`** (023 `version_modelo`, 024 consentimiento que sobrevive al borrar la cuenta,
+  025 `prediccion_simulacion`, 026 `revision_texto_local`, 027 `llamada`): confirmar cuáles ya están en Railway y
+  aplicar las que falten, en orden y antes de desplegar `DEV`. La de D37 pasó a ser la **028** para no repetir el
+  número 023.
+- [x] ~~**Bloquea publicar la v1.1 del consentimiento**~~ (`/vision/predecir` sin el permiso de cámara y el
+  consentimiento de una cuenta eliminada sin plazo): resuelto en D38 (2026-11-23).
+- [ ] **Antes de publicar la v1.1** (D38): aplicar la **029** en Railway y que la app registre
+  `analisis_conducta_camara` al tocar "Acepto, activar cámara" (C09). Con la `v1.1` vigente y sin ese permiso, el
+  backend no guarda métricas ni predicciones de la cámara.
+- [ ] **Validar con un abogado el plazo de 5 años** (D38): que el art. 40 corra desde el borrado de la cuenta y que la
+  vía contractual (art. 2515 del Código Civil) aplique. Revisar si la Agencia de Protección de Datos dicta
+  instrucciones sobre plazos cuando empiece a operar (la Ley 21.719 rige desde el 15-10-2027, Ley 21.855).
+- [x] ~~**`POST /pruebas/video` sin sesión**~~ (de `main`): ahora solo existe con `HABILITAR_PRUEBAS_VIDEO=true`,
+  apagada por defecto y prohibida en Railway (D39, 2026-11-24).
+- [x] ~~**Puerto 8093 en `application.yaml`**~~ (commit `f8d6d86` de `main`): Railway revisa `/ready` en el 8080, así
+  que los 3 despliegues de `main` del 2026-11-23 fallaron y producción siguió con el PR #6 (`/pruebas/video` nunca
+  llegó a producción). Vuelve a 8080 (2026-11-24); en local se usa `-P:ktor.deployment.port=8093`.
+- [ ] **Antes de llevar `DEV` a `main`**: con el puerto correcto Railway sí despliega `main`. Aplicar antes en Railway las
+  migraciones 023 a 029 en orden. Después de desplegar, comprobar que `POST /pruebas/video` responde 404 y, si el
+  servicio tiene un volumen en el directorio de trabajo, revisar que `pruebas/` esté vacío.
+- [ ] **Reescribir las respuestas ideales del banco al formato de la app** (D40): 255 abiertas en Railway (73 blandas
+  y 4 de video con `S: T: A: R:`, 178 técnicas con resumen y pasos `1) 2)`), sin cambiar el contenido. Cambia datos de
+  producción: con el visto bueno del usuario.
+- [ ] **Revisor local sin las marcas de formato** (D40): `REVISOR_TEXTO_LIBRE` (backend) y su copia en la app cuentan
+  "S:" o "1)" como palabras. Cambiarlos juntos (y los casos dorados) para no romper la paridad.
+- [ ] **Pruebas del modelo de visión sin el `.onnx`**: `./gradlew test` completo falla en una máquina sin el modelo
+  E14 (8 pruebas de `motor-vision` y `PruebaVisionDesacoplada`), porque `models/` no trae el `.onnx`. Decidir si el
+  modelo se descarga con un script o si esas pruebas se saltan cuando falta.
 - [x] **Ejecutar `src/DB/PROBAR_SEMILLA.ps1`** (D25): 7/7 en verde contra PostgreSQL 16 (2026-11-07).
 
 ## Media
@@ -33,6 +67,7 @@ Ordenados por prioridad sugerida. Al tomar uno, anotarlo aquí con la rama; al t
 - [ ] **IA para premium en práctica y nivelación** (hoy solo freemium; la interfaz `EvaluadorRespuesta` lo permite).
 - [ ] **Resumen de nivelación con IA** para premium (hoy determinista).
 - [ ] **Transcripción de audio (STT)** para preguntas de video: hoy un clip sin transcripción no se evalúa.
+  - Para la **llamada en vivo** ya existe el endpoint de transcripciones (D41, migración `030`); falta la app (pregunta visible, captura con `MotorDictado`, envío por respuesta y reporte) y aplicar la `030` en Railway.
 - [x] Endpoint para que un admin vea costos de IA (2026-11-06, rama `feature/costos-ia-admin`): `GET /api/v1/admin/costos-ia`
   por día (UTC) y por modelo, con el costo estimado de las llamadas fallidas. El panel lo muestra en Dashboard, Informes
   y Generar con IA (`getCostosIa`, commit `f912f63` del panel, rama `feature/panel-admin-v2`, sin integrar en `main`).

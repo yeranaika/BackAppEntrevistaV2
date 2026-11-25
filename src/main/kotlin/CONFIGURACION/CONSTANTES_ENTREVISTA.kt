@@ -15,7 +15,6 @@ const val HORAS_MAXIMAS_SESION_ENTREVISTA = 2L
 const val SESIONES_SIN_REPETIR_PREGUNTAS = 3
 
 const val LARGO_MAXIMO_RESPUESTA_ENTREVISTA = 4000
-const val LARGO_MAXIMO_URL_VIDEO = 500
 
 /** El cliente de visión envía paquetes de ~30 filas cada 500 ms; esto deja margen sin aceptar lotes abusivos. */
 const val METRICAS_VIDEO_MAXIMAS_POR_LOTE = 300

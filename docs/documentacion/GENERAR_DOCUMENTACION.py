@@ -111,7 +111,9 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Mi perfil", "GET", "/me/perfil", espera=[200, 404]),
         req("Actualizar perfil", "PUT", "/me/perfil", desc="Valores válidos de `area` (exactos, como los envía la app): `TI`, `Desarollador`, `Analista`, `Administracion`, `Otra área`, `Ventas / Comercial`, `Finanzas`, `RRHH / Personas`, `Diseño / UX`, `Operaciones / Logística`. Otro valor → `area_invalida`.", body={"nivelExperiencia": "junior", "area": "TI", "pais": "CL", "notaObjetivos": "Conseguir mi primer trabajo"}),
         req("Eliminar mi cuenta", "DELETE", "/cuenta", body={"confirmar": "eliminar"}, omitir_en_prueba=True,
-            desc="⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{\"confirmar\": \"eliminar\"}`."),
+            desc="⚠️ Borrado definitivo de la cuenta y todos sus datos. Requiere `{\"confirmar\": \"eliminar\"}`. "
+                 "Solo se conserva el registro de consentimiento (versión, alcances, fechas y correo, sin la IP) durante 5 años "
+                 "desde el borrado, como prueba (D38); después una tarea diaria lo borra."),
     ]),
     ("04 · Onboarding y objetivo", "", [
         req("Onboarding (Android)", "PUT", "/perfil/objetivo", body={"area": "TI", "metaCargo": "Backend Developer", "nivel": "jr"},
@@ -125,17 +127,29 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
     ]),
     ("05 · Consentimientos y documentos legales", "", [
         req("Texto vigente", "GET", "/consent/current", PUBLICA, guarda={"versionConsentimiento": ("j.version", lambda j: j.get("version"))}),
-        req("Aceptar consentimiento", "POST", "/me/consent", body={"version": "{{versionConsentimiento}}", "alcances": {"uso_datos": True, "ia_entrenamiento": False}},
-            espera=[201], desc="`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior."),
+        req("Aceptar consentimiento", "POST", "/me/consent", body={"version": "{{versionConsentimiento}}", "alcances": {"estadisticas_uso": True, "marketing": False}},
+            espera=[201], desc="`404 version_no_encontrada` si la versión no existe. Un consentimiento nuevo revoca el anterior. "
+                               "Solo cuentan los alcances que ofrece la versión (`estadisticas_uso`, `marketing` y `analisis_conducta_camara` en la v1.1): "
+                               "una clave que no ofrece (por ejemplo `analytics`) se descarta sin error y el mapa `alcances` de la respuesta solo trae "
+                               "los que ofrece. Tomar el estado de esa respuesta, no de lo enviado (D35). El permiso de cámara se registra aparte, "
+                               "con la misma versión y los alcances que ya tenía la persona. **Permiso de cámara (D38):** si el pedido no trae la clave "
+                               "`analisis_conducta_camara`, se conserva la que tenía la persona (la pantalla general y la de Perfil no la editan); "
+                               "`analisis_conducta_camara: false` lo retira y borra lo medido con la cámara, igual que pasar de una versión sin el permiso "
+                               "aparte (v1.0) a una que lo ofrece sin aceptarlo."),
         req("Mi consentimiento", "GET", "/me/consent/latest", espera=[200, 204]),
-        req("Revocar consentimiento", "POST", "/me/consent/revoke", espera=[200, 404]),
+        req("Revocar consentimiento", "POST", "/me/consent/revoke", espera=[200, 404],
+            desc="Retirar el consentimiento retira también el permiso de cámara: se borra lo medido con ella en todo lo de la persona "
+                 "(métricas de video, predicciones de la simulación, resumen de sus llamadas en vivo y el puntaje corporal de sus reportes) (D38). "
+                 "Se borra siempre, también si responde `404` porque no había uno vigente: así un reintento vuelve a borrar."),
         req("EULA vigente", "GET", "/api/v1/legal/eula", PUBLICA),
         req("Versiones del EULA", "GET", "/api/v1/legal/versions", PUBLICA),
         req("Términos de servicio", "GET", "/api/v1/legal/terms", PUBLICA),
         req("Política de privacidad", "GET", "/api/v1/legal/privacy", PUBLICA),
         req("Publicar versión del EULA (admin)", "POST", "/api/v1/legal/admin/eula", ADMIN,
-            body={"version": "2.0.0", "title": "EULA", "body": "Texto"}, omitir_en_prueba=True,
-            desc="⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`."),
+            body={"version": "2.0.0", "title": "EULA", "body": "Texto", "alcances": ["estadisticas_uso", "marketing", "analisis_conducta_camara"]}, omitir_en_prueba=True, espera=[201, 409],
+            desc="⚠️ Cambia el texto vigente para todos los usuarios. Alias: `POST /admin/consent/text`. `alcances` son las opciones "
+                 "que la persona puede aceptar (sin ellas, una versión nueva no ofrece ninguna). `409 version_con_aceptaciones` si cambia "
+                 "el título, el cuerpo o los alcances de una versión que alguien ya aceptó; republicarla igual solo la deja vigente (D35)."),
     ]),
     ("06 · Recordatorios", "", [
         req("Guardar preferencias", "PUT", "/recordatorios/preferencias",
@@ -195,13 +209,16 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
         req("Crear pregunta abierta (admin)", "POST", "/api/v1/admin/preguntas", ADMIN,
             body={"cargoId": "{{cargoId}}", "tipo": "abierta_texto", "categoria": "tecnica", "nivel": "junior",
                   "enunciado": "Explica qué es una corrutina {{$timestamp}}",
-                  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo y se reanuda después.",
+                  "respuestaIdeal": "Una corrutina se suspende sin bloquear el hilo. 1) Se lanza en un scope. 2) Se suspende en un punto de suspensión. 3) Se reanuda después.",
                   "rubrica": {"criterios": ["explica_suspension"], "palabras_clave": ["corrutina", "hilo"]}}, espera=[201],
-            desc="Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium."),
+            desc="Las abiertas necesitan `respuestaIdeal` o `rubrica`. Las `palabras_clave` de la rúbrica las usa el motor freemium. "
+                 "**Formato de la respuesta ideal (D40)**, el que ordena la app en la tarjeta: técnica, una frase de resumen y los pasos "
+                 "`1) 2) 3)`; blanda, `S: … T: … A: … R: …` (letras en mayúscula, en ese orden, con dos puntos y un espacio). Sin encabezados "
+                 "como `Respuesta ideal:`. El backend guarda el texto tal cual; si no sigue el formato, la app lo muestra como párrafo."),
         req("Crear pregunta de comportamiento (admin)", "POST", "/api/v1/admin/preguntas", ADMIN,
             body={"cargoId": "{{cargoId}}", "tipo": "abierta_texto", "categoria": "blanda", "nivel": "junior",
                   "enunciado": "Cuéntame de un conflicto en tu equipo {{$timestamp}}",
-                  "respuestaIdeal": "Situación, tarea, acción y resultado del conflicto."}, espera=[201]),
+                  "respuestaIdeal": "S: Dos compañeros discutían por el diseño. T: Debía destrabar la decisión. A: 1) Los escuché por separado. 2) Propuse criterios comunes. R: Se eligió un diseño y el equipo siguió avanzando."}, espera=[201]),
         req("Listar preguntas (admin)", "GET", "/api/v1/admin/preguntas", ADMIN,
             consulta=[("estado", "aprobada"), ("cargoId", "{{cargoId}}"), ("pagina", "1"), ("tamano", "20")],
             desc="Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del cargo o sin cargo: lo que cuenta la cobertura, D26), generadaPorIa, pagina, tamano."),
@@ -280,16 +297,18 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                                  lambda j: (j.get("opciones") or [{}])[0].get("opcionId", ""))}),
         req("Responder pregunta", "POST", "/api/v1/entrevistas/{{sesionId}}/respuestas",
             body={"preguntaSesionId": "{{preguntaSesionId}}", "opcionId": "{{opcionId}}", "texto": "Una corrutina se suspende sin bloquear el hilo."},
-            desc="En alternativas se usa `opcionId`; en abiertas `texto` (y `videoClipUrl` https en las de video). Cada pregunta se responde una vez."),
+            desc="En alternativas se usa `opcionId`; en abiertas y de video `texto` (`videoClipUrl` se acepta pero se ignora: no se guardan clips, D37). Cada pregunta se responde una vez."),
         req("Enviar métricas de video", "POST", "/api/v1/entrevistas/{{sesionId}}/metricas",
             body={"metricas": [{"timestampMs": 0, "contactoVisual": 80.5, "postura": 70},
                                {"timestampMs": 500, "contactoVisual": 78, "postura": 72, "gestos": {"toca_cara": 0, "mirada_fuera": 0.25}},
                                {"timestampMs": 1000}]},
-            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`."),
+            espera=[201], desc="Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Idempotente: una métrica por `timestampMs` de la sesión; `insertadas` cuenta solo las nuevas (un lote reenviado responde 0). Sin emociones (RNF10): `expresion` se ignora y de `gestos` solo se guardan conductas observables (toca_cara, manos_visibles, gesticula_manos, movimiento_cabeza, cabeza_inclinada, mirada_fuera, rostro_visible). Cada métrica guarda además `versionModelo` definido por el backend (RNF08; cualquier valor enviado por el cliente se ignora). Contrato del modelo guía DivLara (`divlara-e14-mlp`): ver `models/divlara-e14-mlp/MANIFIESTO.json`. "
+                 "**Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, "
+                 "responde `201` con `insertadas: 0` y no guarda nada (la práctica sigue sin cámara)."),
         req("Predecir conductas observables (DivLara E14)", "POST", "/api/v1/vision/predecir",
             body={"features": [0.0, 0.0]},
-            espera=[200, 400, 503], omitir_en_prueba=True,
-            desc="El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }` (en modo P-1 con `frames` agrega además los campos opcionales `mano_cara_una`, `mano_cara_dos` en `[0.0, 1.0]` y `mano_cara_conteo` en `0|1|2` para desagregar contacto de una mano vs ambas sin modificar `predicciones`). Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»)."),
+            espera=[200, 400, 403, 503], omitir_en_prueba=True,
+            desc="El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }` (en modo P-1 con `frames` agrega además los campos opcionales `mano_cara_una`, `mano_cara_dos` en `[0.0, 1.0]` y `mano_cara_conteo` en `0|1|2` para desagregar contacto de una mano vs ambas sin modificar `predicciones`). Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»)."),
         req("Reporte de la simulación (texto tabulado)", "GET", "/api/v1/vision/reporte/{{sesionId}}",
             espera=[200, 404], omitir_en_prueba=True,
             desc="Responde `text/plain` (no JSON): cabecera (sesión, duración, predicciones), **línea de tiempo** de tramos continuos de una misma acción `hh:mm:ss  hh:mm:ss  ACCION  DUR` y **resumen por acción** (veces, total, máximo y promedio por tramo; orden por tiempo total descendente), con columnas de ancho fijo. Una acción es la variable del modelo con mayor valor en ese instante si llega a 4.0 de 8; antes de la primera predicción se muestra `(esperando ventana)` y sin ninguna sobre el umbral `(sin accion reconocida)`. Sin datos: `sin predicciones registradas para esta sesion`. Solo el dueño de la sesión (`404 entrevista_no_encontrada` si no). Las predicciones se guardan con `POST /api/v1/vision/predecir` + `sesionId` y se borran con `POST /api/v1/entrevistas/{id}/borrar`."),
@@ -339,7 +358,7 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
                   "resumen": {"acciones": [{"accion": "head_nodding", "veces": 2, "totalMs": 9000, "maximoMs": 6000}],
                               "linea": [{"inicioMs": 0, "finMs": 3000, "accion": "sin_accion"}, {"inicioMs": 3000, "finMs": 9000, "accion": "head_nodding"}]}},
             espera=[200, 201], guarda={"llamadaId": ("j.id", lambda j: j.get("id"))},
-            desc="T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`."),
+            desc="T3.15. Registra una llamada en vivo terminada (la app la guarda en el teléfono y la sube cuando hay red). Idempotente por `idLocal` y usuario: `201` la guarda, `200` si ya estaba. `resumen` es el reporte tabulado de T3.10 (`acciones`: veces/totalMs/maximoMs por acción; `linea`: tramos); si falta y viene `sesionId`, el servidor lo deriva de las predicciones de esa sesión. `resumen.segmentos` (opcional: `idTarget`, `inicioMs`, `finMs`, `valorMax` por evento) solo se usa para calcular el `feedback` y no se guarda. Solo números derivados, nunca landmarks ni video. `400` con `id_local_invalido`, `fecha_invalida`, `duracion_invalida`, `preguntas_invalidas`, `resumen_invalido`, `resumen_demasiado_grande` o `id_invalido`. **Permiso de cámara (D38):** sin él la llamada se guarda solo con la duración y las preguntas (sin acciones, línea ni feedback), y retirarlo vacía el resumen de las llamadas ya guardadas."),
         req("Historial de llamadas", "GET", "/api/v1/llamadas?pagina=1&tamano=20",
             desc="T3.15. Llamadas del usuario, la más reciente primero. Responde `{ elementos: [{ id, idLocal, fechaInicioMs, duracionSeg, preguntasCnt, accionesCnt }], total, pagina, tamano }`."),
         req("Detalle de una llamada", "GET", "/api/v1/llamadas/{{llamadaId}}",
@@ -422,8 +441,8 @@ Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (15 días).
             body={"correo": "alias.{{$timestamp}}@ejemplo.com", "contrasena": "Clave-segura-1", "rol": "user"}, espera=[201],
             desc="Igual que `POST /admin/usuarios`."),
         req("Publicar texto de consentimiento (alias)", "POST", "/admin/consent/text", ADMIN,
-            body={"version": "2.0.0", "title": "EULA", "body": "Texto"}, omitir_en_prueba=True,
-            desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos."),
+            body={"version": "2.0.0", "title": "EULA", "body": "Texto", "alcances": ["estadisticas_uso", "marketing", "analisis_conducta_camara"]}, omitir_en_prueba=True, espera=[201, 409],
+            desc="⚠️ Igual que `POST /api/v1/legal/admin/eula`: cambia el texto vigente para todos (mismo 409)."),
         req("Generar preguntas con IA (alias)", "POST", "/api/v1/admin/questions/generate-ai", ADMIN,
             body={"cargo_id": "{{cargoId}}", "nivel": "junior", "cantidad": 2}, omitir_en_prueba=True,
             desc="⚠️ Igual que `POST /api/v1/admin/preguntas/generar-ia` (llama al LLM), con los mismos dos 429: "

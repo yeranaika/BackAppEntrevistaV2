@@ -2,7 +2,6 @@ package SERVICIOS
 
 import CONFIGURACION.HORAS_MAXIMAS_SESION_ENTREVISTA
 import CONFIGURACION.LARGO_MAXIMO_RESPUESTA_ENTREVISTA
-import CONFIGURACION.LARGO_MAXIMO_URL_VIDEO
 import CONFIGURACION.METRICAS_VIDEO_MAXIMAS_POR_LOTE
 import CONFIGURACION.PREGUNTAS_ENTREVISTA_MAXIMO
 import CONFIGURACION.PREGUNTAS_ENTREVISTA_MINIMO
@@ -34,7 +33,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
-import java.net.URI
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
@@ -51,8 +49,7 @@ data class PedidoEntrevista(
 data class RespuestaUsuario(
     val preguntaSesionId: UUID,
     val texto: String? = null,
-    val opcionId: String? = null,
-    val videoClipUrl: String? = null
+    val opcionId: String? = null
 )
 
 /**
@@ -67,7 +64,8 @@ class ServicioEntrevista(
     private val contexto: ResolutorContextoPrueba,
     private val procesador: ProcesadorEntrevistaFinalizada,
     private val tareasSegundoPlano: CoroutineScope,
-    private val reloj: Clock = Clock.systemUTC()
+    private val reloj: Clock = Clock.systemUTC(),
+    private val permisoCamara: PermisoCamara = PermisoCamara.SIEMPRE
 ) {
     private val log = LoggerFactory.getLogger(ServicioEntrevista::class.java)
 
@@ -157,13 +155,20 @@ class ServicioEntrevista(
         }
         lote.forEach(::validarMetrica)
         activa(usuarioId, sesionId)
+        // Sin el permiso de cámara no se guarda nada, pero la práctica sigue: responde 0 en vez de un error (D38).
+        if (!permisoCamara.permite(usuarioId)) {
+            log.info("Métricas de video de la sesión {} descartadas: falta el permiso de cámara", sesionId)
+            return 0
+        }
         val sanitizadas = lote.map {
             it.copy(
                 gestos = soloGestosObservables(it.gestos),
                 versionModelo = VERSION_MODELO_DIVLARA
             )
         }
-        return metricas.insertarLote(sesionId, sanitizadas)
+        val insertadas = metricas.insertarLote(sesionId, sanitizadas)
+        // Si el permiso se retiró mientras se insertaba, el lote ya se borró: no cuenta (D38).
+        return if (permisoCamara.confirmarDespuesDeGuardar(usuarioId)) insertadas else 0
     }
 
     /** Cierra la sesión y lanza en segundo plano lo que sigue (reporte de feedback, Fase 7). */
@@ -255,22 +260,14 @@ class ServicioEntrevista(
             val puntaje = if (opcion.esCorrecta) PUNTAJE_MAXIMO_RESPUESTA else 0
             return RespuestaRegistrada(pregunta.id, null, null, opcion.id, BigDecimal(puntaje))
         }
+        // Abiertas y de video se responden con texto (escrito o dictado). No se reciben clips de video (D37, RNF09).
         val texto = respuesta.texto?.trim()?.takeIf { it.isNotEmpty() }
-        val video = respuesta.videoClipUrl?.trim()?.takeIf { it.isNotEmpty() }?.also(::validarUrlVideo)
-        // Una pregunta de video puede responderse solo con el clip; una abierta necesita el texto.
-        val tieneRespuesta = texto != null || (video != null && pregunta.tipo == TipoPregunta.SIMULACION_VIDEO)
-        if (!tieneRespuesta) throw ErrorValidacion("respuesta_requerida", "Escribe tu respuesta")
-        if (texto != null && texto.length > LARGO_MAXIMO_RESPUESTA_ENTREVISTA) {
+            ?: throw ErrorValidacion("respuesta_requerida", "Escribe tu respuesta")
+        if (texto.length > LARGO_MAXIMO_RESPUESTA_ENTREVISTA) {
             throw ErrorValidacion("respuesta_muy_larga", "La respuesta admite hasta $LARGO_MAXIMO_RESPUESTA_ENTREVISTA caracteres")
         }
         // Las respuestas abiertas las evalúa el reporte de feedback (Fase 7).
-        return RespuestaRegistrada(pregunta.id, texto, video, null, null)
-    }
-
-    private fun validarUrlVideo(url: String) {
-        val esValida = url.length <= LARGO_MAXIMO_URL_VIDEO &&
-            runCatching { URI(url) }.getOrNull()?.let { it.scheme == "https" && !it.host.isNullOrBlank() } == true
-        if (!esValida) throw ErrorValidacion("video_url_invalida", "El clip debe ser una URL https de hasta $LARGO_MAXIMO_URL_VIDEO caracteres")
+        return RespuestaRegistrada(pregunta.id, texto, null, null, null)
     }
 
     private fun validarMetrica(metrica: MetricaVideo) {

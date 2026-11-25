@@ -8,12 +8,14 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import org.jetbrains.exposed.sql.update
+import java.time.Instant
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -100,8 +102,15 @@ class RepositorioUsuarioExposed : RepositorioUsuario, LectorUsuarioSesion {
         val correoUsuario = TablaUsuario.selectAll().where { TablaUsuario.usuarioId eq id }.limit(1)
             .firstOrNull()?.get(TablaUsuario.correo) ?: return@transaccion false
         // Desliga el consentimiento del usuario y deja el correo como identidad antes de que la fila deje de existir.
+        // Se conservan la versión, las opciones, las fechas y el correo como prueba durante el plazo de D38; la IP no.
+        val ahora = Instant.now()
+        TablaConsentimiento.update({ (TablaConsentimiento.usuarioId eq id) and TablaConsentimiento.fechaRevocado.isNull() }) {
+            it[fechaRevocado] = ahora
+        }
         TablaConsentimiento.update({ TablaConsentimiento.usuarioId eq id }) {
             it[identidadRef] = correoUsuario
+            it[ipOrigen] = null
+            it[cuentaEliminadaEn] = ahora
             it[usuarioId] = null
         }
         val sesiones = TablaSesionEntrevista.select(TablaSesionEntrevista.sesionId)

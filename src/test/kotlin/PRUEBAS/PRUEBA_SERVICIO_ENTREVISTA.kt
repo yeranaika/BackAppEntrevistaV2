@@ -263,9 +263,6 @@ class PruebaServicioEntrevista {
         fallaCon<ErrorValidacion>("opcion_invalida") { servicio.responder(ana, sesion.id, RespuestaUsuario(multiple, texto = "la A")) }
         fallaCon<ErrorValidacion>("respuesta_requerida") { servicio.responder(ana, sesion.id, RespuestaUsuario(abierta, texto = "   ")) }
         fallaCon<ErrorValidacion>("respuesta_muy_larga") { servicio.responder(ana, sesion.id, RespuestaUsuario(abierta, texto = "x".repeat(4001))) }
-        fallaCon<ErrorValidacion>("video_url_invalida") {
-            servicio.responder(ana, sesion.id, RespuestaUsuario(abierta, texto = "ok", videoClipUrl = "http://inseguro.com/clip.mp4"))
-        }
         fallaCon<ErrorNoEncontrado>("pregunta_no_encontrada") { servicio.responder(ana, sesion.id, RespuestaUsuario(UUID.randomUUID(), texto = "x")) }
         fallaCon<ErrorValidacion>("pregunta_repetida") {
             servicio.responderVarias(ana, sesion.id, listOf(RespuestaUsuario(abierta, texto = "a"), RespuestaUsuario(abierta, texto = "b")))
@@ -273,14 +270,17 @@ class PruebaServicioEntrevista {
     }
 
     @Test
-    fun `una pregunta de video se puede responder solo con el clip`() = runBlocking<Unit> {
+    fun `una pregunta de video se responde con texto y no guarda clips`() = runBlocking<Unit> {
         repeat(5) { sistema.sembrarPregunta() }
         repeat(3) { sistema.sembrarPregunta(CategoriaHabilidad.BLANDA, tipo = TipoPregunta.SIMULACION_VIDEO) }
         val sesion = iniciar()
         val video = sesion.preguntas.first { it.tipo == TipoPregunta.SIMULACION_VIDEO }
 
-        val respondida = servicio.responder(ana, sesion.id, RespuestaUsuario(video.id, videoClipUrl = "https://storage.ejemplo.com/clip.mp4"))
-        assertEquals("https://storage.ejemplo.com/clip.mp4", respondida.videoClipUrl)
+        // D37: no se reciben clips de video (RNF09), así que sin texto no hay respuesta.
+        fallaCon<ErrorValidacion>("respuesta_requerida") { servicio.responder(ana, sesion.id, RespuestaUsuario(video.id)) }
+        val respondida = servicio.responder(ana, sesion.id, RespuestaUsuario(video.id, texto = "Lo resolví conversando con el equipo"))
+        assertEquals("Lo resolví conversando con el equipo", respondida.transcripcion)
+        assertNull(respondida.videoClipUrl)
     }
 
     @Test

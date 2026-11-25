@@ -61,8 +61,11 @@ import SERVICIOS.ServicioSuscripcion
 import SERVICIOS.ServicioTendenciasSkill
 import SERVICIOS.ServicioToken
 import SERVICIOS.ServicioUsuario
+import MODELOS.BorradorDatosCamaraExposed
 import MODELOS.RepositorioMetricaVideoExposed
+import MODELOS.RepositorioDiccionarioExposed
 import MODELOS.RepositorioLlamadaExposed
+import MODELOS.RepositorioTranscripcionExposed
 import MODELOS.RepositorioPrediccionSimulacionExposed
 import MODELOS.RepositorioRevisionTextoExposed
 import MODELOS.RepositorioSesionEntrevistaExposed
@@ -91,11 +94,14 @@ import SERVICIOS.ServicioPruebasApp
 import SERVICIOS.ServicioTestNivelacion
 import SERVICIOS.SelectorPreguntas
 import SERVICIOS.ServicioEntrevista
+import SERVICIOS.ServicioDiccionario
 import SERVICIOS.ServicioLlamada
+import SERVICIOS.ServicioTranscripcion
 import SERVICIOS.ServicioRevisionLocal
 import SERVICIOS.ServicioSimulacion
 import MODELOS.LectorCostosIaExposed
 import SERVICIOS.ServicioCostosIa
+import SERVICIOS.TareaPurgaConsentimientos
 import SERVICIOS.TareaRescateReportes
 import SERVICIOS.TareaSincronizacionMercado
 import UTILIDADES.TareasSegundoPlano
@@ -233,7 +239,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     )
 
     val servicioConsentimiento = ServicioConsentimiento(
-        RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentosLegales
+        RepositorioTextoConsentimientoExposed(), RepositorioConsentimientoExposed(), documentosLegales, BorradorDatosCamaraExposed()
     )
 
     val servicioRecordatorio = ServicioRecordatorio(RepositorioRecordatorioExposed())
@@ -288,10 +294,15 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         selector = selectorPreguntas,
         contexto = resolutorContexto,
         procesador = servicioReporte,
-        tareasSegundoPlano = tareasSegundoPlano
+        tareasSegundoPlano = tareasSegundoPlano,
+        permisoCamara = servicioConsentimiento
     )
-    val servicioSimulacion = ServicioSimulacion(repositorioPrediccionSimulacion, repositorioSesionEntrevista)
-    val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion)
+    val servicioSimulacion = ServicioSimulacion(
+        repositorioPrediccionSimulacion, repositorioSesionEntrevista, permisoCamara = servicioConsentimiento
+    )
+    val servicioLlamada = ServicioLlamada(RepositorioLlamadaExposed(), servicioSimulacion, servicioConsentimiento)
+    val servicioTranscripcion = ServicioTranscripcion(RepositorioTranscripcionExposed(), repositorioSesionEntrevista)
+    val servicioDiccionario = ServicioDiccionario(RepositorioDiccionarioExposed())
     val servicioRevisionLocal = ServicioRevisionLocal(repositorioPregunta, RepositorioRevisionTextoExposed())
     private val corrector = CorrectorRespuestas(evaluadorRespuesta)
     private val repositorioPractica = RepositorioPracticaExposed()
@@ -331,10 +342,12 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     private val tareaMercado = TareaSincronizacionMercado(servicioTendencias)
     private val tareaRescate = TareaRescateReportes(servicioReporte)
+    private val tareaPurgaConsentimientos = TareaPurgaConsentimientos(servicioConsentimiento)
 
     fun iniciarTareasSegundoPlano() {
         tareaMercado.iniciar()
         tareaRescate.iniciar()
+        tareaPurgaConsentimientos.iniciar()
     }
 
     /**
@@ -345,6 +358,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     suspend fun detenerTareas(espera: Duration) {
         tareaMercado.detener()
         tareaRescate.detener()
+        tareaPurgaConsentimientos.detener()
         tareasSegundoPlano.esperarYCerrar(espera)
     }
 
@@ -352,6 +366,7 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
         tareasSegundoPlano.cancelar()
         tareaMercado.close()
         tareaRescate.close()
+        tareaPurgaConsentimientos.close()
         servicioContextoMercado.close()
         clienteMercadoLaboral.close()
         clienteGooglePlay?.close()
