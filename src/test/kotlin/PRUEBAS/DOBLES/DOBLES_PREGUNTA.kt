@@ -59,6 +59,27 @@ class GeneracionEnMemoria(private val fallaAlAuditar: Boolean = false) : Reposit
         return preguntas.map { IdsGenerados(UUID.randomUUID(), UUID.randomUUID()) }
     }
 
+    /** Lo que "hay en el banco" para comparar; con [filtraSimilares] el doble hace lo mismo que el repositorio real. */
+    val existentes = mutableListOf<MODELOS.PreguntaExistente>()
+    var filtraSimilares = false
+
+    override suspend fun existentesParaComparar(alcance: MODELOS.AlcanceComparacion) = existentes.toList()
+
+    override suspend fun guardarLoteSinSimilares(
+        traza: TrazaGeneracion,
+        preguntas: List<PreguntaGenerada>,
+        alcance: MODELOS.AlcanceComparacion,
+        separar: (List<MODELOS.PreguntaExistente>) -> List<MODELOS.PreguntaSimilar?>
+    ): MODELOS.LoteGuardado {
+        if (!filtraSimilares) return MODELOS.LoteGuardado(guardarLote(traza, preguntas), emptyList())
+        val coincidencias = separar(existentes)
+        val nuevas = preguntas.filterIndexed { i, _ -> coincidencias[i] == null }
+        return MODELOS.LoteGuardado(
+            if (nuevas.isEmpty()) emptyList() else guardarLote(traza, nuevas),
+            coincidencias.mapIndexedNotNull { i, c -> c?.let { MODELOS.DescartadaPorSimilar(i, it) } }
+        )
+    }
+
     override suspend fun registrarFallo(traza: TrazaGeneracion) {
         if (fallaAlAuditar) error("BD caída")
         fallos += traza
@@ -68,6 +89,20 @@ class GeneracionEnMemoria(private val fallaAlAuditar: Boolean = false) : Reposit
 /** Arma el JSON de un lote como lo devolvería un LLM, con variantes para probar el validador. */
 object LoteLlmDePrueba {
     private val json = Json { encodeDefaults = true }
+
+    /** Enunciados sin palabras en común: el filtro de preguntas parecidas (D37) no debe descartarlos entre sí. */
+    private val ENUNCIADOS_DISTINTOS = listOf(
+        "Cuéntame cómo lideraste a tu equipo durante un cambio inesperado de prioridades",
+        "Describe un error grave que cometiste y qué aprendiste después",
+        "Háblame de una vez que debiste negociar plazos imposibles con un cliente",
+        "Relata una situación donde recibiste una crítica dura sobre tu trabajo",
+        "Explica cómo conviertes una idea innovadora en un producto entregable",
+        "Narra un momento en que tuviste que enseñar una tecnología nueva a colegas",
+        "Detalla cómo manejaste presión extrema antes de una entrega crítica",
+        "Comparte una experiencia resolviendo desacuerdos técnicos con un compañero",
+        "Cuenta cómo organizas tu semana cuando todo parece urgente",
+        "Describe cuándo asumiste responsabilidad por un fracaso colectivo"
+    )
 
     const val RESPUESTA_STAR =
         "Situación: existía un problema relevante. Tarea: debía resolverlo. Acción: apliqué una estrategia concreta. Resultado: logré una mejora medible."
@@ -94,7 +129,7 @@ object LoteLlmDePrueba {
         criterios: List<String> = listOf("Situación clara", "Tarea clara", "Acción clara", "Resultado medible"),
         opcionesCorrectas: Int = 1,
         respuestaIdeal: String = RESPUESTA_STAR,
-        enunciado: (Int) -> String = { "Pregunta $it con contexto suficiente para evaluar desempeño profesional" },
+        enunciado: (Int) -> String = { ENUNCIADOS_DISTINTOS[(it - 1) % ENUNCIADOS_DISTINTOS.size] },
         opcionesDuplicadas: Boolean = false,
         feedbackGenerico: (Int) -> MODELOS.FeedbackGenerico? = { FEEDBACK_DE_PRUEBA }
     ): String {

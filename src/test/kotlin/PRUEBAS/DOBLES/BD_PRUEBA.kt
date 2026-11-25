@@ -238,6 +238,7 @@ class SistemaPrueba(
     )
     val costosIa = SERVICIOS.ServicioCostosIa(MODELOS.LectorCostosIaExposed(), topeGeneracionIa, reloj, creditosMimo)
     val pregunta = ServicioPregunta(preguntas, catalogo)
+    val similares = SERVICIOS.ServicioPreguntasSimilares(preguntas)
     val mercadoRepo = RepositorioMercadoExposed()
     /** Como en producción: la sincronización deja las ofertas en la caché y la generación las reutiliza (D26). */
     val ofertas = INTEGRACIONES.OfertasEnCache(clienteMercado, cache)
@@ -357,7 +358,7 @@ class SistemaPrueba(
             controladorContrasena(contrasena)
             controladorOnboarding(onboarding)
             controladorAdminUsuario(admin)
-            controladorPregunta(pregunta, generacion, cobertura, feedbackGenerico)
+            controladorPregunta(pregunta, generacion, cobertura, feedbackGenerico, similares)
             controladorCostosIa(costosIa)
             controladorMercado(mercado, tendencias)
             controladorConsentimiento(consentimiento, documentos)

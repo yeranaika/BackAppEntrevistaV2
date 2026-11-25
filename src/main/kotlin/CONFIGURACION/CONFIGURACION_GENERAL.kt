@@ -94,7 +94,9 @@ data class ConfiguracionLimites(
      */
     val cabeceraIpCliente: String? = null,
     /** Generaciones de preguntas con IA por IP en cada ventana (anti-ráfaga; el gasto lo frena el tope mensual, D23). */
-    val generacionesIaPorIp: Int = GENERACIONES_IA_POR_IP_POR_DEFECTO
+    val generacionesIaPorIp: Int = GENERACIONES_IA_POR_IP_POR_DEFECTO,
+    /** Parecido (0 a 1) desde el cual una pregunta generada con IA se descarta por repetir otra; 0 lo apaga (D37). */
+    val umbralSimilitudPreguntas: Double = SERVICIOS.UMBRAL_SIMILITUD_PREGUNTAS_POR_DEFECTO
 ) {
     init {
         cabeceraIpCliente?.let {
@@ -252,7 +254,9 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),
             recuperacionesPorIp = lector.entero("LIMITE_RECUPERACIONES_POR_IP", RECUPERACIONES_POR_IP_POR_DEFECTO),
             cabeceraIpCliente = lector.opcional("CABECERA_IP_CLIENTE")?.trim()?.takeIf { it.isNotEmpty() },
-            generacionesIaPorIp = lector.entero("LIMITE_GENERACIONES_IA_POR_IP", GENERACIONES_IA_POR_IP_POR_DEFECTO).coerceAtLeast(1)
+            generacionesIaPorIp = lector.entero("LIMITE_GENERACIONES_IA_POR_IP", GENERACIONES_IA_POR_IP_POR_DEFECTO).coerceAtLeast(1),
+            umbralSimilitudPreguntas = (lector.opcional("UMBRAL_SIMILITUD_PREGUNTAS")?.toDoubleOrNull()
+                ?: SERVICIOS.UMBRAL_SIMILITUD_PREGUNTAS_POR_DEFECTO).coerceIn(0.0, 1.0)
         ),
         motorVision = ConfiguracionMotorVision(
             endpoint = lector.opcional("MOTOR_ENDPOINT", "vision.motorEndpoint")?.trim()?.takeIf { it.isNotEmpty() } ?: MOTOR_ENDPOINT_POR_DEFECTO,

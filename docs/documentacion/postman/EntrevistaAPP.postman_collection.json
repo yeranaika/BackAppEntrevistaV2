@@ -2203,6 +2203,97 @@
           }
         },
         {
+          "name": "Preguntas parecidas a una (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/{{preguntaId}}/similares?umbral=0.8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "{{preguntaId}}",
+                "similares"
+              ],
+              "query": [
+                {
+                  "key": "umbral",
+                  "value": "0.8"
+                }
+              ]
+            },
+            "description": "D37. Aprobadas y pendientes del mismo skill (o cargo), tipo, categoría y nivel cuyo enunciado se parece a esta pregunta, de mayor a menor (`similitud` 0 a 1, hasta 5). `umbral` 0.5 a 1 (por defecto `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80); `400 umbral_invalido`. Solo mide palabras compartidas: una paráfrasis con otro vocabulario no aparece. No llama al LLM.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Posibles preguntas duplicadas (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/preguntas/duplicadas?cargoId={{cargoId}}&nivel=junior&tipo=abierta_texto&categoria=tecnica&umbral=0.8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "preguntas",
+                "duplicadas"
+              ],
+              "query": [
+                {
+                  "key": "cargoId",
+                  "value": "{{cargoId}}"
+                },
+                {
+                  "key": "nivel",
+                  "value": "junior"
+                },
+                {
+                  "key": "tipo",
+                  "value": "abierta_texto"
+                },
+                {
+                  "key": "categoria",
+                  "value": "tecnica"
+                },
+                {
+                  "key": "umbral",
+                  "value": "0.8"
+                }
+              ]
+            },
+            "description": "D37. Grupos de preguntas parecidas entre sí dentro de un alcance (hasta las 200 más recientes). Exige `skillId` o `cargoId` más `nivel`, `tipo` y `categoria` (`400` si falta alguno) para no cruzar todo el banco. Cada grupo trae `preguntas` (`id`, `enunciado`, `estado`, `vecesUsada`) y `similitudMaxima`. Para dejar una, `PATCH .../rechazar` con `motivo: \"duplicada\"` (la usada no se puede borrar).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Aprobar pregunta (admin)",
           "request": {
             "method": "PATCH",
@@ -2221,7 +2312,7 @@
                 "aprobar"
               ]
             },
-            "description": "",
+            "description": "D37: la respuesta de crear, editar y aprobar trae `similares` (mismo formato que `/similares`, vacío si no hay): solo avisa, nunca bloquea. En el resto de las rutas `similares` va vacío.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2431,7 +2522,7 @@
                 "generar-ia"
               ]
             },
-            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).",
+            "description": "⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron). D37: las que se parecen (palabras compartidas >= `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80; `0` lo apaga) a una aprobada o pendiente del mismo skill/cargo, tipo, categoría y nivel, o a otra del mismo lote, no se guardan: vienen en `descartadas` (`enunciado` y `similar_a` con `id`, `enunciado`, `estado`, `similitud`) y se cuentan en `preguntas_descartadas`; se cobran igual. Si todas se descartan responde `200` con `preguntas: []` en vez de `201`. El prompt lleva hasta 30 enunciados existentes para que la IA no los repita.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2856,7 +2947,7 @@
                 "predecir"
               ]
             },
-            "description": "El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).",
+            "description": "El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }` (en modo P-1 con `frames` agrega además los campos opcionales `mano_cara_una`, `mano_cara_dos` en `[0.0, 1.0]` y `mano_cara_conteo` en `0|1|2` para desagregar contacto de una mano vs ambas sin modificar `predicciones`). Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"features\": [\n    0.0,\n    0.0\n  ]\n}",

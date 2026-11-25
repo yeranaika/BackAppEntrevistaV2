@@ -1,0 +1,117 @@
+{
+  "id_modelo": "divlara-d37-mlp",
+  "fuente": "E:\\entrenamienrto-IA\\DivLara\\scratch\\d37\\d37_final.py (2026-11-24)",
+  "arquitectura": "Ensamble de 4 Multi-Task MLP (20 cabezas) promediado en un unico ONNX, con shift+round+clip",
+  "input": {
+    "tipo": "ventana_landmarks",
+    "ventana_seg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "n_features": 343,
+    "requiere_archivos": [
+      "modelo.onnx",
+      "scaler.json",
+      "meta.json"
+    ],
+    "pipeline_features": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "output": {
+    "variables": [
+      "posture_stability",
+      "torso_lean",
+      "body_rigidity",
+      "shoulder_symmetry",
+      "upper_body_openness",
+      "arm_crossing",
+      "table_rest",
+      "gesture_activity",
+      "movement_level",
+      "head_nodding",
+      "camera_orientation",
+      "framing_quality",
+      "fidgeting_index",
+      "gaze_alignment",
+      "gaze_direction",
+      "hand_to_face_adaptors",
+      "head_tilt_forward",
+      "shoulder_elevation_sustained",
+      "torso_movement_index",
+      "trunk_openness_dynamics"
+    ],
+    "n_variables": 20,
+    "escala": "0-8",
+    "umbrales": "sin definir (modelo guia)",
+    "nota_targets": "El artefacto real (model.pt/modelo.onnx) tiene 20 salidas verificadas en T3.1 (n_targets=20); meta.json solo detalla los loss_weights de las 12 originales."
+  },
+  "estado": "d37 test macro 86.24 vs d35 86.11",
+  "version": "divlara-d37-mlp",
+  "constanteBackend": "CONFIGURACION.VERSION_MODELO_DIVLARA",
+  "artefacto": {
+    "archivo": "modelo.onnx",
+    "archivosOrigen": [
+      "net_d37_s130.pt",
+      "net_d37_s126.pt",
+      "net_d37_s120.pt",
+      "net_d37_s121.pt"
+    ],
+    "sha256": {
+      "modelo.onnx": "f88035b0faccb151cec01665cd6779c357dcf524ff3e4dd805f099a0ae7ba907",
+      "scaler.json": "5c682aa270fb2bf46a02d739354eec0be948b11a9d997e6bab087860259142ae",
+      "meta.json": "c1031e9dbb424f70fc020887d0228b34b9fdffe61c2d2b01d3e1053688524056",
+      "golden.json": "4caeab80a5253057af92a69de692ec626bbc11ff1002ff37045d54ea4e38b802",
+      "golden_features.json": "23ceb89fdef61d42af0e35adafbacb3a37c038dc53fb58fdfc227450a714b4e3",
+      "golden_cruce.json": "970eb136a7f3c33481464804e514aee624fd2a835d8b31f7875959ddcdbb8390"
+    },
+    "nota": "d37_final.py. 21 features de cruce derivadas dentro del ONNX (la entrada sigue siendo 343). golden.json: mismo input sintetico que d35; golden_cruce.json: 12 ventanas reales (6 cruce/6 no)."
+  },
+  "entrada": {
+    "tipo": "ventana_landmarks",
+    "ventanaSeg": 2,
+    "fps": 10,
+    "frames": 20,
+    "landmarks": "mediapipe pose33 + cara",
+    "nFeatures": 343,
+    "privacidad": "Procesamiento efímero en RAM (0 días de retención). MediaPipe corre en Android y envía solo landmarks de la ventana (P-1)."
+  },
+  "normalizacion": {
+    "metodo": "scaler_json",
+    "archivo": "scaler.json",
+    "pipeline": "identico a DivLara (scaler + feature_columns de meta.json)"
+  },
+  "salidas": {
+    "versionModelo": "divlara-d37-mlp",
+    "sinEmociones": true,
+    "reglaPrivacidad": "RNF10 / D22: prohibido inferir o persistir emociones; solo conductas observables acotadas.",
+    "gestos": {
+      "clavesPermitidas": [
+        "toca_cara",
+        "manos_visibles",
+        "gesticula_manos",
+        "movimiento_cabeza",
+        "cabeza_inclinada",
+        "mirada_fuera",
+        "rostro_visible"
+      ],
+      "nota": "Mapeo desde las variables de E14 (escala 0-8) a conductas observables del backend (GESTOS_OBSERVABLES) se define en T3.1b/umbrales."
+    }
+  },
+  "ensambleSemillas": {
+    "arm_crossing_d37": [
+      130,
+      126,
+      120,
+      121
+    ],
+    "otros19_d35": [
+      "model_e17mlp_b0_d35_draft_20261122_094429",
+      "model_e17mlp_b0_d35x_draft_20261122_095209",
+      "model_e17mlp_b0_d35x_draft_20261122_095333",
+      "model_e17mlp_b0_d35x_draft_20261122_100126"
+    ]
+  },
+  "metricasTest": {
+    "macroAcc_d37": 86.24,
+    "macroAcc_d35_n4": 86.11
+  }
+}

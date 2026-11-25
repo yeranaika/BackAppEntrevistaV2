@@ -444,3 +444,26 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Pruebas**: `PruebaFeedbackGenerico` (17 casos: modelo, esquema y prompt de IA, validación del admin, corrección
   abierta y de opción múltiple, completar por lote o por id, omitidos, fallo a mitad de camino, límites y permisos).
 
+
+## D37 · Preguntas generadas sin repetir las del banco (2026-11)
+- **Pedido:** evitar que `generar-ia` guarde preguntas iguales o casi iguales a las que ya existen. Plan en
+  `Plan-preguntas-sin-duplicados-2026-11-24.md`.
+- **Medida:** `DetectorPreguntasSimilares` reutiliza `ComparadorTextos` (palabras compartidas, sin IA ni tokens) y toma el
+  mayor de ambos sentidos. Solo el enunciado. Una paráfrasis con otro vocabulario no se detecta (haría falta embeddings).
+- **Filtro al generar:** después de validar el lote (así no choca con `cantidad_incorrecta`), cada pregunta se compara con las
+  aprobadas y pendientes del mismo skill (o, sin skill, cargo), tipo, categoría y nivel (las 200 más recientes) y con las
+  ya aceptadas del lote. Si parecido >= `UMBRAL_SIMILITUD_PREGUNTAS` (0.80; 0 apaga) no se guarda: sale en `descartadas`
+  de la respuesta. Las demás se guardan igual. Se cobran todas; si se descartan todas, la llamada se audita como fallo
+  (cuenta en el tope D23 y en Costos IA) y la respuesta es `200` con `preguntas: []`.
+- **Concurrencia:** comparar y guardar van en una sola transacción con `pg_advisory_xact_lock` por alcance (solo Postgres;
+  H2 de pruebas no lo necesita), así dos generaciones simultáneas del mismo alcance no se duplican entre sí.
+- **Prompt:** lleva hasta 30 enunciados existentes (120 caracteres cada uno, como datos) con "no repitas ni parafrasees".
+- **Panel (solo avisa):** `GET /api/v1/admin/preguntas/{id}/similares?umbral=`, `GET /api/v1/admin/preguntas/duplicadas`
+  (exige skill o cargo + nivel + tipo + categoría) y `similares` en las respuestas de crear, editar y aprobar. Nada bloquea
+  a un admin. Rechazar una duplicada usa `rechazar` con `motivo: "duplicada"`.
+- **Contrato:** campos nuevos; `RespuestaPregunta` suma `similares` (vacío salvo crear/editar/aprobar) y `generar-ia` suma
+  `preguntas_descartadas` y `descartadas`. Android (`GET /api/v1/preguntas`) sin cambios. Sin migración.
+- **Pendiente:** calibrar el 0.80 con pares reales del banco de Railway (la BD local tiene 14 preguntas); la pantalla del
+  panel está en el plan, fuera de este repo.
+- **Pruebas:** `PruebaPreguntasSimilares` (11 casos: detector, filtro, todo descartado, umbral 0, prompt) y dos casos nuevos
+  en `PruebaControladorPregunta` (repetir un lote real sobre H2; `similares` y `duplicadas`).

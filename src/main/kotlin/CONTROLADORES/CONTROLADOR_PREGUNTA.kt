@@ -6,6 +6,7 @@ import ESQUEMAS.RespuestaCompletarFeedbackGenerico
 import ESQUEMAS.RespuestaEstadoFeedbackGenerico
 import ESQUEMAS.RespuestaGenerarPreguntas
 import ESQUEMAS.RespuestaOk
+import ESQUEMAS.RespuestaSimilaresDePregunta
 import ESQUEMAS.SolicitudCompletarFeedbackGenerico
 import ESQUEMAS.SolicitudGenerarPreguntas
 import ESQUEMAS.SolicitudPregunta
@@ -16,6 +17,8 @@ import SERVICIOS.ServicioCoberturaPreguntas
 import SERVICIOS.ServicioFeedbackGenerico
 import SERVICIOS.ServicioGeneracionPregunta
 import SERVICIOS.ServicioPregunta
+import SERVICIOS.ServicioPreguntasSimilares
+import SERVICIOS.UMBRAL_SIMILITUD_PREGUNTAS_POR_DEFECTO
 import UTILIDADES.booleanoDeConsulta
 import UTILIDADES.enteroDeConsulta
 import UTILIDADES.responderConMensaje
@@ -63,13 +66,14 @@ fun Route.controladorPregunta(
     servicio: ServicioPregunta,
     generacion: ServicioGeneracionPregunta,
     cobertura: ServicioCoberturaPreguntas,
-    feedbackGenerico: ServicioFeedbackGenerico
+    feedbackGenerico: ServicioFeedbackGenerico,
+    similares: ServicioPreguntasSimilares
 ) {
     route("/api/v1/admin/preguntas") {
         soloAdmin {
             post {
                 val pregunta = servicio.crear(call.receive<SolicitudPregunta>())
-                call.responderConMensaje(pregunta.aRespuestaAdmin(), "Pregunta creada y aprobada", HttpStatusCode.Created)
+                call.responderConMensaje(pregunta.conAviso(similares), "Pregunta creada y aprobada", HttpStatusCode.Created)
             }
 
             get {
@@ -90,6 +94,12 @@ fun Route.controladorPregunta(
                 }
             }
 
+            get("/duplicadas") {
+                val q = call.request.queryParameters
+                val grupos = similares.duplicadas(q["skillId"], q["cargoId"], q["nivel"], q["tipo"], q["categoria"], q["umbral"])
+                call.respond(grupos.map { it.aRespuesta() })
+            }
+
             get("/cobertura") {
                 call.respond(cobertura.cobertura(call.uuidDeConsulta("cargoId"), call.enteroDeConsulta("minimo")).aRespuesta())
             }
@@ -99,13 +109,21 @@ fun Route.controladorPregunta(
                     call.respond(servicio.obtener(call.uuidDeParametro("id")).aRespuestaAdmin())
                 }
 
+                get("/similares") {
+                    val id = call.uuidDeParametro("id")
+                    val umbral = call.request.queryParameters["umbral"]
+                    val encontradas = similares.similaresDe(id, umbral)
+                    call.respond(RespuestaSimilaresDePregunta(id.toString(), umbral?.toDoubleOrNull() ?: UMBRAL_SIMILITUD_PREGUNTAS_POR_DEFECTO, encontradas.map { it.aRespuesta() }))
+                }
+
                 put {
                     val pregunta = servicio.editar(call.uuidDeParametro("id"), call.receive<SolicitudPregunta>())
-                    call.responderConMensaje(pregunta.aRespuestaAdmin(), "Pregunta actualizada; queda pendiente de aprobación")
+                    call.responderConMensaje(pregunta.conAviso(similares), "Pregunta actualizada; queda pendiente de aprobación")
                 }
 
                 patch("/aprobar") {
-                    call.responderConMensaje(servicio.aprobar(call.uuidDeParametro("id"), call.usuarioIdDesdeJwt()).aRespuestaAdmin(), "Pregunta aprobada")
+                    val pregunta = servicio.aprobar(call.uuidDeParametro("id"), call.usuarioIdDesdeJwt())
+                    call.responderConMensaje(pregunta.conAviso(similares), "Pregunta aprobada")
                 }
 
                 patch("/rechazar") {
@@ -142,17 +160,25 @@ private suspend fun RoutingContext.generarConIa(generacion: ServicioGeneracionPr
     val conMercado = resultado.mercado.contexto?.let {
         if (it.ofertasAnalizadas == 1) " Se usó 1 oferta de empleo." else " Se usaron ${it.ofertasAnalizadas} ofertas de empleo."
     }.orEmpty()
+    val descartadas = resultado.descartadas.size
+    val avisoDescartadas = if (descartadas == 0) "" else " Se descartaron $descartadas por parecerse a preguntas que ya existen."
     call.responderConMensaje(
         RespuestaGenerarPreguntas(
             preguntasGeneradas = creadas.size,
             preguntasConError = 0,
+            preguntasDescartadas = descartadas,
             preguntas = creadas.map { it.aRespuesta() },
+            descartadas = resultado.descartadas.map { it.aRespuesta() },
             contextoMercado = resultado.mercado.aRespuesta()
         ),
-        "Preguntas generadas: ${creadas.size}. Quedan pendientes de aprobación.$conMercado",
-        HttpStatusCode.Created
+        "Preguntas generadas: ${creadas.size}. Quedan pendientes de aprobación.$conMercado$avisoDescartadas",
+        // Si todas se parecían a algo existente no se creó nada: 200, no 201.
+        if (creadas.isEmpty()) HttpStatusCode.OK else HttpStatusCode.Created
     )
 }
+
+private suspend fun MODELOS.Pregunta.conAviso(similares: ServicioPreguntasSimilares) =
+    aRespuestaAdmin().copy(similares = similares.avisoPara(this).map { it.aRespuesta() })
 
 private fun ApplicationCall.consultaPreguntas() = ConsultaPreguntas(
     estado = request.queryParameters["estado"],

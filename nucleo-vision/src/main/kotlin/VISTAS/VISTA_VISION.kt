@@ -6,5 +6,8 @@ import ESQUEMAS.RespuestaPrediccionVision
 fun ResultadoPrediccionDivlara.aRespuesta() = RespuestaPrediccionVision(
     versionModelo = versionModelo,
     predicciones = predicciones,
-    escala = escala
+    escala = escala,
+    manoCaraUna = manoCaraUna,
+    manoCaraDos = manoCaraDos,
+    manoCaraConteo = manoCaraConteo
 )

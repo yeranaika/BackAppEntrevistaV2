@@ -5,6 +5,7 @@ import CONFIGURACION.FrameLandmarksDivlara
 import CONFIGURACION.LandmarkMediaPipe
 import CONFIGURACION.VentanaLandmarksDivlara
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 
@@ -92,10 +93,20 @@ fun SolicitudPrediccionVision.aVentanaLandmarks(): VentanaLandmarksDivlara {
     )
 }
 
-/** Respuesta de inferencia ONNX del modelo DivLara (sin defaults por `encodeDefaults = false`). */
+/**
+ * Respuesta de inferencia ONNX del modelo DivLara (campos base sin defaults por `encodeDefaults = false`).
+ * Los campos `mano_cara_*` son aditivos y se informan cuando la solicitud llega con frames de landmarks (P-1),
+ * sin modificar el mapa `predicciones` que consume el contrato Android.
+ */
 @Serializable
 data class RespuestaPrediccionVision(
     val versionModelo: String,
     val predicciones: Map<String, Double>,
-    val escala: String
+    val escala: String,
+    @SerialName("mano_cara_una")
+    val manoCaraUna: Double? = null,
+    @SerialName("mano_cara_dos")
+    val manoCaraDos: Double? = null,
+    @SerialName("mano_cara_conteo")
+    val manoCaraConteo: Int? = null
 )

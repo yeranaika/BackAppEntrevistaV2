@@ -1180,3 +1180,1405 @@ Corrida iniciada: 23-nov-2026 17:49 (-03)
 - T5.6 calibrar umbrales con video e informe a la mañana
 - Aprobar permisos git/gradlew para la integración DEV
 - Proteger /pruebas con authenticate
+---
+
+## 2026-11-23 23:30 (-03) — Bitácora nocturna (cron documentador nocturno)
+
+**Redacción:** OmniRoute `auto` → `zai-org/glm-5.2`
+
+- **Hora del reporte:** 23:30, lunes 23 de noviembre de 2026 (PC ai-pc: 23:32).
+- **Estado del Kanban (board divlara):** ~80 tarjetas, la gran mayoría en done.
+  - **Completadas hoy:** T3.13 BD local Room; T4.1 modelo `mlp_d35` en backend; T4.2/T4.3 UI de recuadros y pulido; T5.2 reviews Antigravity; T5.4 snapshot + merge DEV; T5.4b merge a main; T5.7 fix multipart 50MB; T5.10 review backend + integración; feedback personalizado; integración git dev+master y push.
+  - **Ready (pendientes):** E6-prep dataset de verdad, T4.4 umbral recuadros 3.5, T4.5 app graba vídeo de prueba, T4.6 `POST /pruebas/video`, T4.7 umbrales por evento, T5.1 prueba en vivo v16, T5.3 plan de integración, T5.5 documentador nocturno, T5.6 calibrar umbrales, T5.8 archivos d35 faltantes, T5.9 backend persiste promedios.
+  - **Blocked:** T3.5 métricas y T3.6 validación en vivo (R-2); GPU motor d35 (EP CUDA en 3060 Ti).
+- **Problemas resueltos:**
+  - Docker/PostgreSQL caídos tras el reinicio del PC: verificado ahora en `ai-pc`, los contenedores `Entrevista_APP` (postgres:16, healthy) y `Entrevista_Redis` llevan 29 min arriba; las tareas programadas `DockerStart`, `DockerUp` y `docker_start` están en estado Listo (`schtasks`), levantadas con los bats `iniciar_docker.bat` / `iniciar_backend.bat` / `iniciar_motor.bat`.
+  - Backend en verde: `GET /health` en 8090 y en 8094 responde OK con `modeloDivlara.version = divlara-d35-mlp` cargado.
+  - `BUILD FAILED` por archivos faltantes de d35 (`MANIFIESTO.json` y `golden_features.json`) tras cambiar la constante a d35: se copiaron y se corrigió el gitignore (el patrón `pruebas/` ignoraba también `src/test/kotlin/PRUEBAS/` porque Windows no distingue mayúsculas); quedó anclado a `/pruebas/`.
+  - Fix del error 500 en subida: límite de vídeo subido a 200 MB con tests que validan límite y extensión.
+  - Integración git: merge `7da0fde` en backend (`feature/llamada-vivo-d35`) y `46ff239` en Android; tag de respaldo y ramas feature creadas en el snapshot (`f8d6d86` / `7ddb558`).
+- **Hallazgos técnicos:**
+  - Motor d35 corriendo con `MODELO_VERSION=divlara-d35-mlp`, 522 tests en verde; e14 sigue siendo el default en la app.
+  - Umbral de recuadro en vivo: `arm_crossing`, `table_rest` y `hand_to_face_adaptors` en 3.0, resto en 3.5 y reporte en 4.0; 4 tests nuevos.
+  - Grabación de prueba con `-PgrabarPrueba=true` sube por multipart a `/pruebas/video`; los endpoints quedaron SIN `authenticate`, hay que protegerlos antes de cualquier despliegue.
+  - App: columna de recuadros multi-evento, tarjeta "Eventos en el tiempo" con línea de tiempo por color, debounce de 3 fotogramas para "manos juntas" y gramática de conteo; 453 tests pasando.
+- **Pendientes / riesgos:**
+  - `git fetch` de Android sin credenciales: verificar `origin/main` antes de push.
+  - La sesión de `claude auth` vence entre el 29-nov y el 02-dic.
+  - Quedan archivos de tarea versionados (`task-t*.md`) para `git rm --cached`.
+
+
+ 
+## Turno nocturno 2026-11-24 00:36 -03 
+# Informe Nocturno - DivLara
+**Fecha:** 23→24 de noviembre de 2026  
+**Hora de corte:** 00:36 -03
+
+---
+
+## 📊 Estado del Kanban (Board: divlara)
+- **Total tareas:** ~60
+- **Estado predominante:** done
+- **Completadas en las últimas horas:**
+  - T5.4b: Integración DEV + merge a main
+  - T5.7: Fix multipart 50MB + constante e14
+  - 4 fases del reentreno d36:
+    - Datos y etiquetado del video de calibración
+    - Reentreno GPU con foco en 6 eventos
+    - Calibración de umbrales
+    - Integración backend d36
+
+---
+
+## ✅ Tareas en Ready
+- E6-prep (dataset R1+R2)
+- T4.4: Umbral recuadros 3.5
+- T4.5: App graba video de prueba
+- T4.6: POST /pruebas/video
+- T4.7: Umbrales por evento
+- T5.1: Prueba en vivo v16
+- T5.3: Plan de integración
+- T5.5: Documentador nocturno
+- T5.6: Calibrar umbrales con video
+- T5.8: Archivos d35 faltantes + gitignore
+- T5.9: Backend persiste promedios y segmentos
+
+---
+
+## 🔒 Tareas Bloqueadas
+- T3.5: Métricas
+- T3.6: Validación en vivo vs offline
+
+---
+
+## 🔍 Hallazgos Técnicos
+
+### Integración a Main
+- **Pendiente:** La sesión de Claude bloqueó git tag/fetch/switch/merge por falta de aprobación
+- **Estado actual:** Backend sigue en feature/llamada-vivo-d35 (f8d6d86), main no se tocó
+- **Plan de acción:** 9 archivos en conflicto con origin/DEV (BD_PRUEBA.kt el más probable, más 5 docs)
+- **Orden:** feature → origin/DEV → main con tag de respaldo
+
+### Snapshot de Versiones
+- **Backend:** f8d6d86
+- **Android:** 7ddb558 (llamada en vivo, d35, migraciones 023-027, .gitignore limpio)
+- **Main:** 70f4b6c / d033f82 (sin mover)
+
+### Umbrales Recuadro en Vivo
+- arm_crossing, table_rest, hand_to_face_adaptors: 3.0
+- Resto: 3.5
+- Reporte: 4.0
+- 4 tests nuevos (UmbralesCajaVivaTest)
+
+### Motor d35
+- **Puerto:** 8094 (PID 618892)
+- **MODELO_VERSION:** divlara-d35-mlp
+- **Endpoints:** /health OK, /predict devuelve 20 scores enteros 0-8
+- **Constante e14:** Default del código sigue en e14
+- **Backend tests:** 522 en verde
+
+### App (v16)
+- **versionCode:** 16
+- **versionName:** 1.9.7
+- **Puerto:** 8093
+- **Parámetro:** -PgrabarPrueba=true → POST multipart a /pruebas/video
+- **Funcionalidades:**
+  - Overlay de recuadros multi-evento
+  - Tarjeta "Eventos en el tiempo" con línea de tiempo por evento
+  - Debounce de 3 fotogramas en "manos juntas" (amarillo)
+  - Gramática "1 vez / N veces"
+- **Android tests:** 453 en verde
+
+### Backend Endpoints
+- POST /pruebas/video
+- GET /pruebas (listos)
+- **Validaciones:** extensión .mp4, tope 200MB, nombre generado por servidor
+- **Seguridad:** Sin autenticación (recomendable proteger antes de desplegar)
+
+---
+
+## ⚠️ Incidencias
+- Worker de video cerró con timeout por no respuesta del servidor 192.168.0.181
+- Aviso: sesión de Claude vence entre 29-nov y 2-dic
+
+---
+
+## 🐳 Estado de Servicios
+- No se reportaron caídas de Docker ni PostgreSQL en este turno
+---
+
+## Guardia nocturna 2026-11-24 01:42 (UTC-3) —Bitácora automática
+
+# INFORME DE GUARDIA NOCTURNA - PROYECTO DIVLARA
+**Corte:** 01:42 h | **Fecha:** 23-24 de noviembre de 2026
+
+## Estado del proyecto
+- Proyecto DivLara/Entrevistas-IA en vigencia durante la noche
+- Backend en feature/llamada-vivo-d35 (f8d6d86)
+- Android en feature/llamada-overlay-grabacion (7ddb558)
+- Main sin movimientos (70f4b6c / d033f82)
+- Backend: 522 tests en verde
+- Android: 453 tests en verde
+- Motor de visión en puerto 8094 con MODELO_VERSION=divlara-d35-mlp (/health OK)
+- App build v16 (versionCode 16, versionName 1.9.7, puerto 8093)
+
+## Tareas completadas
+- Reentreno d36 completo en 10 fases: datos y etiquetado del video de calibración, reentreno GPU con foco en 6 eventos, calibración de umbrales con el video, integración en backend, rebuild Android v17, reviews de Antigravity, arreglo de review + rebuild v18, debounce por tiempo v19, multi-cajas en la app v21
+- T5.4b integración DEV + merge a main
+- T5.7 fix de multipart 50 MB y constante e14
+- T5.10 reviews de Antigravity (backend + integración)
+- T4.1 modelo mlp_d35 empaquetado como divlara-d35-mlp en backend
+- T4.2 recuadros multi-evento y línea de tiempo con colores
+- T4.3 pulido v14
+- Feedback personalizado a la persona (scoring backend + UI app)
+- GPU del motor d35 con EP CUDA en la 3060 Ti y fallback CPU
+- Integración git dev+master con push en ambos proyectos
+- .gitignore limpiado en ambos repositorios
+
+## Hallazgos técnicos
+- Plan de integración: 9 archivos chocan con origin/DEV (BD_PRUEBA.kt el más probable, más 5 docs); orden elegido feature → origin/DEV → main con tag de respaldo
+- La sesión de Claude bloqueó git tag/fetch/switch/merge por pedir aprobación en entorno no interactivo: la integración a main quedó detenida y main no se tocó
+- Umbrales recuadro en vivo: arm_crossing, table_rest y hand_to_face_adaptors en 3.0; resto en 3.5; reporte en 4.0. Cuatro tests nuevos
+- Motor de visión reiniciado en puerto 8094 con MODELO_VERSION=divlara-d35-mlp; /health OK y /predict devuelve 20 scores enteros 0-8. La constante por defecto sigue en e14
+- App build v16 con grabación de prueba (-PgrabarPrueba=true), overlay multi-evento y tarjeta "Eventos en el tiempo"
+- Debounce de 3 fotogramas en "manos juntas" (amarillo) y gramática "1 vez / N veces"
+- Nuevos endpoints POST /pruebas/video y GET /pruebas: extensión .mp4, tope 200 MB, nombre generado por el servidor; quedan sin autenticación, conviene protegerlos antes de desplegar
+
+## Incidencias
+- El worker de video cerró con timeout porque el servidor 192.168.0.181 no respondió (VIDEOB_EXIT=255); las demás tareas cerraron con TAREA COMPLETADA
+- El antibloqueo registró cinco workers muertos sin bloque final de reporte y los relanzó
+- Aviso: la sesión de Claude vence entre el 29-nov y el 2-dic; renovar con claude auth login
+- Sin commits, sin cambios de código y sin reinicios de servicios en esta guardia; no se reportaron caídas de Docker ni PostgreSQL en este turno
+
+## Pendientes
+- T4.4 umbral recuadros en vivo 3.5
+- T4.5 app graba video de prueba
+- T4.6 endpoint POST /pruebas/video
+- T4.7 umbrales por evento
+- T5.1 prueba en vivo v16
+- T5.3 plan de integración
+- T5.5 documentador nocturno
+- T5.6 calibrar umbrales con video e informe
+- T5.8 archivos d35 faltantes + commit
+- T5.9 backend persiste promedios y segmentos
+
+## Bloqueada
+- "Umbrales vivo v23: apagar arm_crossing y bajar sensibilidad de torso_lean"
+
+---
+
+## Bitácora nocturna 2026-11-24 02:46 (UTC-3) — informe automático (OmniRoute)
+
+# Bitácora Nocturna — DivLara
+
+**Fecha y hora:** martes 24-nov-2026 02:46 (-03)
+
+## Estado del Kanban
+
+- **Total de tareas:** 60
+- **Terminadas:** la gran mayoría
+- **Bloqueadas:** 3
+  - T3.5 Métricas de rendimiento en la app (R-2)
+  - T3.6 Validación en vivo vs offline (R-2)
+  - "Umbrales vivo v23: apagar arm_crossing + torso_lean menos sensible"
+- **En estado "ready":** 11
+  - E6-prep Dataset de verdad R1+R2
+  - T4.4 Umbral recuadros en vivo 3.5
+  - T4.5 App graba vídeo de prueba
+  - T4.6 Endpoint POST /pruebas/video
+  - T4.7 Umbrales por evento
+  - T5.1 Prueba en vivo con grabación (v16)
+  - T5.3 Claude pensador: plan de integración
+  - T5.5 OmniRoute documentador nocturno
+  - T5.6 Calibrar umbrales con video + informe mañana
+  - T5.8 Archivos d35 faltantes + gitignore + verde + commit
+  - T5.9 Backend persiste promedios+segmentos de /api/v1/llamadas (review AG P1, para mañana)
+
+## Trabajo Realizado
+
+### integra
+- **Resultado:** FALLÓ
+- **Motivo:** El entorno bloqueó los comandos de escritura de git. Las operaciones `git tag` y `git fetch` pidieron aprobación, pero la sesión no es interactiva.
+- **Cambios aplicados:** Cero cambios
+- **Estado actual:**
+  - Backend en `feature/llamada-vivo-d35` (commit f8d6d86)
+  - Sin tag de respaldo
+  - Sin merges
+  - `main` intacto
+- **Aviso:** El sign-in de Claude vence entre 29-nov y 02-dic
+
+### plan
+- **Resultado:** Plan de integración DEV listo
+- **Conflictos detectados:**
+  - Conflicto seguro: `BD_PRUEBA.kt` (línea 179)
+  - Probables: `CONTENEDOR_DEPENDENCIAS.kt`, `CONFIGURACION_RUTAS.kt`, `CONFIGURACION_GENERAL.kt`
+  - Riesgo semántico: constante `TipoProveedorIa.MIMO` en `when` exhaustivo
+  - Sin conflictos en Android
+- **Estrategia propuesta:** commitear en rama feature, traer `origin/DEV` ahí, luego fusionar a main, con tag de respaldo y rollback
+- **Falta:** `git fetch` con credenciales y decidir la rama remota
+
+### snap
+- **Resultado:** snapshot completo
+- **Backend (`feature/llamada-vivo-d35`, f8d6d86):** nucleo-vision, motor-vision, llamada en vivo (migración 027), modelo d35 (023), predicción de simulación (025), revisión de texto local (026), consentimiento (024), docs y pruebas
+- **Android (`feature/llamada-overlay-grabacion`, 7ddb558):** overlay de visión en vivo, llamada en vivo, landmarks, anonimizador de video, revisión de texto local, sin conexión, voz TTS, consentimiento biométrico y tests
+- **Estado git:** limpio en ambos repositorios (0 cambios pendientes)
+- **Main sin cambios:** backend `70f4b6c`, Android `d033f82`
+- **Actualización:** `.gitignore` ampliado (`.opencode/`, `dumps/`, `APKs/`, `*.apk`)
+
+### nivelar
+- **Umbrales de recuadro en vivo:**
+  - `arm_crossing`: 3.0
+  - `table_rest`: 3.0
+  - `hand_to_face_adaptors`: 3.0
+  - Resto (incluye los no mapeados): 3.5 (`UMBRAL_CAJA_VIVA`)
+  - Reporte "Eventos en el tiempo": 4.0 (sin cambios)
+- **Tests nuevos:** 4 (`UmbralesCajaVivaTest`)
+- **Resultado:** BUILD SUCCESSFUL
+- **Versiones:** `versionCode=16`, `versionName=1.9.7`, puerto 8093, `mostrarOverlayVision=true`, `grabarPrueba=true`
+
+### grabar
+- **Funcionalidad:** `GrabadorPrueba` en la app
+- **Comportamiento:**
+  - Con `-PgrabarPrueba=true` guarda en `getExternalFilesDir/pruebas/prueba-<timestamp>.mp4` sin audio
+  - Indicador "● GRABANDO PRUEBA" en rojo
+  - Al Detener hace `POST` multipart a `/pruebas/video`; si falla, el archivo queda en el teléfono y se muestra un aviso sin crash
+- **Tests nuevos:** 3 (`GrabacionPruebaTest`)
+- **Resultado:** Build exitoso, sin commit ni instalación del APK
+
+### videob
+- **Endpoint `POST /pruebas/video`:** multipart, guarda en `<raíz>/pruebas/prueba-yyyyMMdd-HHmmss-SSS.mp4`, límite 200 MB, validación de extensión `.mp4`, sin residuos
+- **Endpoint `GET /pruebas`:** listado `[{archivo, bytes, fecha}]`
+- **Tests nuevos:** 3 (`PRUEBA_CONTROLADOR_PRUEBA_VIDEO`)
+- **Resultado:** `./gradlew test` en verde
+- **Problema de cierre:** "Timeout, server 192.168.0.181 not responding" (exit 255)
+- **Pendientes:** las dos rutas no exigen sesión (proteger con `authenticate`) y regenerar `docs/documentacion/API.md`
+
+### d35
+- **Motor:** relanzado con `MODELO_VERSION=divlara-d35-mlp` (PID 618892, puerto 8094)
+- **`GET /health`:** `{"status":"OK","modeloDivlara":{"version":"divlara-d35-mlp","cargado":true}}`
+- **`POST /predict`:** con `golden_features.json` devuelve 20 scores enteros en escala 0-8
+- **Tests:** 522 tests, 0 fallos, 0 errores
+- **Entorno:** venv `.venv` Linux → todo corrió con WSL
+- **Valor por defecto:** `e14` sigue como versión por defecto en `CONSTANTES_VISION.kt`
+- **Problema de cierre:** `W1_EXIT=255` (sin commit ni push)
+
+### andr
+- **UI en vivo:** columna de recuadros multi-evento junto a la caja con más espacio libre (nombre, valor y color de paleta); todos los activos a la vez
+- **Reporte:** tarjeta "Eventos en el tiempo" con fila por evento, barra 00:00 a la duración total, conteo de veces y duración máxima en mm:ss
+- **Reportes viejos sin segmentos:** mensaje neutro "Esta llamada no tiene línea de tiempo por evento."
+- **Resultado:** Build exitoso y 453 tests pasando
+- **Problema de cierre:** `W2_EXIT=255` (sin commit ni push)
+
+### fix
+- **Mejoras:**
+  - Debounce de 3 fotogramas para "manos juntas" (`DebounceBinario` en `PALETA_EVENTOS.kt`)
+  - Color de "manos juntas" cambiado de `0xFFEEEEEE` a `0xFFFFD600`
+  - `textoVeces(n)` → "1 vez" / "N veces"
+  - Cobertura de hasta 9 recuadros en pantalla
+- **Tests:** `EventosSegmentosTest` (debounce, color, `textoVeces` con 0/1/2/10)
+- **Resultado:** `FIX_EXIT=0`
+
+## Problemas Resueltos
+
+- Docker y PostgreSQL caídos tras el reinicio del PC
+- Levantados con `schtasks` + los bats `iniciar_docker.bat`, `iniciar_backend.bat`, `iniciar_motor.bat`
+- Motor ya responde en puerto 8094
+
+## Pendientes para Mañana
+
+- T5.9 Backend persiste promedios+segmentos de `/api/v1/llamadas` (review AG P1)
+- T5.6 Calibrar umbrales con video
+- T5.8 Archivos d35 faltantes
+- Desbloquear la escritura de git en sesión no interactiva
+- Proteger `/pruebas/*` con `authenticate`
+- Regenerar `API.md` y renovar el sign-in de Claude antes del 29-nov
+
+---
+
+## Bitácora nocturna — 2026-11-24 03:57 (-03)
+
+**Estado kanban (board `divlara`):** ~62 tareas en `done`.
+
+**En `ready`:** E6-prep (dataset R1+R2 para el revisor sin IA), T4.4 umbral recuadros en vivo 3.5, T4.5 app graba vídeo de prueba, T4.6 endpoint `POST /pruebas/video`, T4.7 umbrales por evento, T5.1 prueba en vivo con grabación (v16), T5.3 plan de integración de Claude, T5.5 documentador nocturno, T5.6 calibrar umbrales con vídeo, T5.8 archivos d35 faltantes + gitignore tests, T5.9 backend persiste promedios+segmentos de `/api/v1/llamadas`.
+
+**En `blocked`:** T3.5 métricas de rendimiento, T3.6 validación vivo vs offline, y "Umbrales vivo v23" (apagar `arm_crossing` + `torso_lean` menos sensible).
+
+**Snapshot previo a la integración:** ramas `feature/llamada-vivo-d35` (backend `f8d6d86`) y `feature/llamada-overlay-grabacion` (Android `7ddb558`), `git status` limpio, `.gitignore` ampliado (`.opencode/`, `dumps/`, `APKs/`).
+
+**Nota de sesión:** el sign-in de Claude vence entre el 29-nov y el 02-dic-2026 → renovar con `claude auth login`.
+
+### Informe redactado (OmniRoute · deepseek-r1-distill-qwen-32b)
+
+# Informe Nocturno - Proyecto DivLara/Entrevistas
+
+**Hora de cierre:** Martes 24 de noviembre de 2026, 03:57 (-03)
+
+## Estado del Proyecto
+
+- **Kanban:** 62 tareas completadas
+- **Motor d35:** Relanzado en puerto 8094 (MODELO_VERSION=divlara-d35-mlp)
+  - GET /health: cargado=true
+  - GET /predict: devuelve 20 scores enteros 0-8
+  - 522 tests en verde
+  - e14 sigue como default en CONSTANTES_VISION.kt
+
+## Reentreno d36
+
+Fases 1-10 completadas (datos/etiquetado, reentreno GPU 6 eventos, calibración de umbrales, integración backend, rebuild Android v17-v21, debounce, multi-cajas, reviews Antigravity). Push integrado en ambos proyectos.
+
+## Integración a main
+
+- Backend merge: 7da0fde (visión d35, llamada en vivo, DEV)
+- Android merge: 46ff239
+- **Pendiente:** git fetch de Android con credenciales (falló "could not read Username") y limpiar 4 archivos task-t*.md versionados con git rm --cached
+
+## Pendiente Bloqueante
+
+En models/divlara-d35-mlp/ faltan MANIFIESTO.json y golden_features.json → 5 tests en rojo (PruebaSaludModeloDivlara, PruebaVisionDesacoplada y 3 de motor-vision). Es la tarea T5.8.
+
+## Umbrales en Vivo (nivelar)
+
+- arm_crossing=3.0
+- table_rest=3.0
+- hand_to_face_adaptors=3.0
+- resto=3.5
+- reporte=4.0
+
+4 tests nuevos, BUILD SUCCESSFUL, APK v16 (versionName 1.9.7, puerto 8093)
+
+## Grabación de Prueba
+
+- flag -PgrabarPrueba=true guarda mp4 sin audio en getExternalFilesDir/pruebas
+- indicador rojo "● GRABANDO PRUEBA"
+- subida multipart a POST /pruebas/video al Detener
+- 3 tests
+
+## Backend POST /pruebas/video
+
+- Guarda en pruebas/prueba-<timestamp>.mp4
+- Límite 210 MB
+- Valida extensión .mp4
+- GET /pruebas lista archivos
+- 3 tests
+- **OJO:** ambas rutas no exigen sesión (authenticate) — proteger antes de desplegar
+
+## Correcciones
+
+- gitignore: el patrón pruebas/ ignoraba también src/test/kotlin/PRUEBAS/ por mayúsculas en Windows; se ancló a /pruebas/ y entraron 11 tests de src/test y 5 de motor-vision
+- Docker/PostgreSQL: levantados tras reinicio del PC (schtasks + iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat)
+
+## UI
+
+- Recuadros multi-evento en vivo con paleta
+- Tarjeta "Eventos en el tiempo" con línea de tiempo por evento
+- Gramática "1 vez"/"N veces"
+- Debounce de 3 fotogramas para "manos juntas"
+- Color amarillo #FFD600
+- 453 tests en Android
+
+## Aviso
+
+La sesión de Claude vence entre el 29-nov y el 02-dic-2026 (renovar con claude auth login)
+
+## Prohibido
+
+Commits, tocar código, reiniciar servicios
+
+*(fuente: logs /tmp/claude_{integra,plan,snap,nivelar,grabar,videob,d35,andr,fix} y kanban `divlara`)*
+## 2026-11-24 05:14 — 05:11 (-03)
+
+# Bitácora Nocturna - Proyecto DivLara
+
+**Fecha/Hora:** martes 24 de noviembre de 2026, 05:11 (-03)
+
+## Tareas Completadas
+- T5.4b: Integración DEV + merge a main (worker claude); T5.7: fix multipart 50MB y constante e14
+- T5.10: review Antigravity backend + integración
+- Reentreno d36: 4 fases completadas (datos/etiquetado video calibración, reentreno GPU 6 eventos, calibración umbrales, integración backend d36)
+- T4.1-T4.3: modelo mlp_d35 → divlara-d35-mlp en backend; app con recuadros multi-evento y línea de tiempo con colores; pulido v14
+- T3.14-T3.17: consentimiento único, overlay visión, historial llamadas en vivo, ventana reporte post-llamada
+- T5.8 (archivos d35 faltantes + gitignore + verde + commit) y T4.4-T4.7 ejecutados según logs
+
+## Hallazgos Técnicos
+- Motor de visión: MODELO_VERSION=divlara-d35-mlp (PID 618892, puerto 8094); GET /health cargado=true; POST /predict devuelve 20 enteros 0-8; e14 default en CONSTANTES_VISION.kt
+- Tests: 522 verde tras cambio a d35; 453 verde Android tras overlay
+- POST /pruebas/video: multipart límite 210 MB, guarda con nombre servidor, valida extensión .mp4; GET /pruebas lista archivos; ambas rutas no exigen sesión
+- Umbrales en vivo: arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5; reporte "Eventos en el tiempo" 4.0
+- Grabación prueba: -PgrabarPrueba=true → POST multipart a /pruebas/video; versionCode=16, versionName=1.9.7
+- gitignore: patrón pruebas/ ignoraba src/test/kotlin/PRUEBAS/ por case-insensitivity Windows; anclado a /pruebas/; entraron 16 tests sin versionar
+
+## Problemas Resueltos
+- Docker/PostgreSQL caídos tras reinicio PC: levantados con schtasks y bats iniciar_docker.bat, iniciar_backend.bat, iniciar_motor.bat
+- Integración a main: primera pasada falló por bloqueo git tag/fetch (sesión no interactiva); segunda resuelta con tag respaldo y merge local (backend 7da0fde, Android 46ff239), gitignore ampliado, testReleaseUnitTest exitoso; pendiente git fetch Android por falta credenciales
+- Fix límite 50MB/210MB y tests controlador; 3 tests rojos por 14 features cara rellenados con scaler.mean d35
+- Merge rama feature sobre DEV resuelto archivo por archivo (conflicto BD_PRUEBA.kt)
+
+## Pendientes
+- T5.5: documentador nocturno (esta tarea)
+- T5.6: calibrar umbrales con video e informe por la mañana
+- T5.8-T5.9, T4.4-T4.7
+- E6-prep dataset de verdad
+- Tareas bloqueadas T3.5/T3.6
+
+---
+
+## Noche 2026-11-24 · Bitácora nocturna DivLara (corrida del cron 06:17 -03)
+
+**Estado del tablero `divlara` (06:17):** 70 tarjetas — 55 completadas, 11 en ready, 3 bloqueadas.
+
+**Tareas avanzadas / completadas**
+- Reentreno d36 completo (Fases 1-10: datos y etiquetado, reentreno GPU con foco en 6 eventos, calibración de umbrales, integración backend, rebuild Android v17, reviews Antigravity, arreglos + v18, debounce por tiempo v19, multi-cajas + review, refresco v21).
+- Integración git dev + master y push de ambos proyectos.
+- T5.4b integración DEV + merge a main; T5.7 fix multipart 50MB + constante e14; T5.10 reviews Antigravity.
+- GPU motor d35: EP CUDA en 3060 Ti + fallback CPU + benchmark antes/después.
+- Feedback personalizado (backend scoring + app UI).
+- Recién en ready: T5.3 plan de integración (Claude pensador), T5.5 documentador nocturno (esta tarea), T5.6 calibrar umbrales + informe, T5.8 archivos d35 faltantes, T5.9 persistir promedios y segmentos de `/api/v1/llamadas`.
+
+**Hallazgos técnicos**
+- Backend `f8d6d86` en `feature/llamada-vivo-d35` (nucleo-vision, motor-vision, migraciones 027/023/025/026/024); Android `7ddb558` en `feature/llamada-overlay-grabacion`, merge a `main` = `46ff239`, `testReleaseUnitTest` exitoso.
+- Motor d35 corriendo con `MODELO_VERSION=divlara-d35-mlp` (PID 618892, puerto 8094): `/health` con `cargado:true` y `/predict` con 20 scores enteros escala 0-8; 522 tests en verde; e14 sigue de default.
+- Umbrales de recuadro en vivo: `arm_crossing` 3.0, `table_rest` 3.0, `hand_to_face_adaptors` 3.0, resto 3.5, reporte 4.0 (build versionCode 16 / versionName 1.9.7 / puerto 8093).
+- `MANIFIESTO.json` y `golden_features.json` de d35 generados con datos reales (14 features de cara con `scaler.mean`, predicciones recalculadas con onnxruntime); gitignore `pruebas/` anclado a `/pruebas/` por case-insensitivity de Windows; entraron 16 tests que estaban sin versionar.
+- UI: recuadros multi-evento en vivo y tarjeta "Eventos en el tiempo" con barra de tiempo (453 tests); grabación de prueba con `-PgrabarPrueba=true` y endpoints `POST /pruebas/video` (límite 200 MB, extensión validada) + `GET /pruebas` con 3 tests.
+
+**Problemas resueltos**
+- Primer intento de integración falló: el entorno bloqueó `git tag/fetch/merge` por no haber aprobación en sesión no interactiva; se resolvió en el segundo intento con merge a main en ambos repos.
+- Fix500: `BUILD FAILED` (2 fallos en raíz + 3 en `motor-vision`) por archivos faltantes en `models/divlara-d35-mlp/`; quedaron generados `MANIFIESTO.json` y `golden_features.json`.
+
+**Pendientes / alertas**
+- Proteger `POST /pruebas/video` y `GET /pruebas` con `authenticate` (hoy no exigen sesión).
+- `git fetch` de Android sin credenciales (`could not read Username`); retirar `task-t*.md` versionados con `git rm --cached`.
+- Logs con cierre anómalo: `claude_videob` (`Timeout, server 192.168.0.181 not responding`, `VIDEOB_EXIT=255`), `claude_integra2`, `claude_d35` y `claude_andr` con exit 255 pese a completar.
+- Bloqueadas: T3.5 métricas de rendimiento, T3.6 validación en vivo vs offline, "Umbrales vivo v23: apagar `arm_crossing` + `torso_lean` menos sensible".
+
+### 2026-11-24 07:25 -03
+
+**Bit├ícora Nocturna - DivLara**
+
+**Fecha:** Mar 24 nov 2026, 07:25 -03
+
+**Completado:**
+- Reentreno d36: fases 1-10 (datos, etiquetado, GPU eventos, umbrales, backend, Android v17, reviews, debounce v19, multi-cajas, integraci├│n, feedback personalizado, GPU motor d35 EP CUDA 3060 Ti con benchmark)
+- T5.4b: integraci├│n DEV + merge a main
+- T5.7: fix multipart 50MB + constante e14
+- T5.10: reviews Antigravity backend+integraci├│n
+
+**Resuelto:**
+- Merge DEVÔåÆmain en Android (46ff239) con tag de respaldo y .gitignore ampliado, backend merge 7da0fde
+- Fix multipart 50MB con l├¡mite aceptado y tests verdes (BUILD FAILED corregido)
+- Archivos d35: MANIFIESTO.json y golden_features.json corregidos, gitignore `pruebas/` ÔåÆ `/pruebas/`
+- Umbrales por evento: arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5
+- Grabaci├│n de prueba: GRABADOR_PRUEBA.kt con flag grabarPrueba=true y subida multipart a /pruebas/video
+- Endpoints POST /pruebas/video (l├¡mite 200MB, validaci├│n extensi├│n) y GET /pruebas
+
+**En curso:**
+- Motor d35 relanzado (PID 618892, puerto 8094, /health OK, 522 tests verdes)
+- UI multi-recuadros en vivo + tarjeta "Eventos en el tiempo"
+- Backend persiste promedios+segmentos
+- Validaci├│n vivo vs offline (T3.6)
+- Calibrar umbrales con video + informe ma├▒ana (T5.6)
+
+**Pendientes:**
+- T3.5: m├®tricas rendimiento
+- T4.4: umbral recuadros vivo 3.5
+- T4.5: app graba v├¡deo de prueba
+- T4.6: endpoint POST /pruebas/video sin authenticate
+- T4.7: umbrales por evento
+- T5.1: prueba en vivo v16
+- T5.3: plan de integraci├│n
+- T5.8: archivos d35 faltantes + gitignore + commit
+- E6-prep: dataset R1+R2
+
+---
+
+## 2026-11-24 08:35 -03 — Bitácora nocturna (cron documentador; noche 23→24 nov 2026)
+
+# Bitácora Nocturna — DivLara
+**Noche:** 23→24 nov 2026  
+**Ejecución:** mar 24 nov 08:34 -03
+
+---
+
+## Resumen General
+- 70+ tareas completadas en kanban.
+- Tareas actualmente bloqueadas: T3.5, T3.6 y "Umbrales vivo v23".
+- En *ready*: E6-prep, T4.4, T4.5, T4.6, T4.7, T5.1, T5.3, T5.5, T5.6, T5.8 y T5.9.
+
+---
+
+## Avances de la Noche
+
+- **Snapshot e integración**
+  - Backend en rama feature/llamada-vivo-d35 (commit f8d6d86).
+  - Android en rama feature/llamada-overlay-grabación (commit 7ddb558).
+  - git status limpio en ambos.
+  - main sin cambios (commits 70f4b6c / d033f82).
+  - Plan de merge con origin/DEV listo: 9 archivos con conflicto probable, BD_PRUEBA.kt choca seguro.
+
+- **Modelos**
+  - Motor con d35 (522 tests verdes, /health con divlara-d35-mlp).
+  - Reentreno d36 (parity ONNX 1.4e-6).
+  - Reentreno d37 (F1 de arm_crossing 0.0 → 80.0 con umbral ≥6, AUC 0.974; 597 tests).
+  - Inferencia en GPU CUDA en la RTX 3060 Ti.
+
+- **App Android**
+  - APKs de la v16 a la v23.
+  - Overlay multi-caja, línea de tiempo por evento, debounce por tiempo, grabación de prueba con POST /pruebas/video.
+  - Extractor MediaPipe real y revisor de texto local sin IA.
+  - Suites hasta 508/508 verdes.
+
+- **Backend**
+  - Borrado duro de datos (migración 024).
+  - Higiene de logs (2 archivos que podían filtrar correos en trazas).
+  - Motor desacoplado (MOTOR_ENDPOINT, 503 si el motor cae).
+  - Reporte de simulación (migración 025).
+  - Revisor de texto (migración 026 sin aplicar).
+
+---
+
+## Hallazgos Técnicos
+
+- iniciar_motor.bat hardcodea MODELO_VERSION=divlara-d35-mlp: reiniciar MotorUp sin editarlo sirve d35, y BackendUp sin reiniciar sigue reportando d35 en /health y en PostgreSQL.
+- Polaridad de gaze: ≤2 es desvío de mirada; la app dispara al revés.
+- El gitignore pruebas/ ignoraba también src/test/kotlin/PRUEBAS/ (Windows no distingue mayúsculas); se ancló a /pruebas/.
+- pg_dump y psql no están en el PATH de Windows: el respaldo E10 se hizo dentro del contenedor Docker Entrevista_APP (postgres:16, puerto 5432) con pg_restore -l (244 entradas TOC, exit 0).
+
+---
+
+## Problemas Resueltos
+
+- Servicios tras el reinicio del PC: Docker/PostgreSQL, backend (iniciar_backend.bat, 8093) e inferencia (iniciar_motor.bat, 8094) levantados con schtasks; /health en verde con cuda.
+- Workers atascados detectados por el antibloqueo (fase8, fase9, fase10, feedback, gpu, d37): se relanzaron y terminaron.
+- Login de claude-code vence entre el 29-nov y el 02-dic: renovar con claude auth login.
+
+---
+
+## Pendientes
+
+- T5.8 (archivos d35 + gitignore + commit).
+- T5.9 (promedios y segmentos de /api/v1/llamadas).
+- T4.4–T4.7 y T5.6 (calibrar umbrales con video).
+- Tareas bloqueadas: T3.5, T3.6 y umbrales vivo v23 (apagar arm_crossing).
+
+
+---
+
+## 2026-11-24 09:42 -03 — Bitácora nocturna (cron documentador; noche 23→24 nov 2026)
+
+# Bitácora nocturna DivLara — corte: martes 24 de noviembre de 2026, 09:42
+
+## Estado del Kanban (board divlara)
+- **Done:** ~50 tareas
+- **Bloqueadas (R-2):** 2
+  - T3.5 Métricas de rendimiento
+  - T3.6 Validación en vivo vs offline
+- **En ready:** 10 tareas
+  - E6-prep (dataset R1+R2)
+  - T4.4 umbral recuadros 3.5
+  - T4.5 app graba vídeo
+  - T4.6 endpoint POST /pruebas/video
+  - T4.7 umbrales por evento
+  - T5.1 prueba en vivo v16
+  - T5.3 plan de integración
+  - T5.5 documentador nocturno
+  - T5.6 calibrar umbrales
+  - T5.8 archivos d35 + commit
+  - T5.9 backend persiste promedios y segmentos
+
+## Logs de herramientas
+
+### snap: snapshot limpio
+- **Ramas desde main:**
+  - backend → feature/llamada-vivo-d35 (f8d6d86)
+  - Android → feature/llamada-overlay-grabacion (7ddb558)
+- **.gitignore:** limpiado (opencode.json, dumps/, APKs/)
+- **git status:** limpio
+- **main:** sin cambios (70f4b6c / d033f82)
+
+### plan: 9 archivos del backend chocan con origin/DEV
+- **Conflicto seguro:** BD_PRUEBA.kt (ambos añaden parámetros a SistemaPrueba)
+- **Aditivos probables:** CONTENEDOR_DEPENDENCIAS.kt, CONFIGURACION_RUTAS.kt, CONFIGURACION_GENERAL.kt
+- **Riesgo semántico:** constante TipoProveedorIa.MIMO en when exhaustivo
+- **Android:** sin conflictos
+- **Orden recomendado:** commitear en feature, traer origin/DEV ahí y luego fusionar a main
+
+### integra: TAREA FALLIDA
+- **Problema:** sesión no interactiva bloqueó git (requiere aprobación)
+- **En ausencia de tag de respaldo y sin tocar main:** backend sigue en feature/llamada-vivo-d35 (f8d6d86)
+
+### nivelar: umbrales del recuadro en vivo
+- **Valores configurados:**
+  - arm_crossing, table_rest, hand_to_face_adaptors = 3.0
+  - resto = 3.5 (UMBRAL_CAJA_VIVA)
+  - reporte = 4.0
+- **Tests:** UmbralesCajaVivaTest (4 en verde)
+- **Build exitoso:**
+  - versionCode 16, versionName 1.9.7
+  - puerto 8093
+  - mostrarOverlayVision=true
+  - grabarPrueba=true
+
+### grabar: módulo grabación de prueba
+- **Archivo:** GRABADOR_PRUEBA.kt
+- **Configuración:** -PgrabarPrueba=true
+- **Comportamiento:**
+  - Guarda prueba-<ts>.mp4 sin audio
+  - Indicador rojo "● GRABANDO PRUEBA"
+  - Subida multipart a /pruebas/video al detener
+- **Estado:** Build exitoso
+
+### videob: endpoints de pruebas
+- **POST /pruebas/video:**
+  - Nombre de archivo lo define el servidor
+  - Validación de extensión .mp4
+  - Campo obligatorio
+  - Tope 200 MB con borrado de parciales
+- **GET /pruebas:** lista de pruebas
+- **Tests:** 3 en verde
+- **Pendiente:** ambas rutas no exigen sesión (revisar antes de desplegar)
+- **Cierre:** timeout SSH (exit 255)
+
+### d35: motor de predicción
+- **Versión:** MODELO_VERSION=divlara-d35-mlp (PID 618892)
+- **Endpoints:**
+  - /health → version=divlara-d35-mlp, cargado=true
+  - /predict con golden_features.json → 20 scores enteros (escala 0-8)
+- **Tests:** 522 en verde
+- **Defecto:** e14 en CONSTANTES_VISION.kt
+- **Cierre:** timeout SSH (exit 255)
+
+### andr: interfaz Android
+- **Nuevas características:**
+  - Columna de recuadros multi-evento en vivo
+  - Tarjeta "Eventos en el tiempo" en el reporte
+  - Barra temporal 00:00 a duración total
+  - Conteo y duración máxima de eventos
+- **Problema:** Llamadas abiertas desde historial del servidor no traen segmentos (DetalleLlamadaDto no los incluye)
+- **Build exitoso:** 453 tests
+
+### fix: correcciones múltiples
+- **Píldora que no tapa el recuadro:** caso de 9 recuadros, solo compilado
+- **Gramática:** textoVeces(n)
+- **Debounce:** 3 fotogramas para "manos juntas" (DebounceBinario, color 0xFFFFD600)
+- **Tests:** EventosSegmentosTest
+- **Estado:** FIX_EXIT=0
+
+## Infraestructura (solo lectura)
+**Servidor:** ai-pc
+- **Postgres 16 (Entrevista_APP):** Up 11 h (healthy), puerto 5432
+- **Tareas programadas:** DockerStart/DockerUp/docker_start
+- **Servicios:** divlara-backend, divlara-motor
+- **Script de inicialización:** iniciar_docker.bat, iniciar_backend.bat, iniciar_motor.bat
+
+## Avisos
+- **Expiración de autenticación Claude Code:** entre el 29-nov y 02-dic-2026
+- **Acción requerida:** renovar con `claude auth login` o `setup-token`
+
+## Resumen operativo
+- No se hicieron commits
+- No hubo cambios de código
+- No hubo reinicios
+
+---
+
+## Bitácora nocturna — entrada 2026-11-24 10:54 (-03) · cron documentador nocturno
+
+**INFORME DE BITÁCORA NOCTURNA**
+
+**Fecha y hora**
+*   Hora: martes 24 de noviembre de 2026, 10:54 h (-03)
+*   Bitácora nocturna de DivLara (turno noche 22-23 nov, redactada el 24 nov por la mañana)
+
+**TAREAS COMPLETADAS (kanban divlara)**
+*   47 tareas en done
+*   Destacan la cadena de reentreno d36 (Fases 1-10: datos/etiquetado, reentreno GPU con foco en 6 eventos, calibración de umbrales, integración backend, rebuild Android v17, reviews Antigravity, arreglo de reviews v18, debounce v19, multi-cajas v20, refresco de sobrecarga v21)
+*   Integración git dev+master y push de ambos proyectos
+*   Feedback personalizado por pregunta (backend scoring + app UI)
+*   GPU del motor d35 con EP CUDA en 3060 Ti y fallback CPU con benchmark antes/después
+*   T3.14 overlay de visión
+*   T3.15 historial de llamadas en vivo
+*   T3.16 consentimiento único
+*   T3.17 ventana de reporte post-llamada
+*   T4.1 modelo mlp_d35
+*   T4.2 recuadros multi-evento con línea de tiempo
+*   T4.3 pulido v14
+*   T5.4b integración DEV + merge a main
+*   T5.7 fix de multipart 50MB y constante e14
+*   T5.10 reviews
+
+**TAREAS READY (pendientes, 12)**
+*   T4.4 umbral de recuadros en vivo 3.5
+*   T4.5 app graba vídeo de prueba
+*   T4.6 endpoint POST /pruebas/video
+*   T4.7 umbrales por evento
+*   T5.1 prueba en vivo con grabación (v16)
+*   T5.3 plan de integración del Claude pensador
+*   T5.5 documentador nocturno (esta tarea)
+*   T5.6 calibrar umbrales con vídeo e informe
+*   T5.8 archivos d35 faltantes + gitignore de tests + verde + commit
+*   T5.9 backend persiste promedios y segmentos de /api/v1/llamadas
+*   E6-prep dataset de verdad R1+R2
+*   2 bloqueadas: T3.5 métricas en vivo, T3.6 validación en vivo vs offline
+*   Sigue bloqueada e7b42a84 (umbrales vivo v23: apagar arm_crossing y bajar sensibilidad de torso_lean)
+
+**HALLAZGOS TÉCNICOS**
+*   Motor d35 en ejecución: relanzado con MODELO_VERSION=divlara-d35-mlp (PID 618892); /health responde cargado:true; POST /predict con golden_features devuelve 20 scores enteros en escala 0-8. 522 tests verdes, e14 sigue como versión por defecto.
+*   Modelo d37 (nuevo): cargado en motor con CUDA, 597 tests verdes; cruce de brazos positivo con salida >=6 y 4-5 sin cruce, así que los umbrales de la app (3.0/4.0) hay que subirlos a 6. Los frames estáticos no separan (AUC 0.50): el modelo solo es fiable con ventanas reales de 20 fotogramas.
+*   Gitignore anclado: el patrón pruebas/ ignoraba también src/test/kotlin/PRUEBAS/ porque Windows no distingue mayúsculas; se cambió a /pruebas/, lo que dejó visibles 11 tests de src/test y 5 de motor-vision que estaban sin versionar.
+*   Faltaban MANIFIESTO.json y golden_features.json en models/divlara-d35-mlp (552 tests con 2 fallos + 3 en motor-vision); ya se repusieron y T5.8 sigue open para cerrar commit.
+*   d35 reutiliza la ventana de landmarks y las 343 columnas de e14; las 14 features de cara faltantes se rellenaron con scaler.mean de d35 y expected_predicciones se recalculó ejecutando el modelo.onnx real con onnxruntime.
+*   Umbrales en vivo: arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5, reporte 4.0. "Manos juntas" usa table_rest (3.0) y ahora tiene debounce de 3 fotogramas.
+*   Endpoints POST /pruebas/video y GET /pruebas funcionan (multipart, límite 200MB, 400 si extensión distinta de .mp4), pero NO exigen sesión: protegerlos antes de cualquier despliegue.
+
+**PROBLEMAS RESUELTOS**
+*   Docker/PostgreSQL quedaron caídos tras el reinicio del PC y se levantaron con schtasks y los bats iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat (iniciar_motor.bat se editó fuera del repo para pasar MODELO_VERSION=divlara-d37-mlp).
+*   La primera integración falló (claude_integra): el entorno bloqueó git tag/fetch/switch/merge por falta de aprobación y no hubo cambios. Se resolvió con la pasada integra2: snapshot en ramas feature/llamada-vivo-d35 (backend f8d6d86) y feature/llamada-overlay-grabacion (Android 7ddb558), merge a main (backend 7da0fde, Android 46ff239) con tag de respaldo respaldo/pre-integracion-main, y gitignore de task-t*.md/opencode.json.
+*   Fix multipart 50MB + constante e14 completado (T5.7).
+
+**PENDIENTES/AVISOS**
+*   git fetch de Android sigue sin hacerse por falta de credenciales (could not read Username); el main...origin/main 0/0 es de la referencia local, verificar antes de pushear.
+*   Claude auth vence entre 2026-11-29 y 2026-12-02: correr claude auth login antes de esa fecha.
+*   Quedaron archivos de notas versionados (task-t315.md, task-t314.md, task-t316.md, task-t317.md) para quitarlos con git rm --cached.
+*   videob.log terminó con "Timeout, server 192.168.0.181 not responding" (VIDEOB_EXIT=255) tras completar la tarea.
+
+---
+
+**Bit├ícora nocturna DivLara ÔÇö martes 24-nov-2026 12:04 -03**
+
+**Estado del kanban**
+- **Bloque Reentreno d36:** Ô£ô Completo (Fases 1-10, reviews Antigravity, integraci├│n git dev+master, feedback personalizado, GPU motor d35)
+- **Bloque T5:** Ô£ô T5.2 reviews Antigravity x3, T5.4 snapshot + rama actualizada con DEV, T5.4b integraci├│n DEV + merge a main, T5.7 fix multipart 50MB + constante e14, T5.10 review backend + integraci├│n
+- **Ready:** T4.6 endpoint POST /pruebas/video, T4.7 umbrales por evento, T5.1 prueba en vivo con grabaci├│n (v16), T5.3 plan de integraci├│n, T5.5 documentador nocturno, T5.6 calibrar umbrales con video, T5.8 archivos d35 faltantes + gitignore + verde + commit, T5.9 backend persiste promedios+segmentos (para ma├▒ana)
+- **Bloqueado:** T-umbrales vivo v23 (apagar arm_crossing, torso_lean menos sensible)
+
+**Trabajo de la noche**
+- **Integra:** FALL├ô por bloqueo del entorno (git tag/fetch pidieron aprobaci├│n en sesi├│n no interactiva). Sin cambios: backend en feature/llamada-vivo-d35 (f8d6d86), sin tag de respaldo, sin merge a main.
+- **Plan:** plan de integraci├│n DEV listo. 9 archivos en com├║n con origin/DEV; conflicto seguro en BD_PRUEBA.kt (l├¡nea 179); probables CONTENEDOR_DEPENDENCIAS.kt, CONFIGURACION_RUTAS.kt, CONFIGURACION_GENERAL.kt; riesgo sem├íntico con TipoProveedorIa.MIMO en un when exhaustivo. Android sin conflictos. Orden: feature ÔåÆ traer origin/DEV ÔåÆ merge a main, con tag de respaldo y rollback.
+- **Snap:** backend f8d6d86 (nucleo-vision, motor-vision, llamada en vivo migraci├│n 027, modelo d35, simulaci├│n, revisi├│n de texto local, consentimiento, docs, pruebas); Android 7ddb558 (overlay, landmarks, anonimizador, SQLDelight 3-4, TTS, consentimiento). git status limpio en ambos; main intacto (70f4b6c / d033f82); .gitignore ampliado (.opencode/, dumps/, APKs/, *.apk).
+- **Nivelar:** umbrales en vivo arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5, reporte 4.0; 4 tests nuevos; BUILD SUCCESSFUL versionCode=16, versionName=1.9.7.
+- **Grabar:** con -PgrabarPrueba=true graba mp4 sin audio en getExternalFilesDir/pruebas/, indicador "ÔùÅ GRABANDO PRUEBA" en rojo, POST multipart a /pruebas/video al Detener; 3 tests; sin commit.
+- **Videob:** POST /pruebas/video (multipart, l├¡mite 200 MB, extensi├│n .mp4, nombres del servidor a prueba de path traversal), GET /pruebas listado; 3 tests; ./gradlew test en verde. Cierre con "Timeout, server 192.168.0.181 not responding" (exit 255) tras completar. Pendiente: proteger /pruebas/* con authenticate y regenerar docs/documentacion/API.md.
+- **D35:** 522 tests en verde; motor relanzado con MODELO_VERSION=divlara-d35-mlp (PID 618892, puerto 8094); /health OK y /predict con golden_features.json devuelve 20 scores enteros (escala 0-8). Venv Linux ÔåÆ todo corri├│ en WSL con PYTHONPATH. e14 sigue como default. Cierre W1_EXIT=255 (sin commit).
+- **Andr:** columna de recuadros multi-evento en vivo + tarjeta "Eventos en el tiempo" con barra 00:00ÔåÆduraci├│n, conteo y duraci├│n m├íxima; reportes viejos sin segmentos muestran mensaje neutro. Build exitoso, 453 tests. Cierre W2_EXIT=255 (sin commit).
+- **Fix:** debounce de 3 fotogramas para "manos juntas" (DebounceBinario), color 0xFFFFD600, textoVeces(n) ("1 vez"/"N veces"), scroll para 9 recuadros; tests en EventosSegmentosTest; FIX_EXIT=0.
+
+**Problemas resueltos**
+Docker/PostgreSQL ca├¡dos tras el reinicio del PC, levantados con schtasks + iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat; motor d35 de vuelta en 8094 tras matar el java viejo; venv Linux ejecut├índose bajo WSL.
+
+**Pendientes**
+Desbloquear git en sesi├│n no interactiva, T5.9 promedios+segmentos, T5.6 calibrar umbrales, T5.8 archivos d35, proteger /pruebas/*, regenerar API.md, renovar sign-in de Claude antes del 29-nov.
+
+Sin commits, sin tocar c├│digo, sin reiniciar servicios en esta corrida.
+
+
+
+---
+
+## Bitácora nocturna — corte 24-nov-2026 14:35 (UTC-03) — redacción OmniRoute (glm-5.2)
+
+# BITÁCORA NOCTURNA — Proyecto DivLara
+
+**Fecha:** 24-nov-2026 14:35 (UTC-03)  
+**Corte:** 24-nov-2026 14:35 (UTC-03)
+
+---
+
+## Tablero `divlara`
+
+- **Total tareas:** 69
+- **Done:** 55
+- **Ready:** 11
+- **Blocked:** 3
+
+### Tareas bloqueadas
+
+- T3.5: métricas en la app
+- T3.6: validación vivo vs offline (R-2)
+- "Umbrales vivo v23": apagar arm_crossing / torso_lean menos sensible
+
+### Tareas listas
+
+- E6-prep: dataset de verdad
+- T4.4: umbral 3.5
+- T4.5: grabación de prueba
+- T4.6: POST /pruebas/video
+- T4.7: umbrales por evento
+- T5.1: prueba en vivo v16
+- T5.3: plan de integración de Claude
+- T5.5: documentador nocturno
+- T5.6: calibración de umbrales
+- T5.8: archivos d35 + gitignore + commit
+- T5.9: backend persiste promedios/segmentos
+
+---
+
+## Avances por tarea
+
+### integra (git)
+- **Estado:** FALLÓ por permisos
+- **Motivo:** git tag/fetch/switch/merge pedían aprobación y la sesión no es interactiva
+- **Rama actual:** feature/llamada-vivo-d35 (f8d6d86)
+- **Tag de respaldo:** sin tag
+- **Estado de main:** no se ha tocado main
+- **Aviso:** sesión Claude vence 29-nov a 02-dic
+
+### plan
+- **Conflictos:** backend vs origin/DEV
+- **Archivos en conflicto:** 9 archivos comunes
+- **Choque duro:** BD_PRUEBA.kt (línea 179)
+- **Componentes afectadas:** CONTENEDOR_DEPENDENCIAS, CONFIGURACION_RUTAS, CONFIGURACION_GENERAL + 5 docs
+- **Riesgo semántico:** TipoProveedorIa.MIMO en `when` exhaustivos
+- **Estado Android:** sin conflictos
+- **Orden de trabajo:** rama feature -> traer DEV -> merge a main (con tag de respaldo y rollback)
+
+### snap
+- **Snapshot:** limpio
+- **Backend:** f8d6d86 (nucleo-vision, motor-vision, llamada en vivo mig.027, d35 023, simulación 025, revisión local 026, consentimiento 024)
+- **Android:** 7ddb558 (overlay, llamada en vivo, landmarks, anonimizador, offline, TTS, consentimiento)
+- **.gitignore:** limpiado (.opencode/, dumps/, APKs/, *.apk)
+- **main:** intacto (backend 70f4b6c, Android d033f82)
+- **Cambios pendientes:** 0
+
+### nivelar (T4.4)
+- **Umbrales en vivo:**
+  - arm_crossing: 3.0
+  - table_rest: 3.0
+  - hand_to_face_adaptors: 3.0
+  - resto: 3.5
+  - reporte: 4.0
+- **Tests:** 4 nuevos
+- **Resultado:** BUILD SUCCESSFUL
+- **Versión:** versionCode 16, versionName 1.9.7
+- **Puerto:** 8093
+- **Funcionalidades activas:** overlay y grabarPrueba
+
+### grabar (T4.5)
+- **GrabadorPrueba:**
+  - -PgrabarPrueba=true guarda mp4 sin audio
+  - Guarda en getExternalFilesDir/pruebas/
+  - Indicador visual: "● GRABANDO PRUEBA"
+  - Subida multipart a POST /pruebas/video con Ktor
+- **Manejo de errores:** si falla la subida, el archivo queda en el teléfono y avisa sin crash
+- **Tests:** 3
+- **Estado:** sin commit ni instalación
+
+### videob (T4.6)
+- **Endpoints:**
+  - POST /pruebas/video (multipart, máx 200 MB, solo .mp4, nombre del servidor anti path-traversal)
+  - GET /pruebas
+- **Tests:** 3 en verde
+- **Requisito de sesión:** no exigen sesión
+
+### d35
+- **Tests:** 522 tests, 0 fallos
+- **Motor:** puerto 8094 relanzado con MODELO_VERSION=divlara-d35-mlp
+- **PID:** 618892
+- **Health check:** /health OK
+- **Predict endpoint:** /predict devuelve 20 scores enteros (escala 0-8)
+- **Estado del código:** default sigue siendo e14
+- **Estado:** sin commit
+
+### andr (T4.2/T4.3)
+- **Funcionalidades:**
+  - recuadros multi-evento en vivo
+  - tarjeta "Eventos en el tiempo" con línea de tiempo por evento
+- **Comportamiento de llamadas antiguas:** sin segmentos muestran mensaje neutro (DetalleLlamadaDto no los incluye)
+- **Tests:** 453 en verde
+
+### fix (T4.3)
+- **Debounce:** 3 fotogramas para "manos juntas" (DebounceBinario)
+- **Color amarillo:** 0xFFFFD600
+- **Gramática:** "1 vez / N veces" (textoVeces)
+- **Recuadros en vivo:** cubren hasta 9 cajas
+- **Estado:** solo compilado, sin prueba en pantalla
+
+---
+
+## Problemas y pendientes
+
+1. **Integración git bloqueada**
+   - Motivo: permisos de sesión no interactiva
+   - Acción requerida: autorizar los comandos o ejecutar el paso 1 manualmente
+
+2. **Motor d35 fuera de servicio**
+   - Estado: relanzado con el modelo correcto (venv Linux vía WSL)
+   - Verificación: /health y /predict confirmados
+   - Modelo: divlara-d35-mlp
+
+3. **Endpoints /pruebas sin autenticación**
+   - Estado: pendiente antes de despliegue fuera de pruebas
+
+
+
+## Entrada 2026-11-24 15:49 -03
+
+# Bitácora Nocturna — DivLara
+
+**Resumen:** martes 24 nov 2026 | 15:49 -03
+
+---
+
+## ⏰ Hora de ejecución
+15:49 (hora del sistema)
+
+---
+
+## ✅ TAREAS COMPLETADAS
+
+- **Reentreno d36:** fases 1-10 completadas (datos/etiquetado, reentreno GPU en 6 eventos, calibración de umbrales, integración backend, rebuild Android v17, reviews, arreglos + v18, debounce v19, multi-cajas v20, tamaño v21)
+- **T5.4b:** Integración DEV + merge a main; T5.4 snapshot + rama actualizada con DEV
+- **T5.10:** review Antigravity backend + integración
+- **T5.7:** fix multipart 50MB + constante e14
+- **T5.2:** reviews Antigravity x3
+- **T3.13-T3.17:** BD local offline (Room) con revisor de texto libre sin IA, overlay de visión (marco + esqueleto MediaPipe), historial de llamadas en vivo, consentimiento único solo la primera vez, ventana de reporte post-llamada
+- **T4.1-T4.3:** modelo mlp_d35 -> divlara-d35-mlp en backend, recuadros multi-evento + línea de tiempo con colores, pulido v14
+- **E10:** pg_dump previo + migración 024 en DBentrevista
+- **Otros:** feedback personalizado (backend scoring + app UI), integración git dev+master y push de ambos proyectos, GPU motor d35 con EP CUDA en 3060 Ti + benchmark
+
+---
+
+## 📋 TAREAS PENDIENTES (ready)
+
+- E6-prep dataset R1+R2 para validar el revisor sin IA
+- T4.4 umbral recuadros en vivo 3.5
+- T4.5 app graba vídeo de prueba
+- T4.6 endpoint POST /pruebas/video
+- T4.7 umbrales por evento
+- T5.1 prueba en vivo (v16)
+- T5.3 plan de integración
+- T5.5 documentador nocturno
+- T5.6 calibrar umbrales con video
+- T5.8 archivos d35 faltantes + gitignore + commit
+- T5.9 backend persiste promedios y segmentos
+
+---
+
+## 🚫 BLOQUEADA
+
+- "Umbrales vivo v23: apagar arm_crossing (siempre activo) + torso_lean menos sensible"
+
+---
+
+## 🔍 HALLAZGOS TÉCNICOS
+
+**Umbrales en vivo:**
+- arm_crossing 3.0
+- table_rest 3.0
+- hand_to_face_adaptors 3.0
+- resto 3.5 (UMBRAL_CAJA_VIVA)
+- reporte 4.0 sin cambios
+
+**Tests y builds:**
+- 4 tests nuevos
+- BUILD SUCCESSFUL con testReleaseUnitTest y assembleReleaseLocal
+- versionCode 16, versionName 1.9.7
+- puerto 8093
+
+**Grabación de prueba:**
+- flag -PgrabarPrueba=true guarda mp4 sin audio en getExternalFilesDir/pruebas/
+- subida multipart a /pruebas/video con Ktor
+- 3 tests
+
+**Endpoint POST /pruebas/video:**
+- multipart, límite 200MB
+- validación de extensión
+- GET /pruebas disponible
+- pendiente proteger con authenticate antes de desplegar
+
+**Motor d35:**
+- relanzado con MODELO_VERSION=divlara-d35-mlp (PID 618892)
+- /health OK y /predict devuelve 20 scores enteros
+- 522 tests en verde
+
+**App Android:**
+- recuadros en vivo con nombre/valor/color
+- tarjeta "Eventos en el tiempo" con barra de tiempo por evento
+- 453 tests pasando
+
+**Fix:**
+- debounce de 3 fotogramas para "manos juntas" en segmentos del reporte
+- color amarillo
+- helper textoVeces(n)
+- tests nuevos
+
+**Plan integración DEV->main:**
+- rama feature + origin/DEV
+- resolver conflictos una vez (BD_PRUEBA.kt choque probable)
+- tag de respaldo
+- sin push
+
+**Snapshot:**
+- commits f8d6d86 (backend)
+- commits 7ddb558 (Android)
+- git status limpio en ambos
+
+---
+
+## ⚠️ PROBLEMAS Y BLOQUEOS
+
+**Fallo de integración:**
+- Los comandos git tag/fetch/switch/merge y gradlew quedaron bloqueados por permisos en una sesión no interactiva
+- El backend sigue en feature/llamada-vivo-d35 sin tag de respaldo y sin tocar main
+
+**Vencimiento de autenticación:**
+- Aviso de autenticación de Claude: la sesión vence entre el 29-nov y el 2-dic
+- hay que correr "claude auth login" antes de esa fecha
+
+**Logs con exit 255:**
+- Varios logs terminaron con exit 255 pese a reportar TAREA COMPLETADA
+- videob: "Timeout, server 192.168.0.181 not responding"
+- videob, d35, andr
+
+
+
+# Bitácora nocturna — 2026-11-24 17:01 (-03)
+
+## Hora
+Martes 24 de noviembre de 2026, 17:01 (-03).
+
+## Kanban (board divlara)
+
+- **Completadas recientes**
+  - T5.4b integración DEV + merge a main
+  - T5.7 fix multipart 50 MB + constante e14
+  - T5.10 reviews Antigravity
+  - Reentreno d36 fases 1–10 (etiquetado, reentreno GPU, calibración, integración backend, rebuild v17→v21, multi-cajas, sobrecarga)
+  - T4.1 modelo d35 en backend
+  - T4.2/T4.3 recuadros + pulido v14
+  - T3.13 BD offline (Room) + revisor sin IA
+  - T3.14–T3.17 overlay, historial de llamadas, consentimiento único, ventana de reporte
+  - Feedback personalizado
+  - GPU motor d35 con EP CUDA en la 3060 Ti
+  - T0.8 el video nunca sale del teléfono
+  - T0.9 eliminar cuenta conserva consentimiento (migración 024)
+  - E10 pg_dump + migración 024
+
+- **Ready**
+  - E6-prep dataset R1+R2
+  - T4.4 umbral recuadros 3.5
+  - T4.5 app graba vídeo
+  - T4.6 POST /pruebas/video
+  - T4.7 umbrales por evento
+  - T5.1 prueba en vivo
+  - T5.3 plan de integración
+  - T5.6 calibrar umbrales
+  - T5.8 archivos d35 faltantes + commit
+  - T5.9 backend persiste promedios y segmentos
+
+- **Bloqueadas (3)**
+  - T3.5 métricas de rendimiento
+  - T3.6 validación vivo vs offline
+  - Umbrales vivo v23 (apagar arm_crossing, torso_lean menos sensible)
+
+## Hallazgos técnicos
+
+- **d37**
+  - `divlara-d37-mlp` entrenado en CPU (12 semillas, ~3 min)
+  - `arm_crossing` AUC 0.974 con F1≥6 en vídeo de test (0.0 antes)
+  - Parity ONNX vs torch 0.0
+  - Desplegado en `models/divlara-d37-mlp`, motor con CUDA
+  - `/health` cargado:true
+  - 597 tests verdes
+  - Aviso: umbrales de la app (3.0/4.0) hay que subirlos a 6
+
+- **d35**
+  - Motor relanzado con `MODELO_VERSION=divlara-d35-mlp`
+  - `/predict` con 20 scores
+  - 522 tests
+
+- **d35files**
+  - Completados `MANIFIESTO.json` y `golden_features.json` de d35 (14 features de cara con `scaler.mean` de d35)
+  - Gitignore anclado a `/pruebas/` (dejaba ignorados 11 tests de src/test y 5 de motor-vision)
+
+- **fix500**
+  - Build rojo por los archivos de d35 faltantes → resuelto en d35files
+
+- **Reentreno d36 (fases 1–10)**
+  - 8 lotes etiquetados OK
+  - d36 val 87.21 vs d35 87.03
+  - `hand_to_face` no separable (AUC < 0.5, faltan datos o features de cara)
+  - Polaridad de mirada ≤2 = desvío
+  - La calibración baja los falsos positivos de mesa (88 s → 0) pero no arregla torso, brazos ni cara
+  - App v16→v21 con recuadros multi-evento, debounce por tiempo y multi-cajas
+  - 487 tests
+
+- **grabar/videob**
+  - flag `-PgrabarPrueba=true` graba mp4 sin audio y sube a `POST /pruebas/video` (límite 200 MB)
+  - Pendiente proteger con `authenticate`
+
+- **andr**
+  - Tarjeta «Eventos en el tiempo» con línea de tiempo por evento
+  - 453 tests
+
+- **integra**
+  - La sesión no interactiva bloqueó `git tag/fetch/switch/merge` (TAREA FALLIDA)
+  - integra2 logró luego el merge a main (46ff239 Android, 7da0fde backend) sin `git fetch` por credenciales
+
+## Infraestructura (solo lectura)
+
+- Docker en ai-pc:
+  - `Entrevista_APP` (healthy) y `Entrevista_Redis`, ambos Up 3 hours
+
+## Problemas resueltos
+
+- Build rojo por modelos d35 incompletos → completados MANIFIESTO y golden, tests en verde
+- Gitignore `pruebas/` que tragaba los tests `PRUEBAS/` → anclado a `/pruebas/`
+- Motor relanzado con schtasks e `iniciar_motor.bat`
+
+## Avisos y pendientes
+
+- Sesión de Claude vence entre el 29-nov y el 2-dic: correr `claude auth login`
+- Cola ready grande y 3 tareas bloqueadas. Sin commits ni cambios de código (solo lectura)
+
+---
+
+## 2026-11-24 18:10 (-03) — Bitácora nocturna (cron documentador)
+
+**Corte:** martes 24 de noviembre de 2026, 18:10 (-03).
+
+**Tablero `divlara`:**
+- **Completadas:** T5.2 reviews Antigravity x3 (backend/android/integración); T5.4 snapshot + rama con DEV; T5.4b integración DEV + merge a main; T5.7 fix multipart 50MB + constante e14; T5.10 reviews Antigravity; reentreno d36 (fases 1-10: datos/etiquetado, reentreno GPU en 6 eventos, calibración de umbrales, integración backend, rebuild Android v17, reviews, fix v18, debounce v19, multi-cajas, review, refresco v21); integración git dev+master con push; feedback personalizado (backend scoring + UI); GPU motor d35: EP CUDA en 3060 Ti + fallback CPU con benchmark.
+- **Ready:** T4.6 endpoint POST /pruebas/video; T4.7 umbrales por evento; T5.1 prueba en vivo con grabación (v16); T5.5 plan de integración; T5.6 calibrar umbrales con video; T5.8 archivos d35 + gitignore tests + commit; T5.9 backend persiste promedios y segmentos de /api/v1/llamadas.
+- **Bloqueada:** umbrales vivo v23 (apagar `arm_crossing`, `torso_lean` menos sensible).
+
+**Trabajo de la noche (logs):**
+- **Snapshot OK:** backend `feature/llamada-vivo-d35` (f8d6d86) y Android `feature/llamada-overlay-grabacion` (7ddb558); gitignore limpio; `git status` limpio en ambos; main intacto.
+- **Plan OK:** 9 archivos backend en conflicto potencial con `origin/DEV`; el duro es `BD_PRUEBA.kt` (ambos añaden parámetros a `SistemaPrueba`) y riesgo semántico con la constante `TipoProveedorIa.MIMO` en `when` exhaustivos. Orden: feature → traer `origin/DEV` → merge a main, con tag de respaldo y rollback.
+- **Integra bloqueado:** `git tag/fetch/switch/merge/gradlew` pidieron aprobación en sesión no interactiva → cero cambios; backend sigue en la rama feature.
+- **Videob (exit 255):** `POST /pruebas/video` (multipart .mp4, tope 200MB, nombre lo genera el servidor) y `GET /pruebas`, 3 tests verdes; falta proteger con `authenticate`; cierre con timeout hacia 192.168.0.181.
+- **Grabar OK:** flag `-PgrabarPrueba=true` guarda `prueba-<timestamp>.mp4` sin audio y lo sube al backend; build OK sin commit.
+- **Nivelar OK:** umbrales en vivo `arm_crossing` 3.0, `table_rest` 3.0, `hand_to_face_adaptors` 3.0, resto 3.5, reporte 4.0; 4 tests nuevos; BUILD SUCCESSFUL (versionCode 16, v1.9.7, puerto 8093).
+- **Android OK:** columna de recuadros de eventos en vivo + tarjeta "Eventos en el tiempo"; 453 tests verdes.
+- **Fix OK:** `DebounceBinario` de 3 fotogramas para "manos juntas", color amarillo `0xFFFFD600`, gramática "1 vez / N veces", tests en `EventosSegmentosTest.kt`.
+- **Motor:** relanzado en WSL con `MODELO_VERSION=divlara-d35-mlp` (522 tests verdes); ya desplegado `models/divlara-d37-mlp` vía `iniciar_motor.bat` + `schtasks` → `/health` cuda, 597 tests verdes.
+
+**Infraestructura:**
+- Docker/PostgreSQL caídos tras el reinicio del PC; levantados con `schtasks /run /tn ...` y los bats `iniciar_docker.bat` / `iniciar_backend.bat` / `iniciar_motor.bat`. Contenedor `Entrevista_APP` (postgres:16, puerto 5432, BD `DBentrevista`), motor 8094, backend 8093.
+- Respaldo `pg_dump -Fc -U root -d DBentrevista` validado con `pg_restore -l` (244 entradas TOC).
+- Aviso: `iniciar_motor.bat` con d35 puede dejar 8093, 8094 y `versionModelo` inconsistentes si no se reinicia el backend.
+
+
+---
+
+## Anexo nocturno - 2026-11-24 19:18 (-03)
+
+**Bitácora nocturna DivLara — noche 23→24 nov 2026 (recopilación: 24-nov 19:18, -03)**
+
+🔹 **Kanban board `divlara`**
+- Completadas: reentreno d36 fases 1–10 (datos, GPU en 6 eventos, calibración, integración, rebuild Android v17–v21, debounce, multi-cajas) + reviews; integración git DEV+main y push; feedback personalizado (backend scoring + app UI); GPU motor d35 (EP CUDA en 3060 Ti + fallback CPU); T5.4b merge DEV→main; T5.7 fix multipart 50 MB; T5.10 reviews Antigravity.
+- Listas (`ready`): T4.4 umbral recuadros 3.5, T4.5 app graba vídeo, T4.6 `POST /pruebas/video`, T4.7 umbrales por evento, T5.1 prueba en vivo v16, T5.3 plan de integración, T5.5 documentador nocturno (esta), T5.6 calibrar umbrales con vídeo, T5.8 archivos d35 + commit, T5.9 backend persiste promedios/segmentos, E6-prep dataset R1+R2.
+- Bloqueadas: T3.5 métricas de rendimiento, T3.6 validación vivo vs offline y "umbrales v23: apagar `arm_crossing` + `torso_lean`".
+
+🔹 **Avances por hora (logs `/tmp/claude_*`)**
+- 22-nov 21:41 · `d35`: motor relanzado con `MODELO_VERSION=divlara-d35-mlp`; `/health` OK y `/predict` con 20 scores enteros 0–8; 522 tests en verde. Sin commit.
+- 22-nov 21:41 · `andr`: recuadros multi-evento en vivo + tarjeta "Eventos en el tiempo" con barra de segmentos por evento; 453 tests.
+- 22-nov 22:47 · `fix`: debounce de 3 fotogramas para "manos juntas", gramática "1 vez / N veces", color amarillo, umbral por evento; tests nuevos.
+- 22-nov 23:41 · `grabar`: grabación de prueba con `-PgrabarPrueba=true` → subida multipart a `POST /pruebas/video`.
+- 22-nov 23:48 · `nivelar`: umbrales en vivo `arm_crossing`/`table_rest`/`hand_to_face` = 3.0, resto 3.5, reporte 4.0; `BUILD SUCCESSFUL` v1.9.7 (versionCode 16).
+- 23-nov 00:39 · `videob`: endpoints `POST/GET /pruebas` con validación de extensión y peso (200 MB), tests verdes; **no exigen `authenticate`** (pendiente proteger). Cierra con `Timeout, server 192.168.0.181 not responding` (exit 255) tras completar la tarea.
+- 23-nov 01:43 · `snap`: commits de respaldo en ramas feature (backend `f8d6d86`, Android `7ddb558`), `main` intacto.
+- 23-nov 01:45 · `plan`: plan de integración DEV→main, 9 archivos en conflicto (`BD_PRUEBA.kt` es el duro), orden feature→DEV→main, sin push.
+- 23-nov 01:51 · `integra`: **tarea fallida** — el entorno bloqueó `git tag`/`fetch`/`merge` por falta de aprobación interactiva; el backend quedó en `feature/llamada-vivo-d35`. Después T5.4b y `ca852b5a` sí cerraron la integración.
+- 23-nov 07:08–16:59 · reentreno **d36**: fases 1–10 completadas hasta APK v21.
+
+🔹 **Última noche (23→24 nov)**
+- 23-nov 23:47 · `umbrales2`: build v23 (`versionName 1.14.0`, APK 86 MB) exitoso; 6 tests quedaron desfasados por los umbrales nuevos.
+- 24-nov 02:59 · `tests`: esos 6 tests actualizados (`arm_crossing` activa desde 5.0, `torso_lean` exige `|v−4| ≥ 2`); `CLAUDE_EXIT=0`.
+- 24-nov 03:40 · `d37`: modelo **divlara-d37-mlp** entrenado (12 semillas, 60 s/semilla en CPU), parity ONNX↔torch con diferencia 0.0, desplegado y sirviendo con `cuda`; 597 tests en verde. Pendientes: subir umbrales de la app a 6 para el cruce de brazos; los frames estáticos no separan (AUC 0.50).
+
+🔹 **Problemas resueltos**
+- Tras el reinicio del PC quedaron caídos Docker y PostgreSQL; se levantaron con `schtasks` y los bats `iniciar_docker.bat`, `iniciar_backend.bat` e `iniciar_motor.bat`. Motor en 8094, backend en 8093 y panel DivLara en 8080 respondiendo.
+
+🔹 **Notas**: sin commits ni push, sin tocar código ni reiniciar servicios.
+
+
+---
+
+## Bitácora nocturna — 2026-11-24 20:27 (-03)
+
+# Bitácora nocturna — proyecto Entrevistas/DivLara
+
+## 20:27 — Estado inicial
+
+### Tareas del Kanban (board divlara)
+**Completadas (done):** 62 tareas
+- Reentreno d36 (Fase1 datos → Fase10 refresco, con reviews Antigravity)
+- snapshot + rama feature
+- integración DEV→main
+- fix multipart 50MB + constante e14
+- feedback personalizado (scoring + UI)
+- GPU motor d35 (CUDA en 3060 Ti + fallback CPU + benchmark)
+- migración 024 + pg_dump (T0.9/E10)
+- T3.13 BD local Room
+
+**Recientes en done:** T4.2 recuadros multi-evento + línea de tiempo, T4.3 pulido v14, T4.1 modelo d35 en backend, T5.4 snapshot, T5.4b merge a main, T5.7 fix multipart
+
+**Pendientes (ready):** E6-prep dataset R1+R2, T4.4 umbral recuadros vivo 3.5, T4.5 app graba vídeo, T4.6 endpoint POST /pruebas/video, T4.7 umbrales por evento, T5.1 prueba en vivo v16, T5.3 plan de integración, T5.5 documentador nocturno (OmniRoute), T5.6 calibrar umbrales, T5.8 archivos d35 faltantes + commit, T5.9 backend persiste promedios/segmentos
+
+**Bloqueadas:** T3.5 y T3.6 (métricas/validación R-2) y "Umbrales vivo v23" (apagar arm_crossing, torso_lean menos sensible)
+
+### Hallazgos y avances técnicos (logs /tmp/claude_*)
+
+- **snap:** snapshot limpio en ambos repos — backend f8d6d86 (rama feature/llamada-vivo-d35) y Android 7ddb558 (feature/llamada-overlay-grabación); .gitignore ampliado (opencode/, dumps/, APKs/); main intacto (70f4b6c / d033f82)
+
+- **plan:** análisis de conflictos con origin/DEV — 9 archivos en común; BD_PRUEBA.kt choca seguro (línea 179), CONTENEDOR_DEPENDENCIAS/CONFIGURACION_RUTAS/CONFIGURACION_GENERAL aditivos, 5 docs probable conflicto, riesgo semántico con la constante TipoProveedorIa.MIMO en when exhaustivos; estrategia: rama feature → traer DEV → merge a main, con tag de respaldo y rollback
+
+- **integra:** TAREA FALLIDA — el sandbox bloqueó git tag/fetch/switch/merge/gradlew por falta de aprobación interactiva; backend sigue en feature/llamada-vivo-d35 sin tocar main. Requiere liberar esos comandos o ejecutar el paso 1 a mano
+
+- **d35:** motor relanzado con MODELO_VERSION=divlara-d35-mlp en el puerto 8094; /health OK y /predict devolvió 20 scores enteros (escala 0-8) con golden_features.json; 522 tests en verde; e14 sigue como default en código
+
+- **nivelar:** umbrales por evento para recuadro en vivo — arm_crossing 3.0, table_rest 3.0, hand_to_face_adaptors 3.0, resto 3.5, reporte 4.0; 4 tests nuevos; BUILD SUCCESSFUL (v16, versionName 1.9.7, port 8093)
+
+- **grabar:** grabación de prueba en la app con flag -PgrabarPrueba=true, vídeo sin audio, subida multipart a POST /pruebas/video, avisos sin crash; 3 tests
+
+- **videob:** endpoints POST /pruebas/video (validación extensión, tope 200MB, nombre de servidor anti-path-traversal) y GET /pruebas; tests en verde; pendiente proteger con authenticate. Log cerró con "server 192.168.0.181 not responding" (exit 255) tras completar la tarea
+
+- **andr:** overlay multi-recuadros + tarjeta "Eventos en el tiempo" con línea de tiempo por evento; 453 tests pasando; llamadas viejas sin segmentos muestran mensaje neutro
+
+- **fix:** debounce de 3 fotogramas para "manos juntas" (DebounceBinario), gramática "1 vez/N veces", píldora que no tapa el recuadro; tests en EventosSegmentosTest
+
+### Problemas resueltos
+- **Inicio de sesión:** Tras el reinicio del PC quedaron caídos Docker/PostgreSQL y el backend; se levantaron con schtasks + los bats iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat, devolviendo los puertos 8093 (backend), 8094 (motor), 8080 (DivLara web) y 8789
+
+- **Motor d35:** Motor d35 re-lanzado a mano tras morir el proceso java del puerto 8094
+
+### Aviso de sesión
+La sesión de Claude avisa que el sign-in vence entre 2026-11-29 y 2026-12-02 (renovar con claude auth login antes para trabajos sin interacción)
+
+## 2026-11-24 21:34 -03 (documentación nocturna)
+
+**Información del Entrevistas/DivLara - 24/11/2026 21:34 UTC-3**
+
+*Resumen del tablero*
+- Tablero "divlara": ~76 tareas.
+- Completadas recientemente: reentreno d36 (10 fases), T5.4b, T5.7, T5.10, GPU d35 con fallback CPU.
+- Ready pendientes: E6-prep, T4.4 a T4.7, T5.1 a T5.9.
+- Bloqueadas: T3.5, T3.6 y ajustes de umbrales vivos.
+
+*Hallazgos técnicos*
+- Modelo d37: arm_crossing F1 80.0 en vídeo, 65.1 en vivo. Desplegado en /health, sin commit.
+- Motor d35: relanzado, fallback CPU, 522 tests verdes.
+- Umbrales: ajustados a 3.5 en vivo y mapa 3.0/3.5 por evento. Reduce ruido de mesa (88s → 0).
+- App Android: versiones v16-v23, overlay, multi-cajas, grabación de prueba.
+- Backend: endpoint /pruebas/video, borrado duro, migraciones 022-027.
+
+*Problemas resueltos*
+- Docker y Postgres reiniciados tras caída.
+- Integración resuelta con snapshots y merges manuales.
+- BUILD FAILED corregido (archivos d35, gitignore, tests rescatados).
+- Suite en verde (508/508).
+
+*Pendientes*
+- T5.5, T5.6, T5.8, T5.9 sin commit.
+- Subir umbral arm_crossing a 6 en app.
+- Configurar git fetch Android (sin credenciales).
+- Login de Claude CLI vence 29 nov-2 dic.
+
+*Detalle adicional (fuente: kanban + logs /tmp/claude_)*
+- Docker y PostgreSQL se levantaron con `schtasks` y los `.bat` `iniciar_docker.bat` / `iniciar_backend.bat` / `iniciar_motor.bat`.
+- Merges: Android `46ff239` a main; backend `7da0fde` sobre DEV; snapshots `f8d6d86` (backend) y `7ddb558` (Android).
+- d37: parity ONNX vs torch 0.0 en salida, 597 tests verdes, artefactos en `scratch/d37`.
+- d35files: gitignore anclado a `/pruebas/`, MANIFIESTO y golden de d35 regenerados, commit hecho.
+
+
+## [2026-11-24 22:42 -03]
+# Bitácora nocturna — DivLara
+
+## 24-nov-2026
+
+**Resumen general**
+- Kanban: 64 tareas completadas
+- Pendientes: 2 bloqueadas (T3.5, T3.6, "Umbrales vivo v23: apagar arm_crossing") + 11 en ready
+
+**Hallazgos técnicos por equipo**
+
+- **integra** (~20:00)
+  - Fallo por permisos: entorno bloqueó git tag/fetch/switch/merge en sesión no interactiva
+  - Backend en feature/llamada-vivo-d35 (f8d6d86), sin tag de respaldo, main intacto
+
+- **plan** (~21:00)
+  - Analizó conflictos con origin/DEV (9 archivos; BD_PRUEBA.kt choque duro; TipoProveedorIa.MIMO riesgo)
+  - Estrategia: feature → traer DEV → merge a main
+  - Android sin conflictos
+
+- **snap** (~21:30)
+  - Snapshot limpio: backend f8d6d86 y Android 7ddb558 en ramas feature; main sin mover (70f4b6c / d033f82)
+  - .gitignore ampliado (dumps/, APKs/); git status limpio en ambos
+
+- **nivelar** (~22:00)
+  - Umbrales: arm_crossing=3.0, table_rest=3.0, hand_to_face_adaptors=3.0, resto 3.5, reporte 4.0
+  - 4 tests nuevos; build verde v16 (versionName 1.9.7)
+
+- **grabar** (~21:30)
+  - App graba prueba con -PgrabarPrueba=true → mp4 sin audio, indicador rojo
+  - Subida multipart a /pruebas/video; 3 tests; build OK
+
+- **videob** (~22:10)
+  - Endpoint POST /pruebas/video + GET /pruebas validado (extensión/peso 200MB)
+  - 3 tests verdes; pendiente proteger rutas con authenticate
+  - Log terminó con timeout hacia 192.168.0.181 (exit 255) pero tarea completada
+
+- **d35** (~22:20)
+  - Motor relanzado con MODELO_VERSION=divlara-d35-mlp en puerto 8094
+  - /health OK y /predict devuelve 20 scores enteros; 522 tests verdes; default sigue en e14
+
+- **andr** (~21:45)
+  - UI multi-recuadros en vivo + tarjeta "Eventos en el tiempo" con línea de tiempo
+  - 453 tests OK
+
+- **fix** (~22:30)
+  - Debounce de 3 fotogramas para "manos juntas", color amarillo
+  - Corrección gramática "vez/veces", recuadros hasta 9; tests nuevos; build OK
+
+**Problemas resueltos**
+- Motor de inferencia d35 levantado tras reinicio
+- Snapshot/git preparado para la integración
+- Umbrales y grabación de prueba funcionando
+
+**Pendiente mañana**
+- Ejecutar T5.3, T5.8, T5.9
+- Proteger /pruebas/video
+- Desbloquear T3.5 y T3.6
+
+
+---
+
+## 2026-11-24 23:45 (-03) — Bitácora nocturna (cron)
+
+# Bitácora Nocturna - Proyecto DivLara
+
+**Hora:** mar 24 nov 2026 23:45 (-03)
+
+## Estado del Proyecto
+
+- **Kanban (board divlara):** ~60 tareas done
+- **Recién completadas:**
+  - T5.4b (integración DEV + merge a main)
+  - T5.7 (fix multipart 50MB + constante e14)
+  - T5.10 (reviews antigravity)
+  - reentreno d36 fases 1-4
+  - T4.1-T4.3
+  - T3.13-T3.17
+- **En ready:** E6-prep, T4.4, T4.5, T4.6, T4.7, T5.1, T5.3, T5.5, T5.6, T5.8, T5.9
+- **Bloqueadas:** T3.5 y T3.6
+
+## Hallazgos Técnicos
+
+- **claude_integra:** FALLÓ por bloqueo de git (git tag/fetch/switch/merge pidieron aprobación y la sesión no es interactiva). Backend sigue en feature/llamada-vivo-d35 (commit f8d6d86), sin tag de respaldo, sin merge a main. No se hizo ningún cambio.
+- **claude_plan:** plan de integración listo; 9 archivos en conflicto backend (BD_PRUEBA.kt seguro; CONTENEDOR_DEPENDENCIAS/CONFIGURACION_RUTAS/CONFIGURACION_GENERAL probablemente aditivos; 5 docs). Android sin conflictos. Orden: rama feature → traer origin/DEV → merge a main, con tag de respaldo y rollback. Riesgo semántico: constante TipoProveedorIa.MIMO en when exhaustivo.
+- **claude_snap:** snapshot OK. Backend commit f8d6d86 (rama feature/llamada-vivo-d35), Android 7ddb558 (feature/llamada-overlay-grabacion). git status limpio en ambos; main intacto (70f4b6c / d033f82). .gitignore ampliado (opencode/, dumps/, APKs/, *.apk); borrado archivo vacío =5.26.
+- **claude_nivelar:** umbrales en vivo arm_crossing=3.0, table_rest=3.0, hand_to_face_adaptors=3.0, resto=3.5, reporte=4.0. Nuevo UmbralesCajaVivaTest con 4 tests. BUILD SUCCESSFUL, versionCode 16, versionName 1.9.7.
+- **claude_grabar:** app graba prueba con flag -PgrabarPrueba=true → getExternalFilesDir/pruebas/prueba-<ts>.mp4 sin audio, indicador rojo, POST multipart a /pruebas/video al Detener. 3 tests. Build exitoso.
+- **claude_videob:** endpoint POST /pruebas/video (multipart, guardado en pruebas/, límite 200MB, validación ext .mp4) y GET /pruebas. 3 tests, gradlew test verde. Pendiente: las rutas no exigen sesión antes de despliegue. Al final: Timeout, server 192.168.0.181 not responding (EXIT=255).
+- **claude_d35:** 522 tests verdes. Motor relanzado con MODELO_VERSION=divlara-d35-mlp (PID 618892, puerto 8094); /health OK y /predict devuelve 20 scores enteros escala 0-8. e14 sigue como default. models/ untracked.
+- **claude_andr:** UI con recuadros multi-evento en vivo y tarjeta "Eventos en el tiempo" con línea de tiempo por evento; llamadas del servidor sin segmentos muestran mensaje neutro. Build OK, 453 tests.
+- **claude_fix:** debounce de 3 fotogramas para "manos juntas" (DebounceBinario), color amarillo 0xFFFFD600, gramática "1 vez / N veces", scroll para 9 recuadros. Tests en EventosSegmentosTest. Solo compila, sin prueba en pantalla.
+
+## Problemas Resueltos
+
+- Reinicio del PC dejó Docker/PostgreSQL caídos; se levantaron con schtasks y los bats iniciar_docker.bat / iniciar_backend.bat / iniciar_motor.bat (backend 8093, motor 8094, dashboard 8080, postgres).
+- Timeout final del servidor 192.168.0.181 en videob queda por investigar.
+
+## Restricciones
+
+- Prohibido en esta bitácora: commits, tocar código, reiniciar servicios.

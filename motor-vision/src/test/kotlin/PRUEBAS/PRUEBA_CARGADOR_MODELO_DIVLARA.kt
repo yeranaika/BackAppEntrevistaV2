@@ -7,11 +7,15 @@ import CONFIGURACION.ArtefactoModeloDivlara
 import CONFIGURACION.CANTIDAD_FEATURES_DIVLARA
 import CONFIGURACION.CargadorModeloDivlara
 import CONFIGURACION.DIRECTORIO_MODELOS_DIVLARA
+import CONFIGURACION.EP_CPU
+import CONFIGURACION.EP_CUDA
 import CONFIGURACION.ESCALA_MODELO_DIVLARA
 import CONFIGURACION.EstadoCargaModeloDivlara
 import CONFIGURACION.LectorArtefactoArchivoPreparado
 import CONFIGURACION.LectorArtefactoModeloDivlara
+import CONFIGURACION.LectorModeloOnnxDivlara
 import CONFIGURACION.VERSION_MODELO_DIVLARA
+import CONFIGURACION.resolverHabilitarGpu
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
@@ -249,6 +253,46 @@ class PruebaCargadorModeloDivlara {
                     "Paridad fuera de tolerancia en $variable: esperado=$esperado, real=$real, delta=$delta > ${golden.tolerancia}"
                 )
             }
+        }
+    }
+
+    @Test
+    fun `dispositivo CUDA inexistente cae de forma controlada a CPU sin romper la carga`() {
+        val goldenPath = Path.of(DIRECTORIO_MODELOS_DIVLARA, VERSION_MODELO_DIVLARA, "golden.json")
+        val golden = json.decodeFromString<GoldenDivlara>(Files.readString(goldenPath))
+
+        CargadorModeloDivlara(
+            lector = LectorModeloOnnxDivlara(dispositivoCuda = 999),
+            reloj = relojFijo
+        ).use { cargador ->
+            val estado = cargador.cargarSiDisponible()
+            assertEquals(EstadoCargaModeloDivlara.CARGADO, estado.estado, "Error en fallback CPU: ${estado.error}")
+            assertTrue(estado.cargado)
+            assertEquals(EP_CPU, cargador.proveedorEjecucion())
+            assertEquals(EP_CPU, estado.ep)
+
+            val resultado = cargador.predecir(golden.features)
+            assertEquals(golden.expected.keys, resultado.predicciones.keys)
+        }
+    }
+
+    @Test
+    fun `MODELO_DEVICE cpu desactiva GPU y resuelve EP cpu directamente`() {
+        assertTrue(resolverHabilitarGpu(null))
+        assertTrue(resolverHabilitarGpu(""))
+        assertTrue(resolverHabilitarGpu(EP_CUDA))
+        assertTrue(resolverHabilitarGpu("CUDA"))
+        assertFalse(resolverHabilitarGpu(EP_CPU))
+        assertFalse(resolverHabilitarGpu(" CPU "))
+
+        CargadorModeloDivlara(
+            lector = LectorModeloOnnxDivlara(habilitarGpu = false),
+            reloj = relojFijo
+        ).use { cargador ->
+            val estado = cargador.cargarSiDisponible()
+            assertEquals(EstadoCargaModeloDivlara.CARGADO, estado.estado)
+            assertEquals(EP_CPU, cargador.proveedorEjecucion())
+            assertEquals(EP_CPU, estado.ep)
         }
     }
 }

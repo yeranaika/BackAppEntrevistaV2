@@ -1,5 +1,6 @@
 package SERVICIOS
 
+import CONFIGURACION.AnalizadorManoCara
 import CONFIGURACION.CANTIDAD_FEATURES_DIVLARA
 import CONFIGURACION.ExtractorFeaturesDivlara
 import CONFIGURACION.MotorInferenciaDivlara
@@ -33,7 +34,12 @@ class ServicioVision(
         // Si solo llega pose33 sin iris/cara, las columnas ausentes se imputan con scaler.mean (igual que live.py).
         val mediasFallback = motor.mediasScaler()?.takeIf { it.size == CANTIDAD_FEATURES_DIVLARA }
         val vector = extractor.extraerVector(ventana, mediasFallback = mediasFallback)
-        return predecir(vector.toList())
+        val detalleManoCara = AnalizadorManoCara.analizar(ventana)
+        return predecir(vector.toList()).copy(
+            manoCaraUna = detalleManoCara.manoCaraUna,
+            manoCaraDos = detalleManoCara.manoCaraDos,
+            manoCaraConteo = detalleManoCara.manoCaraConteo
+        )
     }
 
     fun predecir(features: List<Double>): ResultadoPrediccionDivlara {
