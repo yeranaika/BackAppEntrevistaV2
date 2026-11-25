@@ -1,6 +1,6 @@
 # Backend EntrevistaAPP (Ktor) para Railway, con Tailscale en modo userspace (D49).
-# Reemplaza a RailPack: mismo artefacto de antes (gradlew installDist -> build/install/ktor-sample)
-# porque el log del contenedor ya apuntaba a /app/build/install/ktor-sample.
+# Build: gradlew installDist (JDK21). Runtime: JRE21; el binario queda en
+# /app/install/bin/ktor-sample y lo arranca /app/start.sh via ENTRYPOINT.
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /src
 COPY gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties ./
