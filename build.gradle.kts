@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.JavaExec
+import java.io.File
+import java.util.Properties
 
 plugins {
     application
@@ -107,4 +109,26 @@ dependencies {
     // Contrato, errores y validación de visión compartidos con el motor. El modelo ONNX NO se carga aquí: lo hace
     // :motor-vision (otro proceso) y el backend lo consulta por HTTP (MOTOR_ENDPOINT).
     implementation(project(":nucleo-vision"))
+}
+
+tasks.test {
+    val archivo = rootProject.file("local.properties")
+    if (archivo.isFile) {
+        val props = Properties().apply { archivo.inputStream().use { load(it) } }
+        props.getProperty("motor.cuda.visible.devices")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            environment("CUDA_VISIBLE_DEVICES", it)
+        }
+        props.getProperty("motor.cuda.device.id")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            environment("ONNX_CUDA_DEVICE_ID", it)
+        }
+        props.getProperty("motor.onnx.dll.dir")?.trim()?.takeIf { it.isNotEmpty() }?.let { dir ->
+            val pathActual = System.getenv("PATH") ?: ""
+            val nuevoPath = if (pathActual.contains(dir, ignoreCase = true)) {
+                pathActual
+            } else {
+                "$dir${File.pathSeparator}$pathActual"
+            }
+            environment("PATH", nuevoPath)
+        }
+    }
 }

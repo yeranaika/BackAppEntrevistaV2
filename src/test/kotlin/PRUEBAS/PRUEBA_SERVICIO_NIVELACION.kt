@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -75,6 +76,64 @@ class PruebaServicioNivelacion {
         assertEquals(s, CalculadoraNivel.nivelLogrado(mapOf(j to listOf(80.0), m to listOf(60.0), s to listOf(90.0))))
         assertEquals(1, CalculadoraNivel.brecha(j, m))
         assertEquals(0, CalculadoraNivel.brecha(s, m))
+    }
+
+    @Test
+    fun `sin evidencia de junior no alcanza el minimo y la brecha cuenta un nivel mas (D42)`() {
+        val j = NivelExperiencia.JUNIOR
+        val m = NivelExperiencia.SEMISENIOR
+        val s = NivelExperiencia.SENIOR
+        assertTrue(CalculadoraNivel.alcanzaNivelMinimo(mapOf(j to listOf(60.0))), "llegar justo al umbral basta")
+        assertTrue(CalculadoraNivel.alcanzaNivelMinimo(mapOf(m to listOf(80.0))), "aprobar un nivel más difícil también es evidencia")
+        assertTrue(CalculadoraNivel.alcanzaNivelMinimo(mapOf(j to listOf(0.0), m to listOf(100.0))))
+        assertFalse(CalculadoraNivel.alcanzaNivelMinimo(mapOf(j to listOf(50.0), m to listOf(10.0), s to listOf(0.0))))
+        assertFalse(CalculadoraNivel.alcanzaNivelMinimo(mapOf(m to listOf(7.0))), "el caso de producción: solo semisenior y mal")
+        assertFalse(CalculadoraNivel.alcanzaNivelMinimo(mapOf(j to emptyList())))
+        assertFalse(CalculadoraNivel.alcanzaNivelMinimo(emptyMap()))
+
+        assertEquals(0, CalculadoraNivel.brecha(j, j))
+        assertEquals(1, CalculadoraNivel.brecha(j, j, alcanzaMinimo = false), "no cumple un cargo junior")
+        assertEquals(2, CalculadoraNivel.brecha(j, m, alcanzaMinimo = false))
+        assertEquals(3, CalculadoraNivel.brecha(j, s, alcanzaMinimo = false))
+    }
+
+    @Test
+    fun `quien responde todo mal no cumple ninguna skill, tampoco las que piden junior (D42)`() {
+        sembrarBanco()
+        val (_, resultado) = responderHasta(iniciar(), emptySet())
+
+        assertNotNull(resultado)
+        assertEquals(NivelExperiencia.JUNIOR, resultado.nivelGlobal, "se guarda el mínimo")
+        assertTrue(resultado.skillsOk.isEmpty(), "nadie 'ya cumple' con cero")
+        val porNombre = resultado.skillsBrecha.associateBy { it.nombre }
+        val compose = porNombre.getValue("Jetpack Compose")
+        assertEquals("junior", compose.nivelActual)
+        assertEquals("junior", compose.nivelRequerido)
+        assertEquals(1, compose.brecha)
+        assertEquals("media", compose.prioridad, "no es obligatoria")
+        val kotlinSkill = porNombre.getValue("Kotlin")
+        assertEquals(2, kotlinSkill.brecha, "le falta junior y además semisenior")
+        assertEquals("alta", kotlinSkill.prioridad)
+        assertEquals(listOf("Kotlin", "Jetpack Compose"), resultado.skillsBrecha.map { it.nombre }, "primero la de prioridad alta")
+        assertTrue(resultado.resumen!!.startsWith("Todavía no alcanzas el nivel Junior"), resultado.resumen)
+        assertFalse(resultado.resumen!!.contains("Tu nivel actual es"))
+        assertTrue(resultado.resumen!!.contains("Kotlin"))
+    }
+
+    @Test
+    fun `una skill que solo tuvo preguntas semisenior y las fallo no cumple el junior que pide el cargo (D42)`() {
+        // Como Testing y QA en producción: 7/100 con dos preguntas semisenior y el cargo pedía junior.
+        NivelExperiencia.entries.forEach { nivel ->
+            repeat(2) { sistema.sembrarPregunta(nivel = nivel, skillId = kotlin) }
+            sistema.sembrarPregunta(nivel = nivel, skillId = if (nivel == NivelExperiencia.SEMISENIOR) compose else kotlin)
+        }
+        val (_, resultado) = responderHasta(iniciar(), setOf(NivelExperiencia.JUNIOR))
+
+        val compose = resultado!!.skillsBrecha.single { it.nombre == "Jetpack Compose" }
+        assertEquals(1, compose.brecha)
+        assertTrue(resultado.skillsOk.none { it.nombre == "Jetpack Compose" })
+        assertEquals(1, resultado.skillsBrecha.single { it.nombre == "Kotlin" }.brecha, "Kotlin sí demostró junior: le falta solo semisenior")
+        assertTrue(resultado.resumen!!.startsWith("Tu nivel actual es Junior"), "en el test completo sí demostró junior")
     }
 
     @Test

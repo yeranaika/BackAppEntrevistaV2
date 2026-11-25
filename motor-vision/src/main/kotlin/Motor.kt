@@ -21,7 +21,12 @@ fun Application.moduloMotor() {
     val version = System.getenv("MODELO_VERSION")?.takeIf { it.isNotBlank() } ?: VERSION_MODELO_DIVLARA
     val cargador = CargadorModeloDivlara(version = version, directorioBase = Path.of(directorio))
     val estado = cargador.cargarSiDisponible()
-    log.info("Motor de visión: modelo {} -> {}", version, estado.estado)
+    log.info(
+        "Motor de visión: modelo {} -> {} (EP={})",
+        version,
+        estado.estado,
+        cargador.proveedorEjecucion() ?: "ninguno"
+    )
     monitor.subscribe(ApplicationStopped) { cargador.close() }
 
     configurarSerializacionMotor()

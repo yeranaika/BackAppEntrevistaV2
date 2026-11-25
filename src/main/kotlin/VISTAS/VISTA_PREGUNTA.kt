@@ -7,7 +7,14 @@ import ESQUEMAS.RespuestaPregunta
 import ESQUEMAS.RespuestaPreguntaGenerada
 import ESQUEMAS.RespuestaPreguntaPublica
 import ESQUEMAS.RespuestaPreguntaRevisable
+import ESQUEMAS.RespuestaGrupoSimilares
+import ESQUEMAS.RespuestaPreguntaDescartada
+import ESQUEMAS.RespuestaPreguntaEnGrupo
+import ESQUEMAS.RespuestaPreguntaSimilar
 import MODELOS.EstadoPregunta
+import MODELOS.GrupoPreguntasSimilares
+import MODELOS.PreguntaSimilar
+import SERVICIOS.PreguntaDescartada
 import MODELOS.PaginaPreguntas
 import MODELOS.Pregunta
 import ESQUEMAS.RespuestaContextoMercado
@@ -32,7 +39,16 @@ fun Pregunta.aRespuestaAdmin() = RespuestaPregunta(
     motivoRechazo = motivoRechazo,
     vecesUsada = vecesUsada,
     fechaCreacion = fechaCreacion.toString(),
-    opciones = opciones.map { RespuestaOpcion(it.id.toString(), it.texto, it.esCorrecta, it.explicacion, it.orden) }
+    opciones = opciones.map { RespuestaOpcion(it.id.toString(), it.texto, it.esCorrecta, it.explicacion, it.orden) },
+    similares = emptyList()
+)
+
+fun PreguntaSimilar.aRespuesta() = RespuestaPreguntaSimilar(id?.toString(), enunciado, estado?.valorBd, similitud)
+
+fun PreguntaDescartada.aRespuesta() = RespuestaPreguntaDescartada(enunciado, similar.aRespuesta())
+
+fun GrupoPreguntasSimilares.aRespuesta() = RespuestaGrupoSimilares(
+    preguntas.map { RespuestaPreguntaEnGrupo(it.id.toString(), it.enunciado, it.estado.valorBd, it.vecesUsada) }, similitudMaxima
 )
 
 fun PaginaPreguntas.aRespuesta() = RespuestaPaginaPreguntas(

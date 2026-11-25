@@ -111,7 +111,14 @@ class PruebaVisionDesacoplada {
                                 setBody(payload)
                             }
                             assertEquals(HttpStatusCode.OK, respuesta.status, "$etiqueta: ${respuesta.bodyAsText()}")
-                            verificar(respuesta.bodyAsText(), esperado, tolerancia)
+                            val cuerpo = respuesta.bodyAsText()
+                            verificar(cuerpo, esperado, tolerancia)
+                            val obj = json.parseToJsonElement(cuerpo).jsonObject
+                            if (etiqueta == "ventana") {
+                                assertNotNull(obj["mano_cara_una"], "La ventana P-1 debe incluir mano_cara_una")
+                                assertNotNull(obj["mano_cara_dos"], "La ventana P-1 debe incluir mano_cara_dos")
+                                assertNotNull(obj["mano_cara_conteo"], "La ventana P-1 debe incluir mano_cara_conteo")
+                            }
                         }
                     }
                 }

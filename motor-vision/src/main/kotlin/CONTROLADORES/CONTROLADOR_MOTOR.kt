@@ -14,12 +14,16 @@ import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data class RespuestaSaludMotor(val status: String, val modeloDivlara: EstadoModeloDivlaraSalud)
+private data class RespuestaSaludMotor(
+    val status: String,
+    val ep: String? = null,
+    val modeloDivlara: EstadoModeloDivlaraSalud
+)
 
 /**
  * API del motor (sin sesión: es un servicio interno, no debe quedar expuesto a internet):
  * POST /predict  mismo cuerpo que `/api/v1/vision/predecir` de la app → `{versionModelo, predicciones, escala}`
- * GET  /health   estado del modelo cargado
+ * GET  /health   estado del modelo cargado y proveedor de ejecución activo (`ep`: `"cuda"` | `"cpu"`)
  */
 fun Route.controladorMotor(servicio: ServicioVision, modelo: ProveedorEstadoModeloDivlara) {
     post("/predict") {
@@ -33,6 +37,7 @@ fun Route.controladorMotor(servicio: ServicioVision, modelo: ProveedorEstadoMode
         call.respond(
             RespuestaSaludMotor(
                 status = "OK",
+                ep = estado.ep,
                 modeloDivlara = EstadoModeloDivlaraSalud(estado.version, estado.cargado, estado.error)
             )
         )

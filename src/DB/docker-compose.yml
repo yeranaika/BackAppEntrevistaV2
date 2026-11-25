@@ -18,6 +18,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./BasedeDatos.EntrevistaApp.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
       - ./BasedeDatos.EntrevistaApp.Seeds.sql:/docker-entrypoint-initdb.d/002-seeds.sql:ro
+      - ./BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql:/docker-entrypoint-initdb.d/003-seeds-areas-ti.sql:ro
 
   redis:
     image: redis:7-alpine

@@ -1,0 +1,7 @@
+{
+  "tol": 0.0001,
+  "max_diff_salida": 0.0,
+  "max_diff_prerround": 1.9073486328125e-06,
+  "n_filas": 626,
+  "test_macro_onnx": 86.23931623931624
+}

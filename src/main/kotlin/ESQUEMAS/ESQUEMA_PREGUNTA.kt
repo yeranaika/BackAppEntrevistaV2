@@ -57,8 +57,38 @@ data class RespuestaPregunta(
     val motivoRechazo: String?,
     val vecesUsada: Int,
     val fechaCreacion: String,
-    val opciones: List<RespuestaOpcion>
+    val opciones: List<RespuestaOpcion>,
+    /** Preguntas del banco parecidas a esta (D37). Solo se llena al crear, editar y aprobar; en lo demás va vacía. */
+    val similares: List<RespuestaPreguntaSimilar>
 )
+
+/** [id] y [estado] son null cuando lo parecido es otra pregunta del mismo lote, que aún no está en el banco. */
+@Serializable
+data class RespuestaPreguntaSimilar(
+    val id: String?,
+    val enunciado: String,
+    val estado: String?,
+    val similitud: Double
+)
+
+@Serializable
+data class RespuestaPreguntaDescartada(
+    val enunciado: String,
+    @SerialName("similar_a") val similarA: RespuestaPreguntaSimilar
+)
+
+@Serializable
+data class RespuestaSimilaresDePregunta(
+    @SerialName("pregunta_id") val preguntaId: String,
+    val umbral: Double,
+    val similares: List<RespuestaPreguntaSimilar>
+)
+
+@Serializable
+data class RespuestaPreguntaEnGrupo(val id: String, val enunciado: String, val estado: String, val vecesUsada: Int)
+
+@Serializable
+data class RespuestaGrupoSimilares(val preguntas: List<RespuestaPreguntaEnGrupo>, val similitudMaxima: Double)
 
 @Serializable
 data class RespuestaPaginaPreguntas(
@@ -147,7 +177,10 @@ data class RespuestaContextoMercado(
 data class RespuestaGenerarPreguntas(
     @SerialName("preguntas_generadas") val preguntasGeneradas: Int,
     @SerialName("preguntas_con_error") val preguntasConError: Int,
+    /** Válidas pero no guardadas por parecerse a otra del banco o del mismo lote (D37); se cobraron igual. */
+    @SerialName("preguntas_descartadas") val preguntasDescartadas: Int,
     val preguntas: List<RespuestaPreguntaGenerada>,
+    val descartadas: List<RespuestaPreguntaDescartada>,
     @SerialName("contexto_mercado") val contextoMercado: RespuestaContextoMercado? = null
 )
 

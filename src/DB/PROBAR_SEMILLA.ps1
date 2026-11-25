@@ -1,4 +1,4 @@
-﻿# Comprueba que la semilla se puede correr varias veces sin duplicar preguntas ni opciones.
+﻿# Comprueba que la semilla (y la de áreas TI, D44) se puede correr varias veces sin duplicar preguntas ni opciones.
 # Usa una BD desechable (semilla_prueba) que crea y borra; no toca DBentrevista.
 #
 # Uso (PostgreSQL local o portátil, con PGUSER y PGPASSWORD definidos):
@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
 $aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
 $esquema = Join-Path $aqui "BasedeDatos.EntrevistaApp.sql"
 $semilla = Join-Path $aqui "BasedeDatos.EntrevistaApp.Seeds.sql"
+$semillaAreasTi = Join-Path $aqui "BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql"
 $migracion028 = Join-Path (Split-Path -Parent (Split-Path -Parent $aqui)) "migrations\028_modelo_vision_semilla_sin_expresiones.sql"
 $migracion029 = Join-Path (Split-Path -Parent (Split-Path -Parent $aqui)) "migrations\029_plazo_consentimiento_cuenta_eliminada.sql"
 $env:PGPORT = "$Puerto"
@@ -82,6 +83,19 @@ try {
     Sql $migracion029
     Esperar "la 029 deja la cuenta eliminada sin IP, cerrada y con fecha" (Valor "select coalesce(ip_origen, 'sin-ip') || ' ' || (fecha_revocado is not null)::text || ' ' || (cuenta_eliminada_en is not null)::text || ' ' || retencion_legal::text from consentimiento where identidad_ref = 'borrada@prueba.cl'") "sin-ip true true false"
     Esperar "la 029 no toca una cuenta activa" (Valor "select ip_origen || ' ' || (fecha_revocado is null)::text || ' ' || (cuenta_eliminada_en is null)::text from consentimiento where ip_origen = '10.0.0.2'") "10.0.0.2 true true"
+
+    # Áreas TI (D44): va después de la semilla base y se puede correr dos veces sin duplicar.
+    # Sin tildes en las consultas: PowerShell 5.1 no pasa UTF-8 a psql -c. Las 13 skills nuevas se reconocen por su área.
+    $nuevas = "(s.tipo_area in ('qa','seguridad','diseno','soporte','cloud') or s.nombre like 'Power BI%' or s.nombre like 'Excel para%')"
+    $conteoAreas = "select (select count(*) from skill s where $nuevas) || '/' || (select count(*) from cargo where area in ('qa','seguridad','diseno','soporte','cloud') or nombre in ('Analista de Datos Junior','Analista BI SemiSenior')) || '/' || (select count(*) from pregunta p join skill s using (skill_id) where $nuevas) || '/' || (select count(*) from opcion_pregunta o join pregunta p using (pregunta_id) join skill s using (skill_id) where $nuevas)"
+    Sql $semillaAreasTi
+    Esperar "áreas TI: skills/cargos/preguntas/opciones" (Valor $conteoAreas) "13/12/234/468"
+    Esperar "áreas TI: relaciones cargo-skill" (Valor "select count(*) from cargo_skill cs join cargo c using (cargo_id) where c.area in ('qa','seguridad','diseno','soporte','cloud') or c.nombre in ('Analista de Datos Junior','Analista BI SemiSenior')") "69"
+    Sql $semillaAreasTi
+    Esperar "áreas TI: segunda corrida no duplica" (Valor $conteoAreas) "13/12/234/468"
+    Esperar "áreas TI: 6 aprobadas por skill y nivel (3 de opción múltiple)" (Valor "select count(*) from (select s.nombre, p.nivel_dificultad from pregunta p join skill s using (skill_id) where $nuevas and p.estado = 'aprobada' and p.cargo_id is null group by 1, 2 having count(*) = 6 and count(*) filter (where p.tipo_pregunta = 'opcion_multiple') = 3) d") "39"
+    Esperar "áreas TI: cada alternativa con 4 opciones y 1 correcta" (Valor "select count(*) from pregunta p join skill s using (skill_id) where $nuevas and p.tipo_pregunta = 'opcion_multiple' and (select count(*) from opcion_pregunta o where o.pregunta_id = p.pregunta_id) = 4 and (select count(*) from opcion_pregunta o where o.pregunta_id = p.pregunta_id and o.es_correcta) = 1") "117"
+    Esperar "áreas TI: abiertas con pasos y rúbrica completa" (Valor "select count(*) from pregunta p join skill s using (skill_id) where $nuevas and p.tipo_pregunta = 'abierta_texto' and p.respuesta_ideal like '% 1) % 2) % 3) %' and p.rubrica_evaluacion->>'metodo' = 'TECNICA' and jsonb_array_length(p.rubrica_evaluacion->'palabras_clave') >= 3 and p.rubrica_evaluacion->'feedback_generico' ?& array['correcto','medio','malo']") "117"
 }
 finally {
     & "$Bin\dropdb.exe" --if-exists --force $Bd

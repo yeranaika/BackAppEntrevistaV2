@@ -3,6 +3,7 @@ package MODELOS
 import UTILIDADES.transaccion
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -42,6 +43,20 @@ interface RepositorioGeneracionPreguntaIa : LectorUsosGeneracionIa {
     /** Guarda las preguntas (estado pendiente) con su trazabilidad, todo o nada. */
     suspend fun guardarLote(traza: TrazaGeneracion, preguntas: List<PreguntaGenerada>): List<IdsGenerados>
 
+    /** Preguntas del banco con las que se compara antes de generar (para pedirle a la IA que no las repita). */
+    suspend fun existentesParaComparar(alcance: AlcanceComparacion): List<PreguntaExistente> = emptyList()
+
+    /**
+     * Igual que [guardarLote], pero no guarda las preguntas que se parecen a otras del [alcance]. [separar] recibe lo que hay
+     * en el banco y devuelve, por pregunta del lote, con qué se parece (null = se guarda). Sin implementación propia no filtra.
+     */
+    suspend fun guardarLoteSinSimilares(
+        traza: TrazaGeneracion,
+        preguntas: List<PreguntaGenerada>,
+        alcance: AlcanceComparacion,
+        separar: (List<PreguntaExistente>) -> List<PreguntaSimilar?>
+    ): LoteGuardado = LoteGuardado(guardarLote(traza, preguntas), emptyList())
+
     /** Registra una llamada cuyo resultado no se pudo usar (para auditar costo y fallas). */
     suspend fun registrarFallo(traza: TrazaGeneracion)
 }
@@ -49,9 +64,12 @@ interface RepositorioGeneracionPreguntaIa : LectorUsosGeneracionIa {
 class RepositorioGeneracionPreguntaIaExposed : RepositorioGeneracionPreguntaIa {
 
     override suspend fun guardarLote(traza: TrazaGeneracion, preguntas: List<PreguntaGenerada>): List<IdsGenerados> =
-        transaccion {
+        transaccion { insertarLote(traza, preguntas) }
+
+    /** Debe llamarse dentro de una transacción. */
+    private fun insertarLote(traza: TrazaGeneracion, preguntas: List<PreguntaGenerada>): List<IdsGenerados> {
             val ahora = OffsetDateTime.now()
-            preguntas.map { generada ->
+            return preguntas.map { generada ->
                 val ids = IdsGenerados(UUID.randomUUID(), UUID.randomUUID())
                 insertarPreguntaConOpciones(ids.preguntaId, generada.contenido, EstadoPregunta.PENDIENTE, esGeneradaPorIa = true, ahora)
                 TablaGeneracionPreguntaIa.insert {
@@ -68,6 +86,27 @@ class RepositorioGeneracionPreguntaIaExposed : RepositorioGeneracionPreguntaIa {
                 ids
             }
         }
+
+    override suspend fun existentesParaComparar(alcance: AlcanceComparacion): List<PreguntaExistente> =
+        transaccion { leerExistentesParaComparar(alcance) }
+
+    override suspend fun guardarLoteSinSimilares(
+        traza: TrazaGeneracion,
+        preguntas: List<PreguntaGenerada>,
+        alcance: AlcanceComparacion,
+        separar: (List<PreguntaExistente>) -> List<PreguntaSimilar?>
+    ): LoteGuardado = transaccion {
+        // Dos generaciones del mismo alcance a la vez no pueden leer el banco antes de que la otra guarde.
+        val llave = "pregunta|${alcance.skillId}|${alcance.cargoId}|${alcance.nivel.valorBd}|${alcance.tipo.valorBd}|${alcance.categoria.valorBd}"
+        // shortcut: el candado es de Postgres; H2 (pruebas) no lo tiene y ahí no hay concurrencia real.
+        if (TransactionManager.current().db.vendor == "postgresql") {
+            TransactionManager.current().exec("SELECT pg_advisory_xact_lock(hashtext('$llave'))")
+        }
+        val coincidencias = separar(leerExistentesParaComparar(alcance))
+        val descartadas = coincidencias.mapIndexedNotNull { i, c -> c?.let { DescartadaPorSimilar(i, it) } }
+        val nuevas = preguntas.filterIndexed { i, _ -> coincidencias[i] == null }
+        LoteGuardado(insertarLote(traza, nuevas), descartadas)
+    }
 
     override suspend fun registrarFallo(traza: TrazaGeneracion) {
         transaccion {

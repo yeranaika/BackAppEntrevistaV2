@@ -15,7 +15,8 @@ data class EstadoModeloDivlara(
     val cargado: Boolean,
     val tamanoBytes: Long? = null,
     val fechaCarga: Instant? = null,
-    val error: String? = null
+    val error: String? = null,
+    val ep: String? = null
 ) {
     companion object {
         fun noDisponible(version: String = VERSION_MODELO_DIVLARA) = EstadoModeloDivlara(
@@ -26,11 +27,14 @@ data class EstadoModeloDivlara(
     }
 }
 
-/** Resultado de una inferencia ejecutada por el modelo DivLara (escala `0-8`). */
+/** Resultado de una inferencia ejecutada por el modelo DivLara (escala `0-8`), con desagregación opcional de mano-cara. */
 data class ResultadoPrediccionDivlara(
     val versionModelo: String,
     val predicciones: Map<String, Double>,
-    val escala: String = ESCALA_MODELO_DIVLARA
+    val escala: String = ESCALA_MODELO_DIVLARA,
+    val manoCaraUna: Double? = null,
+    val manoCaraDos: Double? = null,
+    val manoCaraConteo: Int? = null
 )
 
 /** Contrato desacoplado de inferencia sobre las 343 features (lo implementa el motor con ONNX Runtime). */

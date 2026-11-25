@@ -623,6 +623,8 @@ Administración (solo admin) y lectura para usuarios.
 | `POST` | `/api/v1/admin/preguntas` | Admin | Crear pregunta de comportamiento (admin) |
 | `GET` | `/api/v1/admin/preguntas` | Admin | Listar preguntas (admin) |
 | `GET` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Ver pregunta (admin) |
+| `GET` | `/api/v1/admin/preguntas/{{preguntaId}}/similares` | Admin | Preguntas parecidas a una (admin) |
+| `GET` | `/api/v1/admin/preguntas/duplicadas` | Admin | Posibles preguntas duplicadas (admin) |
 | `PATCH` | `/api/v1/admin/preguntas/{{preguntaId}}/aprobar` | Admin | Aprobar pregunta (admin) |
 | `PUT` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Editar pregunta (admin) |
 | `DELETE` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Borrar pregunta (admin) |
@@ -736,9 +738,23 @@ Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del carg
 
 `GET /api/v1/admin/preguntas/{{preguntaId}}` · Admin · responde `200`
 
+### Preguntas parecidas a una (admin)
+
+`GET /api/v1/admin/preguntas/{{preguntaId}}/similares?umbral=0.8` · Admin · responde `200`
+
+D37. Aprobadas y pendientes del mismo skill (o cargo), tipo, categoría y nivel cuyo enunciado se parece a esta pregunta, de mayor a menor (`similitud` 0 a 1, hasta 5). `umbral` 0.5 a 1 (por defecto `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80); `400 umbral_invalido`. Solo mide palabras compartidas: una paráfrasis con otro vocabulario no aparece. No llama al LLM.
+
+### Posibles preguntas duplicadas (admin)
+
+`GET /api/v1/admin/preguntas/duplicadas?cargoId={{cargoId}}&nivel=junior&tipo=abierta_texto&categoria=tecnica&umbral=0.8` · Admin · responde `200`
+
+D37. Grupos de preguntas parecidas entre sí dentro de un alcance (hasta las 200 más recientes). Exige `skillId` o `cargoId` más `nivel`, `tipo` y `categoria` (`400` si falta alguno) para no cruzar todo el banco. Cada grupo trae `preguntas` (`id`, `enunciado`, `estado`, `vecesUsada`) y `similitudMaxima`. Para dejar una, `PATCH .../rechazar` con `motivo: "duplicada"` (la usada no se puede borrar).
+
 ### Aprobar pregunta (admin)
 
 `PATCH /api/v1/admin/preguntas/{{preguntaId}}/aprobar` · Admin · responde `200`
+
+D37: la respuesta de crear, editar y aprobar trae `similares` (mismo formato que `/similares`, vacío si no hay): solo avisa, nunca bloquea. En el resto de las rutas `similares` va vacío.
 
 ### Editar pregunta (admin)
 
@@ -787,7 +803,7 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
 
 `POST /api/v1/admin/preguntas/generar-ia` · Admin · responde `200`
 
-⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).
+⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron). D37: las que se parecen (palabras compartidas >= `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80; `0` lo apaga) a una aprobada o pendiente del mismo skill/cargo, tipo, categoría y nivel, o a otra del mismo lote, no se guardan: vienen en `descartadas` (`enunciado` y `similar_a` con `id`, `enunciado`, `estado`, `similitud`) y se cuentan en `preguntas_descartadas`; se cobran igual. Si todas se descartan responde `200` con `preguntas: []` en vez de `201`. El prompt lleva hasta 30 enunciados existentes para que la IA no los repita.
 
 ```json
 {
@@ -927,7 +943,7 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
 
 `POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `403`, `503`
 
-El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }` (en modo P-1 con `frames` agrega además los campos opcionales `mano_cara_una`, `mano_cara_dos` en `[0.0, 1.0]` y `mano_cara_conteo` en `0|1|2` para desagregar contacto de una mano vs ambas sin modificar `predicciones`). Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
 
 ```json
 {
@@ -1201,6 +1217,7 @@ Test para saber el nivel actual y las brechas contra el cargo.
 
 - **Nivel**: se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida.
 - **Brecha**: por cada skill evaluada contra el nivel que pide el cargo; prioridad alta si faltan 2 niveles o la skill es obligatoria.
+- **Mínimo con evidencia** (D42): si ningún nivel de una skill llega a 60, la brecha suma un nivel (un cargo junior queda con brecha 1). `nivelActual` sigue en junior porque es el mínimo: si `brecha` es mayor que la distancia entre `nivelRequerido` y `nivelActual`, todavía no alcanza junior.
 - No cambia el nivel del perfil: se informa como nivel sugerido.
 
 | Método | Ruta | Auth | Qué hace |
@@ -1533,14 +1550,14 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 163 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 173 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
 | 400 | `alcance_invalido` | Hay alcances con nombre vacío o demasiado largo |
 | 400 | `alcances_requeridos` | Indica qué alcances aceptas o rechazas |
 | 400 | `alternativas_invalidas` | Las respuestas alternativas son hasta … textos de máximo … caracteres |
-| 400 | `area_invalida` | El área es obligatoria y de hasta … caracteres |
+| 400 | `area_invalida` | El área usa minúsculas, números y guiones (máx. …), ej. programador-front |
 | 400 | `cantidad_invalida` | La entrevista debe tener entre … y … preguntas |
 | 400 | `cargo_id_invalido` | El id del cargo no es válido |
 | 400 | `cargo_invalido` | El cargo admite hasta … caracteres |
@@ -1550,14 +1567,17 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `codigo_invalido_o_expirado` | El código no existe, venció o ya se usó |
 | 400 | `compra_incompleta` | Faltan el producto o el token de compra |
 | 400 | `compra_invalida` | Compra no válida o no activa |
+| 400 | `confianza_invalida` | La confianza debe estar entre 0 y 1 |
 | 400 | `contexto_requerido` | Indica el cargo o la skill que evalúa la pregunta |
 | 400 | `contrasena_actual_incorrecta` | La contraseña actual es incorrecta |
 | 400 | `contrasena_repetida` | La nueva contraseña debe ser distinta de la actual |
+| 400 | `correccion_invalida` | Cada corrección necesita \"de\" y \"a\" de hasta … caracteres |
 | 400 | `cuenta_google` | Esta cuenta fue creada con Google. No puedes cambiar la contraseña aquí. |
 | 400 | `debe_haber_una_correcta` | Debe haber exactamente una opción correcta |
 | 400 | `dia_invalido` | Día no válido: … |
 | 400 | `dias_invalidos` | days no puede ser negativo |
 | 400 | `dias_requeridos` | Elige al menos un día |
+| 400 | `diccionario_demasiado_grande` | Máximo … términos y … correcciones |
 | 400 | `duracion_invalida` | duracionSeg debe estar entre 0 y … |
 | 400 | `duracion_requerida` | Define days > 0 o expires_at |
 | 400 | `enunciado_invalido` | El enunciado es obligatorio (hasta … caracteres) |
@@ -1573,8 +1593,8 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `id_invalido` | sesionId no es un UUID válido |
 | 400 | `id_local_invalido` | idLocal debe tener entre 1 y … caracteres |
 | 400 | `id_local_repetido` | Hay intentos repetidos en el lote |
-| 400 | `id_requerido` | Falta el parámetro … |
-| 400 | `idioma_invalido` | Idioma no soportado |
+| 400 | `id_requerido` | Falta el parámetro sesionId |
+| 400 | `idioma_invalido` | El idioma debe tener entre 1 y … caracteres |
 | 400 | `invalid_uuid` | Identificador con formato inválido |
 | 400 | `licencia_invalida` | licenseType debe ser PROM, INST o GOOG |
 | 400 | `limite_invalido` | Se pueden completar hasta … preguntas por vez |
@@ -1598,7 +1618,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `no_puede_quitarse_admin` | No puedes quitarte el rol de administrador a ti mismo |
 | 400 | `nombre_cargo_invalido` | El cargo no puede superar … caracteres |
 | 400 | `nombre_cargo_requerido` | El cargo es obligatorio |
-| 400 | `nombre_invalido` | El nombre es obligatorio y de hasta … caracteres |
+| 400 | `nombre_invalido` | El nombre debe tener entre 1 y … caracteres |
 | 400 | `nothing_to_update` | No se envió ningún dato para actualizar |
 | 400 | `opcion_duplicada` | Hay opciones repetidas |
 | 400 | `opcion_invalida` | Elige una de las opciones de la pregunta |
@@ -1610,6 +1630,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `palabras_clave_invalidas` | Se admiten hasta … palabras clave |
 | 400 | `parametro_invalido` | El parámetro … debe ser un número |
 | 400 | `password_too_long` | La contraseña no puede superar … caracteres |
+| 400 | `pregunta_ajena` | La pregunta no es parte de esa sesión |
 | 400 | `pregunta_invalida` | preguntaId no es un UUID |
 | 400 | `pregunta_no_aprobada` | Solo se pueden usar preguntas aprobadas (…) |
 | 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
@@ -1632,15 +1653,19 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `skill_no_encontrada` | La skill del intento … no existe |
 | 400 | `tamano_invalido` | El tamaño de página debe estar entre 1 y … |
 | 400 | `telefono_invalido` | El teléfono no tiene un formato válido |
+| 400 | `termino_invalido` | Un término no puede pasar de … caracteres |
 | 400 | `texto_demasiado_largo` | La respuesta no puede superar … caracteres |
+| 400 | `texto_invalido` | El texto debe tener entre 1 y … caracteres |
 | 400 | `texto_muy_largo` | Los textos admiten hasta … caracteres |
 | 400 | `texto_vacio` | La respuesta no puede estar vacía |
 | 400 | `tiempo_invalido` | El tiempo de respuesta debe estar entre 0 y 1 hora |
+| 400 | `tiempos_invalidos` | inicioMs y finMs deben ser crecientes y la respuesta durar menos de una hora |
 | 400 | `timestamp_invalido` | timestampMs debe ser mayor o igual a cero |
 | 400 | `tipo_invalido` | Tipo debe ser opcion_multiple, abierta_texto o simulacion_video |
 | 400 | `tipo_practica_invalido` | El tipo de práctica es obligatorio y de hasta … caracteres |
 | 400 | `tipo_prueba_no_soportado` | El tipo de prueba debe ser ENT (entrevista), PR o BL (práctica) o NV (nivelación) |
 | 400 | `titulo_invalido` | El título es obligatorio (hasta … caracteres) |
+| 400 | `umbral_invalido` | El umbral debe ser un número entre 0.5 y 1 |
 | 400 | `version_invalida` | La versión es obligatoria y de hasta … caracteres |
 | 400 | `version_requerida` | La versión es obligatoria |
 | 400 | `video_demasiado_grande` | El vídeo supera el máximo de … MB |
@@ -1659,6 +1684,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 404 | `cargo_no_encontrado` | El cargo no existe |
 | 404 | `cargo_not_found` | No se encontró el cargo especificado |
 | 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |
+| 404 | `diccionario_no_encontrado` | No hay un diccionario para el área … |
 | 404 | `entrevista_no_encontrada` | La entrevista no existe |
 | 404 | `llamada_no_encontrada` | La llamada no existe |
 | 404 | `nivelacion_no_encontrada` | El test de nivelación no existe |
@@ -1670,12 +1696,14 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 404 | `prueba_no_encontrada` | La prueba no existe |
 | 404 | `recordatorio_no_configurado` | El usuario no tiene preferencias de recordatorios configuradas |
 | 404 | `reporte_no_disponible` | La entrevista fue cancelada y no tiene reporte |
+| 404 | `sesion_no_encontrada` | La sesión no existe |
 | 404 | `skill_no_encontrada` | La skill no existe |
 | 404 | `test_no_encontrado` | El test de nivelación no existe |
 | 404 | `user_not_found` | Usuario no encontrado |
 | 404 | `version_no_encontrada` | No existe esa versión del texto legal |
 | 409 | `cargo_existente` | Ya existe un cargo con ese nombre |
 | 409 | `compra_ya_registrada` | Esta compra ya está asociada a otra cuenta |
+| 409 | `diccionario_version_desfasada` | El diccionario cambió (versión …, esperabas …). Vuelve a cargarlo antes de guardar |
 | 409 | `email_in_use` | Ese correo ya está registrado |
 | 409 | `entrevista_en_curso` | Finaliza o cancela la entrevista antes de borrar sus datos de video |
 | 409 | `entrevista_en_progreso` | Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra |

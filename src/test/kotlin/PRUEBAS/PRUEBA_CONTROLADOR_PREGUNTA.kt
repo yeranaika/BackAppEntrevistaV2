@@ -149,9 +149,38 @@ class PruebaControladorPregunta {
         assertEquals("pendiente", primera.texto("estado"))
         assertTrue(primera.texto("pregunta_id")!!.isNotBlank())
 
-        // La ruta antigua sigue respondiendo igual.
-        assertEquals(HttpStatusCode.Created, enviar("POST", "/api/v1/admin/questions/generate-ai", pedido, admin).status)
-        assertEquals("4", enviar("GET", "$base?generadaPorIa=true&estado=pendiente", token = admin).objeto().texto("total"))
+        // La ruta antigua sigue respondiendo igual, pero el proveedor de prueba devuelve el mismo lote: ya existe (D37).
+        val repetida = enviar("POST", "/api/v1/admin/questions/generate-ai", pedido, admin)
+        assertEquals(HttpStatusCode.OK, repetida.status)
+        assertEquals("0", repetida.objeto().texto("preguntas_generadas"))
+        assertEquals("2", repetida.objeto().texto("preguntas_descartadas"))
+        val descartada = repetida.objeto()["descartadas"]!!.jsonArray.first().jsonObject
+        assertTrue(descartada.texto("enunciado")!!.isNotBlank())
+        assertEquals("pendiente", descartada["similar_a"]!!.jsonObject.texto("estado"))
+        assertEquals("2", enviar("GET", "$base?generadaPorIa=true&estado=pendiente", token = admin).objeto().texto("total"))
+    }
+
+    @Test
+    fun `similares y duplicadas avisan al panel sin bloquear`() = testApplication {
+        val sistema = sistemaCon()
+        application { sistema.montar(this) }
+        val admin = tokenDe(sistema, "admin@ejemplo.com", ROL_ADMIN)
+        val (cargoId, _) = sistema.crearCatalogo()
+        val pedido = """{"cargo_id":"$cargoId","nivel":"senior","cantidad":2,"tipo":"abierta_texto","categoria":"blanda"}"""
+        enviar("POST", "$base/generar-ia", pedido, admin)
+        val ids = enviar("GET", "$base?generadaPorIa=true", token = admin).objeto()["elementos"]!!.jsonArray.map { it.jsonObject.texto("id")!! }
+
+        // Distintas entre sí: ninguna aparece como parecida de la otra.
+        val similares = enviar("GET", "$base/${ids[0]}/similares?umbral=0.8", token = admin)
+        assertEquals(HttpStatusCode.OK, similares.status)
+        assertEquals(0, similares.objeto()["similares"]!!.jsonArray.size)
+
+        val duplicadas = enviar("GET", "$base/duplicadas?cargoId=$cargoId&nivel=senior&tipo=abierta_texto&categoria=blanda&umbral=0.5", token = admin)
+        assertEquals(HttpStatusCode.OK, duplicadas.status)
+
+        assertEquals(HttpStatusCode.BadRequest, enviar("GET", "$base/${ids[0]}/similares?umbral=0.1", token = admin).status)
+        assertEquals(HttpStatusCode.BadRequest, enviar("GET", "$base/duplicadas?nivel=senior&tipo=abierta_texto&categoria=blanda", token = admin).status)
+        assertEquals(HttpStatusCode.Forbidden, enviar("GET", "$base/duplicadas?cargoId=$cargoId", token = tokenDe(sistema, "u@ejemplo.com", "user")).status)
     }
 
     @Test
