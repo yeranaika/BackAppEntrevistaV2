@@ -1201,6 +1201,7 @@ Test para saber el nivel actual y las brechas contra el cargo.
 
 - **Nivel**: se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida.
 - **Brecha**: por cada skill evaluada contra el nivel que pide el cargo; prioridad alta si faltan 2 niveles o la skill es obligatoria.
+- **Mínimo con evidencia** (D42): si ningún nivel de una skill llega a 60, la brecha suma un nivel (un cargo junior queda con brecha 1). `nivelActual` sigue en junior porque es el mínimo: si `brecha` es mayor que la distancia entre `nivelRequerido` y `nivelActual`, todavía no alcanza junior.
 - No cambia el nivel del perfil: se informa como nivel sugerido.
 
 | Método | Ruta | Auth | Qué hace |
@@ -1533,14 +1534,14 @@ Lo llama Google al terminar el login web; no se usa desde Postman.
 
 ## Catálogo de códigos de error
 
-Los 163 códigos que puede devolver el backend en `error`, leídos del código fuente.
+Los 173 códigos que puede devolver el backend en `error`, leídos del código fuente.
 
 | HTTP | Código | Mensaje |
 |---|---|---|
 | 400 | `alcance_invalido` | Hay alcances con nombre vacío o demasiado largo |
 | 400 | `alcances_requeridos` | Indica qué alcances aceptas o rechazas |
 | 400 | `alternativas_invalidas` | Las respuestas alternativas son hasta … textos de máximo … caracteres |
-| 400 | `area_invalida` | El área es obligatoria y de hasta … caracteres |
+| 400 | `area_invalida` | El área usa minúsculas, números y guiones (máx. …), ej. programador-front |
 | 400 | `cantidad_invalida` | La entrevista debe tener entre … y … preguntas |
 | 400 | `cargo_id_invalido` | El id del cargo no es válido |
 | 400 | `cargo_invalido` | El cargo admite hasta … caracteres |
@@ -1550,14 +1551,17 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `codigo_invalido_o_expirado` | El código no existe, venció o ya se usó |
 | 400 | `compra_incompleta` | Faltan el producto o el token de compra |
 | 400 | `compra_invalida` | Compra no válida o no activa |
+| 400 | `confianza_invalida` | La confianza debe estar entre 0 y 1 |
 | 400 | `contexto_requerido` | Indica el cargo o la skill que evalúa la pregunta |
 | 400 | `contrasena_actual_incorrecta` | La contraseña actual es incorrecta |
 | 400 | `contrasena_repetida` | La nueva contraseña debe ser distinta de la actual |
+| 400 | `correccion_invalida` | Cada corrección necesita \"de\" y \"a\" de hasta … caracteres |
 | 400 | `cuenta_google` | Esta cuenta fue creada con Google. No puedes cambiar la contraseña aquí. |
 | 400 | `debe_haber_una_correcta` | Debe haber exactamente una opción correcta |
 | 400 | `dia_invalido` | Día no válido: … |
 | 400 | `dias_invalidos` | days no puede ser negativo |
 | 400 | `dias_requeridos` | Elige al menos un día |
+| 400 | `diccionario_demasiado_grande` | Máximo … términos y … correcciones |
 | 400 | `duracion_invalida` | duracionSeg debe estar entre 0 y … |
 | 400 | `duracion_requerida` | Define days > 0 o expires_at |
 | 400 | `enunciado_invalido` | El enunciado es obligatorio (hasta … caracteres) |
@@ -1573,8 +1577,8 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `id_invalido` | sesionId no es un UUID válido |
 | 400 | `id_local_invalido` | idLocal debe tener entre 1 y … caracteres |
 | 400 | `id_local_repetido` | Hay intentos repetidos en el lote |
-| 400 | `id_requerido` | Falta el parámetro … |
-| 400 | `idioma_invalido` | Idioma no soportado |
+| 400 | `id_requerido` | Falta el parámetro sesionId |
+| 400 | `idioma_invalido` | El idioma debe tener entre 1 y … caracteres |
 | 400 | `invalid_uuid` | Identificador con formato inválido |
 | 400 | `licencia_invalida` | licenseType debe ser PROM, INST o GOOG |
 | 400 | `limite_invalido` | Se pueden completar hasta … preguntas por vez |
@@ -1598,7 +1602,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `no_puede_quitarse_admin` | No puedes quitarte el rol de administrador a ti mismo |
 | 400 | `nombre_cargo_invalido` | El cargo no puede superar … caracteres |
 | 400 | `nombre_cargo_requerido` | El cargo es obligatorio |
-| 400 | `nombre_invalido` | El nombre es obligatorio y de hasta … caracteres |
+| 400 | `nombre_invalido` | El nombre debe tener entre 1 y … caracteres |
 | 400 | `nothing_to_update` | No se envió ningún dato para actualizar |
 | 400 | `opcion_duplicada` | Hay opciones repetidas |
 | 400 | `opcion_invalida` | Elige una de las opciones de la pregunta |
@@ -1610,6 +1614,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `palabras_clave_invalidas` | Se admiten hasta … palabras clave |
 | 400 | `parametro_invalido` | El parámetro … debe ser un número |
 | 400 | `password_too_long` | La contraseña no puede superar … caracteres |
+| 400 | `pregunta_ajena` | La pregunta no es parte de esa sesión |
 | 400 | `pregunta_invalida` | preguntaId no es un UUID |
 | 400 | `pregunta_no_aprobada` | Solo se pueden usar preguntas aprobadas (…) |
 | 400 | `pregunta_no_permitida` | La nivelación es escrita: no admite preguntas de video (…) |
@@ -1632,10 +1637,13 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `skill_no_encontrada` | La skill del intento … no existe |
 | 400 | `tamano_invalido` | El tamaño de página debe estar entre 1 y … |
 | 400 | `telefono_invalido` | El teléfono no tiene un formato válido |
+| 400 | `termino_invalido` | Un término no puede pasar de … caracteres |
 | 400 | `texto_demasiado_largo` | La respuesta no puede superar … caracteres |
+| 400 | `texto_invalido` | El texto debe tener entre 1 y … caracteres |
 | 400 | `texto_muy_largo` | Los textos admiten hasta … caracteres |
 | 400 | `texto_vacio` | La respuesta no puede estar vacía |
 | 400 | `tiempo_invalido` | El tiempo de respuesta debe estar entre 0 y 1 hora |
+| 400 | `tiempos_invalidos` | inicioMs y finMs deben ser crecientes y la respuesta durar menos de una hora |
 | 400 | `timestamp_invalido` | timestampMs debe ser mayor o igual a cero |
 | 400 | `tipo_invalido` | Tipo debe ser opcion_multiple, abierta_texto o simulacion_video |
 | 400 | `tipo_practica_invalido` | El tipo de práctica es obligatorio y de hasta … caracteres |
@@ -1659,6 +1667,7 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 404 | `cargo_no_encontrado` | El cargo no existe |
 | 404 | `cargo_not_found` | No se encontró el cargo especificado |
 | 404 | `consentimiento_no_encontrado` | No hay consentimiento vigente |
+| 404 | `diccionario_no_encontrado` | No hay un diccionario para el área … |
 | 404 | `entrevista_no_encontrada` | La entrevista no existe |
 | 404 | `llamada_no_encontrada` | La llamada no existe |
 | 404 | `nivelacion_no_encontrada` | El test de nivelación no existe |
@@ -1670,12 +1679,14 @@ Los 163 códigos que puede devolver el backend en `error`, leídos del código f
 | 404 | `prueba_no_encontrada` | La prueba no existe |
 | 404 | `recordatorio_no_configurado` | El usuario no tiene preferencias de recordatorios configuradas |
 | 404 | `reporte_no_disponible` | La entrevista fue cancelada y no tiene reporte |
+| 404 | `sesion_no_encontrada` | La sesión no existe |
 | 404 | `skill_no_encontrada` | La skill no existe |
 | 404 | `test_no_encontrado` | El test de nivelación no existe |
 | 404 | `user_not_found` | Usuario no encontrado |
 | 404 | `version_no_encontrada` | No existe esa versión del texto legal |
 | 409 | `cargo_existente` | Ya existe un cargo con ese nombre |
 | 409 | `compra_ya_registrada` | Esta compra ya está asociada a otra cuenta |
+| 409 | `diccionario_version_desfasada` | El diccionario cambió (versión …, esperabas …). Vuelve a cargarlo antes de guardar |
 | 409 | `email_in_use` | Ese correo ya está registrado |
 | 409 | `entrevista_en_curso` | Finaliza o cancela la entrevista antes de borrar sus datos de video |
 | 409 | `entrevista_en_progreso` | Ya tienes una entrevista en curso: termínala o cancélala antes de iniciar otra |

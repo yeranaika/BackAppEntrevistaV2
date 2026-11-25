@@ -3573,7 +3573,7 @@
     },
     {
       "name": "13 · Nivelación",
-      "description": "Test para saber el nivel actual y las brechas contra el cargo.\n\n- **Nivel**: se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida.\n- **Brecha**: por cada skill evaluada contra el nivel que pide el cargo; prioridad alta si faltan 2 niveles o la skill es obligatoria.\n- No cambia el nivel del perfil: se informa como nivel sugerido.",
+      "description": "Test para saber el nivel actual y las brechas contra el cargo.\n\n- **Nivel**: se sube de junior a senior mientras el promedio del nivel llegue a 60; un nivel sin preguntas corta la subida.\n- **Brecha**: por cada skill evaluada contra el nivel que pide el cargo; prioridad alta si faltan 2 niveles o la skill es obligatoria.\n- **Mínimo con evidencia** (D42): si ningún nivel de una skill llega a 60, la brecha suma un nivel (un cargo junior queda con brecha 1). `nivelActual` sigue en junior porque es el mínimo: si `brecha` es mayor que la distancia entre `nivelRequerido` y `nivelActual`, todavía no alcanza junior.\n- No cambia el nivel del perfil: se informa como nivel sugerido.",
       "item": [
         {
           "name": "Iniciar nivelación",
