@@ -54,6 +54,7 @@ import SERVICIOS.ServicioContextoMercado
 import SERVICIOS.ServicioCoberturaPreguntas
 import SERVICIOS.ServicioOnboarding
 import SERVICIOS.ServicioPregunta
+import SERVICIOS.ServicioPreguntasSimilares
 import SERVICIOS.ServicioRecordatorio
 import SERVICIOS.ServicioRequisitosCargo
 import SERVICIOS.ServicioSuscripcion
@@ -194,6 +195,9 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
 
     val servicioPregunta = ServicioPregunta(repositorioPregunta, lectorCatalogo)
 
+    /** Preguntas parecidas (D37): avisos del panel y filtro de la generación con IA, con el mismo umbral. */
+    val servicioPreguntasSimilares = ServicioPreguntasSimilares(repositorioPregunta, configuracion.limites.umbralSimilitudPreguntas)
+
     /** Lo que piden las ofertas de empleo de un cargo, para el prompt de la generación (D26). */
     val servicioContextoMercado = ServicioContextoMercado(ofertasEnCache, repositorioMercado)
 
@@ -210,7 +214,8 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     )
 
     val servicioGeneracionPregunta = ServicioGeneracionPregunta(
-        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado
+        proveedoresIa, repositorioGeneracionPregunta, lectorCatalogo, topeGeneracionIa, mercado = servicioContextoMercado,
+        umbralSimilitud = configuracion.limites.umbralSimilitudPreguntas
     )
 
     /** Completa el feedback genérico (correcto, medio, malo) de las preguntas del banco (D36), con el mismo tope de gasto. */

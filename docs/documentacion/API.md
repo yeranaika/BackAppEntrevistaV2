@@ -623,6 +623,8 @@ Administración (solo admin) y lectura para usuarios.
 | `POST` | `/api/v1/admin/preguntas` | Admin | Crear pregunta de comportamiento (admin) |
 | `GET` | `/api/v1/admin/preguntas` | Admin | Listar preguntas (admin) |
 | `GET` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Ver pregunta (admin) |
+| `GET` | `/api/v1/admin/preguntas/{{preguntaId}}/similares` | Admin | Preguntas parecidas a una (admin) |
+| `GET` | `/api/v1/admin/preguntas/duplicadas` | Admin | Posibles preguntas duplicadas (admin) |
 | `PATCH` | `/api/v1/admin/preguntas/{{preguntaId}}/aprobar` | Admin | Aprobar pregunta (admin) |
 | `PUT` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Editar pregunta (admin) |
 | `DELETE` | `/api/v1/admin/preguntas/{{preguntaId}}` | Admin | Borrar pregunta (admin) |
@@ -736,9 +738,23 @@ Filtros: estado, tipo, categoria, nivel, skillId, cargoId, paraCargoId (del carg
 
 `GET /api/v1/admin/preguntas/{{preguntaId}}` · Admin · responde `200`
 
+### Preguntas parecidas a una (admin)
+
+`GET /api/v1/admin/preguntas/{{preguntaId}}/similares?umbral=0.8` · Admin · responde `200`
+
+D37. Aprobadas y pendientes del mismo skill (o cargo), tipo, categoría y nivel cuyo enunciado se parece a esta pregunta, de mayor a menor (`similitud` 0 a 1, hasta 5). `umbral` 0.5 a 1 (por defecto `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80); `400 umbral_invalido`. Solo mide palabras compartidas: una paráfrasis con otro vocabulario no aparece. No llama al LLM.
+
+### Posibles preguntas duplicadas (admin)
+
+`GET /api/v1/admin/preguntas/duplicadas?cargoId={{cargoId}}&nivel=junior&tipo=abierta_texto&categoria=tecnica&umbral=0.8` · Admin · responde `200`
+
+D37. Grupos de preguntas parecidas entre sí dentro de un alcance (hasta las 200 más recientes). Exige `skillId` o `cargoId` más `nivel`, `tipo` y `categoria` (`400` si falta alguno) para no cruzar todo el banco. Cada grupo trae `preguntas` (`id`, `enunciado`, `estado`, `vecesUsada`) y `similitudMaxima`. Para dejar una, `PATCH .../rechazar` con `motivo: "duplicada"` (la usada no se puede borrar).
+
 ### Aprobar pregunta (admin)
 
 `PATCH /api/v1/admin/preguntas/{{preguntaId}}/aprobar` · Admin · responde `200`
+
+D37: la respuesta de crear, editar y aprobar trae `similares` (mismo formato que `/similares`, vacío si no hay): solo avisa, nunca bloquea. En el resto de las rutas `similares` va vacío.
 
 ### Editar pregunta (admin)
 
@@ -787,7 +803,7 @@ Deja la pregunta fuera de las pruebas. `PUT /api/v1/admin/preguntas/{id}` edita 
 
 `POST /api/v1/admin/preguntas/generar-ia` · Admin · responde `200`
 
-⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron).
+⚠️ Llama al LLM (cuesta). Las preguntas nacen pendientes de revisión. Máximo 10. `429 tope_generacion_ia_alcanzado` si el gasto del mes (UTC, todos los admins, fallidas incluidas) llegó a `LIMITE_GASTO_GENERACION_IA_MENSUAL_USD` (5 USD por defecto; `0` la desactiva): se revisa antes de llamar al LLM y el mensaje dice cuándo se repone. `429 demasiadas_solicitudes` tras 30 generaciones en 60 min desde la misma IP (`LIMITE_GENERACIONES_IA_POR_IP`, contador común con el alias). Con cargo o skill y `usar_mercado` (por defecto `true`), el prompt lleva lo que piden las ofertas de empleo reales de ese cargo (D26): las que dejó la sincronización semanal o, si no hay, una búsqueda de hasta 6 s. La respuesta trae `contexto_mercado` (`usado`, `ofertas_analizadas`, `fuentes`, `skills_frecuentes`, `fragmentos`, o `motivo` y `mensaje` si no se usaron). D37: las que se parecen (palabras compartidas >= `UMBRAL_SIMILITUD_PREGUNTAS`, 0.80; `0` lo apaga) a una aprobada o pendiente del mismo skill/cargo, tipo, categoría y nivel, o a otra del mismo lote, no se guardan: vienen en `descartadas` (`enunciado` y `similar_a` con `id`, `enunciado`, `estado`, `similitud`) y se cuentan en `preguntas_descartadas`; se cobran igual. Si todas se descartan responde `200` con `preguntas: []` en vez de `201`. El prompt lleva hasta 30 enunciados existentes para que la IA no los repita.
 
 ```json
 {
@@ -927,7 +943,7 @@ Lote de 1 a 300 métricas (puntajes 0-100; un campo ausente = sin evidencia). Id
 
 `POST /api/v1/vision/predecir` · Usuario · responde `200`, `400`, `403`, `503`
 
-El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }`. Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
+El backend no carga el modelo: valida sesión y entrada y reenvía la solicitud al **motor de inferencia** (`MOTOR_ENDPOINT`, por defecto `http://localhost:8094/predict`, módulo `motor-vision`) con tiempo máximo de 3 s y 1 reintento; la respuesta llega sin cambios. Modelo guía `divlara-e14-mlp` con ONNX Runtime dentro del motor. Acepta dos formatos excluyentes: (1) **P-1 landmarks** `{ frames: [{ indiceFrame?, timestampMs?, landmarks: [{ id, x, y, z, visibility?, worldX?, worldY?, worldZ? }] }], fps? }` (nominalmente 20 frames @ 10 FPS, también acepta snake_case `frame_index`/`landmark_id`/`world_x`; si falta iris/cara en pose33 imputa con `scaler.mean`) y (2) **v1 compatibilidad** `{ features: [343 floats] }` (orden `feature_columns` de `models/divlara-e14-mlp/meta.json`; longitud distinta → `400 cantidad_features_invalida`). Aplica normalización `(x - mean) / scale` con `scaler.json` e infiere en memoria RAM sin inferir emociones (RNF10 / P-1); los landmarks y el video nunca se guardan. Si se envía `sesionId` (la entrevista propia) y opcionalmente `timestampMs` (ms desde el inicio de la simulación; si falta se usa la hora del servidor), las predicciones 0-8 de ese instante se guardan para el reporte (`GET /api/v1/vision/reporte/{sesion}`); reenviar el mismo instante no duplica. **Permiso de cámara (D38):** si la versión del consentimiento de la persona ofrece `analisis_conducta_camara` y no lo aceptó, responde `403 permiso_camara_requerido` sin procesar nada. `404 entrevista_no_encontrada` si la sesión no es del usuario, `400 timestamp_invalido`. Responde `{ versionModelo, predicciones, escala: '0-8', mensaje }` (en modo P-1 con `frames` agrega además los campos opcionales `mano_cara_una`, `mano_cara_dos` en `[0.0, 1.0]` y `mano_cara_conteo` en `0|1|2` para desagregar contacto de una mano vs ambas sin modificar `predicciones`). Si el motor responde pero le faltan artefactos (`modelo.onnx`, `scaler.json`, `meta.json`) → `503 modelo_no_disponible`; si el motor no responde, está caído o contesta algo inutilizable → `503 MOTOR_NO_DISPONIBLE` (la app muestra «sin conexión»).
 
 ```json
 {
@@ -1649,6 +1665,7 @@ Los 173 códigos que puede devolver el backend en `error`, leídos del código f
 | 400 | `tipo_practica_invalido` | El tipo de práctica es obligatorio y de hasta … caracteres |
 | 400 | `tipo_prueba_no_soportado` | El tipo de prueba debe ser ENT (entrevista), PR o BL (práctica) o NV (nivelación) |
 | 400 | `titulo_invalido` | El título es obligatorio (hasta … caracteres) |
+| 400 | `umbral_invalido` | El umbral debe ser un número entre 0.5 y 1 |
 | 400 | `version_invalida` | La versión es obligatoria y de hasta … caracteres |
 | 400 | `version_requerida` | La versión es obligatoria |
 | 400 | `video_demasiado_grande` | El vídeo supera el máximo de … MB |

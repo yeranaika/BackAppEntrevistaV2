@@ -144,7 +144,14 @@ class ClienteMotorVision(
         if (respuesta.status.isSuccess()) {
             val datos = runCatching { JSON_CLIENTE_MOTOR.decodeFromString<RespuestaPrediccionVision>(texto) }
                 .getOrElse { throw FallaMotor("El motor respondió un cuerpo ilegible") }
-            return ResultadoPrediccionDivlara(datos.versionModelo, datos.predicciones, datos.escala)
+            return ResultadoPrediccionDivlara(
+                versionModelo = datos.versionModelo,
+                predicciones = datos.predicciones,
+                escala = datos.escala,
+                manoCaraUna = datos.manoCaraUna,
+                manoCaraDos = datos.manoCaraDos,
+                manoCaraConteo = datos.manoCaraConteo
+            )
         }
         val error = runCatching { JSON_CLIENTE_MOTOR.decodeFromString<RespuestaError>(texto) }.getOrNull()
         val estado = respuesta.status.value

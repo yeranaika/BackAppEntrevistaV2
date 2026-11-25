@@ -3,8 +3,11 @@ package PRUEBAS
 import CONFIGURACION.CANTIDAD_FEATURES_DIVLARA
 import CONFIGURACION.CargadorModeloDivlara
 import CONFIGURACION.DIRECTORIO_MODELOS_DIVLARA
+import CONFIGURACION.EP_CPU
+import CONFIGURACION.EP_CUDA
 import CONFIGURACION.ESCALA_MODELO_DIVLARA
 import CONFIGURACION.FRAMES_VENTANA_DIVLARA
+import CONFIGURACION.LectorModeloOnnxDivlara
 import CONFIGURACION.ProveedorEstadoModeloDivlara
 import CONFIGURACION.VERSION_MODELO_DIVLARA
 import CONFIGURACION.configurarErroresMotor
@@ -242,6 +245,7 @@ class PruebaMotorVision {
 
                     val salud = json.parseToJsonElement(client.get("/health").bodyAsText()).jsonObject
                     assertEquals(false, salud["modeloDivlara"]?.jsonObject?.get("cargado")?.jsonPrimitive?.content?.toBoolean())
+                    assertTrue("ep" !in salud, "Sin modelo cargado no debe informar ep")
                 }
             }
         } finally {
@@ -250,16 +254,31 @@ class PruebaMotorVision {
     }
 
     @Test
-    fun `health informa el modelo cargado`() {
+    fun `health informa el modelo cargado y el proveedor de ejecucion activo`() {
         CargadorModeloDivlara().use { cargador ->
             cargador.cargarSiDisponible()
             testApplication {
                 montarMotor(cargador)
                 val salud = json.parseToJsonElement(client.get("/health").bodyAsText()).jsonObject
                 assertEquals("OK", salud["status"]?.jsonPrimitive?.content)
+                val ep = salud["ep"]?.jsonPrimitive?.content
+                assertTrue(ep == EP_CUDA || ep == EP_CPU, "ep inesperado en /health: $ep")
                 val modelo = assertNotNull(salud["modeloDivlara"]?.jsonObject)
                 assertEquals(VERSION_MODELO_DIVLARA, modelo["version"]?.jsonPrimitive?.content)
                 assertEquals("true", modelo["cargado"]?.jsonPrimitive?.content)
+            }
+        }
+    }
+
+    @Test
+    fun `health informa ep cpu cuando se desactiva GPU`() {
+        CargadorModeloDivlara(lector = LectorModeloOnnxDivlara(habilitarGpu = false)).use { cargador ->
+            cargador.cargarSiDisponible()
+            testApplication {
+                montarMotor(cargador)
+                val salud = json.parseToJsonElement(client.get("/health").bodyAsText()).jsonObject
+                assertEquals("OK", salud["status"]?.jsonPrimitive?.content)
+                assertEquals(EP_CPU, salud["ep"]?.jsonPrimitive?.content)
             }
         }
     }

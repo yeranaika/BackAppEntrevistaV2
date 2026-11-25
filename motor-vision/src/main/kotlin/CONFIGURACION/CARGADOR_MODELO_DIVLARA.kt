@@ -29,7 +29,31 @@ const val ARCHIVO_SCALER_DIVLARA = "scaler.json"
 /** Metadatos del modelo (`feature_columns` y `targets`) exportados desde el registro de DivLara. */
 const val ARCHIVO_META_DIVLARA = "meta.json"
 
+/** Variable de entorno para elegir el dispositivo de inferencia (`cuda` por defecto con respaldo a `cpu`, o `cpu`). */
+const val VARIABLE_DISPOSITIVO_MODELO = "MODELO_DEVICE"
+
+/** Variable de entorno opcional para seleccionar el índice CUDA (por defecto 0). */
+const val VARIABLE_DISPOSITIVO_CUDA = "ONNX_CUDA_DEVICE_ID"
+
+/** Índice de dispositivo CUDA por defecto (en conjunto con `CUDA_VISIBLE_DEVICES`). */
+const val DISPOSITIVO_CUDA_POR_DEFECTO = 0
+
+/** Proveedor de ejecución CUDA normalizado (expuesto en `/health` y logs). */
+const val EP_CUDA = "cuda"
+
+/** Proveedor de ejecución CPU normalizado (expuesto en `/health` y logs). */
+const val EP_CPU = "cpu"
+
 private val JSON_MODELO_DIVLARA = Json { ignoreUnknownKeys = true }
+
+private fun resolverDispositivoCudaPorDefecto(): Int =
+    System.getenv(VARIABLE_DISPOSITIVO_CUDA)?.trim()?.toIntOrNull()?.takeIf { it >= 0 }
+        ?: DISPOSITIVO_CUDA_POR_DEFECTO
+
+internal fun resolverHabilitarGpu(valorEntorno: String? = System.getenv(VARIABLE_DISPOSITIVO_MODELO)): Boolean {
+    val normalizado = valorEntorno?.trim()?.lowercase().orEmpty()
+    return normalizado != EP_CPU
+}
 
 /** Parámetros de normalización `(x - mean) / scale` equivalentes a `StandardScaler` de scikit-learn. */
 class ScalerModeloDivlara(
@@ -79,6 +103,7 @@ interface ArtefactoModeloDivlara : AutoCloseable {
     val cantidadFeatures: Int get() = 0
     val variablesSalida: List<String> get() = emptyList()
     val mediasScaler: DoubleArray? get() = null
+    val proveedorEjecucion: String get() = EP_CPU
     fun predecir(features: DoubleArray): Map<String, Double> {
         throw UnsupportedOperationException("El artefacto cargado no soporta inferencia")
     }
@@ -126,7 +151,8 @@ class ArtefactoOnnxDivlara(
     private val sesion: OrtSession,
     private val nombreEntrada: String,
     private val scaler: ScalerModeloDivlara,
-    private val metadatos: MetadatosModeloDivlara
+    private val metadatos: MetadatosModeloDivlara,
+    override val proveedorEjecucion: String = EP_CPU
 ) : ArtefactoModeloDivlara {
 
     override val cantidadFeatures: Int = scaler.cantidadFeatures
@@ -170,10 +196,16 @@ class ArtefactoOnnxDivlara(
 }
 
 /**
- * Lector ONNX Runtime: carga `modelo.onnx`, `scaler.json` y `meta.json` desde la carpeta del modelo
- * y valida consistencia entre dimensiones de entrada y variables de salida.
+ * Lector ONNX Runtime: carga `modelo.onnx`, `scaler.json` y `meta.json` desde la carpeta del modelo,
+ * intenta inicializar CUDA EP con respaldo automático a CPU y valida consistencia entre dimensiones.
  */
-class LectorModeloOnnxDivlara : LectorArtefactoModeloDivlara {
+class LectorModeloOnnxDivlara(
+    private val dispositivoCuda: Int = resolverDispositivoCudaPorDefecto(),
+    private val habilitarGpu: Boolean = resolverHabilitarGpu()
+) : LectorArtefactoModeloDivlara {
+
+    private val log = LoggerFactory.getLogger(LectorModeloOnnxDivlara::class.java)
+
     override fun cargar(archivo: Path): ArtefactoModeloDivlara {
         val tamano = validarArchivoLegible(archivo)
         val carpeta = archivo.parent ?: throw IOException("No se pudo resolver la carpeta del modelo: $archivo")
@@ -196,12 +228,7 @@ class LectorModeloOnnxDivlara : LectorArtefactoModeloDivlara {
         }
 
         val entorno = OrtEnvironment.getEnvironment()
-        val opciones = OrtSession.SessionOptions()
-        val sesion = try {
-            opciones.use { entorno.createSession(archivo.toAbsolutePath().toString(), it) }
-        } catch (error: OrtException) {
-            throw IOException("No se pudo inicializar la sesión ONNX: ${error.message}", error)
-        }
+        val (sesion, proveedorEjecucion) = crearSesionConFallback(entorno, archivo.toAbsolutePath().toString())
 
         try {
             val nombreEntrada = sesion.inputNames.firstOrNull()
@@ -214,12 +241,46 @@ class LectorModeloOnnxDivlara : LectorArtefactoModeloDivlara {
                 sesion = sesion,
                 nombreEntrada = nombreEntrada,
                 scaler = scaler,
-                metadatos = metadatos
+                metadatos = metadatos,
+                proveedorEjecucion = proveedorEjecucion
             )
         } catch (error: Exception) {
             runCatching { sesion.close() }
             throw error
         }
+    }
+
+    private fun crearSesionConFallback(
+        entorno: OrtEnvironment,
+        rutaModelo: String
+    ): Pair<OrtSession, String> {
+        if (habilitarGpu) {
+            try {
+                OrtSession.SessionOptions().use { opcionesGpu ->
+                    opcionesGpu.addCUDA(dispositivoCuda)
+                    val sesionGpu = entorno.createSession(rutaModelo, opcionesGpu)
+                    log.info("Sesión ONNX inicializada — EP activo: {} (CUDA device={})", EP_CUDA, dispositivoCuda)
+                    return sesionGpu to EP_CUDA
+                }
+            } catch (error: Throwable) {
+                if (error is VirtualMachineError) throw error
+                log.warn(
+                    "EP cuda no disponible (device={}), usando respaldo cpu: {}",
+                    dispositivoCuda,
+                    error.message ?: error::class.simpleName
+                )
+            }
+        }
+
+        val sesionCpu = try {
+            OrtSession.SessionOptions().use { opcionesCpu ->
+                entorno.createSession(rutaModelo, opcionesCpu)
+            }
+        } catch (error: OrtException) {
+            throw IOException("No se pudo inicializar la sesión ONNX: ${error.message}", error)
+        }
+        log.info("Sesión ONNX inicializada — EP activo: {}", EP_CPU)
+        return sesionCpu to EP_CPU
     }
 
     private fun validarDimensionesOnnx(
@@ -318,15 +379,17 @@ class CargadorModeloDivlara(
                     estado = EstadoCargaModeloDivlara.CARGADO,
                     cargado = true,
                     tamanoBytes = artefacto.tamanoBytes,
-                    fechaCarga = reloj.instant()
+                    fechaCarga = reloj.instant(),
+                    ep = artefacto.proveedorEjecucion
                 )
                 log.info(
-                    "Modelo DivLara ({}) cargado desde {} ({} bytes, {} features, {} variables).",
+                    "Modelo DivLara ({}) cargado desde {} ({} bytes, {} features, {} variables, EP={}).",
                     version,
                     rutaArtefacto,
                     artefacto.tamanoBytes,
                     artefacto.cantidadFeatures,
-                    artefacto.variablesSalida.size
+                    artefacto.variablesSalida.size,
+                    artefacto.proveedorEjecucion
                 )
             } catch (error: Exception) {
                 val detalle = error.message?.takeIf { it.isNotBlank() }
@@ -358,6 +421,9 @@ class CargadorModeloDivlara(
 
     /** Artefacto en memoria si la carga fue exitosa; `null` si está no disponible o con error. */
     fun artefacto(): ArtefactoModeloDivlara? = synchronized(bloqueo) { artefactoCargado }
+
+    /** Proveedor de ejecución ONNX activo (`cuda` o `cpu`), o `null` si el modelo no cargó. */
+    fun proveedorEjecucion(): String? = artefacto()?.proveedorEjecucion
 
     override fun cantidadFeaturesEsperadas(): Int? = artefacto()?.cantidadFeatures?.takeIf { it > 0 }
 

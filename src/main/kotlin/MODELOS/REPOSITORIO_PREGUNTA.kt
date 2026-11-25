@@ -9,6 +9,7 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
@@ -38,6 +39,38 @@ interface RepositorioPregunta {
     suspend fun cambiarEstado(id: UUID, estado: EstadoPregunta, motivoRechazo: String?, revisadoPor: UUID?): Boolean
 
     suspend fun eliminar(id: UUID): Boolean
+
+    /** Aprobadas y pendientes del [alcance] (las más recientes, hasta [LIMITE_PREGUNTAS_A_COMPARAR]), sin la pregunta [excluirId]. */
+    suspend fun existentesParaComparar(alcance: AlcanceComparacion, excluirId: UUID? = null): List<PreguntaExistente>
+}
+
+const val LIMITE_PREGUNTAS_A_COMPARAR = 200
+
+/** Debe llamarse dentro de una transacción. */
+internal fun leerExistentesParaComparar(alcance: AlcanceComparacion, excluirId: UUID? = null): List<PreguntaExistente> {
+    val condiciones = listOfNotNull(
+        TablaPregunta.estado inList listOf(EstadoPregunta.APROBADA.valorBd, EstadoPregunta.PENDIENTE.valorBd),
+        TablaPregunta.tipoPregunta eq alcance.tipo.valorBd,
+        TablaPregunta.categoriaHabilidad eq alcance.categoria.valorBd,
+        TablaPregunta.nivelDificultad eq alcance.nivel.valorBd,
+        // Con skill se compara dentro del skill; sin skill, dentro del cargo; sin ninguno, solo con las generales.
+        when {
+            alcance.skillId != null -> TablaPregunta.skillId eq alcance.skillId
+            alcance.cargoId != null -> TablaPregunta.cargoId eq alcance.cargoId
+            else -> TablaPregunta.skillId.isNull() and TablaPregunta.cargoId.isNull()
+        },
+        excluirId?.let { TablaPregunta.preguntaId neq it }
+    )
+    return TablaPregunta.selectAll()
+        .where { condiciones.reduce<Op<Boolean>, Op<Boolean>> { a, b -> a and b } }
+        .orderBy(TablaPregunta.fechaCreacion to SortOrder.DESC)
+        .limit(LIMITE_PREGUNTAS_A_COMPARAR)
+        .map {
+            PreguntaExistente(
+                it[TablaPregunta.preguntaId], it[TablaPregunta.enunciado],
+                EstadoPregunta.desdeBd(it[TablaPregunta.estado]) ?: EstadoPregunta.PENDIENTE, it[TablaPregunta.vecesUsada]
+            )
+        }
 }
 
 class RepositorioPreguntaExposed : RepositorioPregunta {
@@ -49,6 +82,9 @@ class RepositorioPreguntaExposed : RepositorioPregunta {
     }
 
     override suspend fun buscarPorId(id: UUID): Pregunta? = transaccion { buscar(id) }
+
+    override suspend fun existentesParaComparar(alcance: AlcanceComparacion, excluirId: UUID?): List<PreguntaExistente> =
+        transaccion { leerExistentesParaComparar(alcance, excluirId) }
 
     override suspend fun listar(filtro: FiltroPreguntas, pagina: Int, tamano: Int): PaginaPreguntas = transaccion {
         val total = consulta(filtro).count()

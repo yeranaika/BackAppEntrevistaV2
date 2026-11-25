@@ -190,6 +190,20 @@ class PruebaClienteMotorVision {
     }
 
     @Test
+    fun `propaga los campos aditivos de desagregacion mano_cara desde el motor`() = runBlocking {
+        val cuerpoConManoCara =
+            """{"versionModelo":"$VERSION_MODELO_DIVLARA","predicciones":{"hand_to_face_adaptors":2.0},"escala":"$ESCALA_MODELO_DIVLARA","mano_cara_una":0.75,"mano_cara_dos":0.0,"mano_cara_conteo":1}"""
+        cliente { json(HttpStatusCode.OK, cuerpoConManoCara) }.use { motor ->
+            val resultado = motor.predecir(solicitudVentana())
+
+            assertEquals(mapOf("hand_to_face_adaptors" to 2.0), resultado.predicciones)
+            assertEquals(0.75, resultado.manoCaraUna)
+            assertEquals(0.0, resultado.manoCaraDos)
+            assertEquals(1, resultado.manoCaraConteo)
+        }
+    }
+
+    @Test
     fun `la configuracion rechaza un endpoint que no es http`() {
         kotlin.test.assertFailsWith<IllegalArgumentException> { ConfiguracionMotorVision("localhost:8094/predict") }
         kotlin.test.assertFailsWith<IllegalArgumentException> { ConfiguracionMotorVision("file:///etc/passwd") }
