@@ -121,7 +121,9 @@ data class ConfiguracionMotorVision(
     /** D47: se envía en la cabecera `X-Wol-Token`. */
     val wolToken: String = "",
     /** D47: esperas antes de cada reintento tras enviar el WOL (3 reintentos: 5, 10 y 20 s). */
-    val esperasDespertarMs: List<Long> = listOf(5_000L, 10_000L, 20_000L)
+    val esperasDespertarMs: List<Long> = listOf(5_000L, 10_000L, 20_000L),
+    /** D49: proxy SOCKS5 de Tailscale (userspace) para motor y WOL; vacío = conexión directa. */
+    val socksProxy: String = ""
 ) {
     init {
         require(wolUrl.isEmpty() || Regex("^https?://[^\\s/]+(/.*)?$").matches(wolUrl)) {
@@ -131,6 +133,9 @@ data class ConfiguracionMotorVision(
             "MOTOR_ENDPOINT inválido (debe ser http(s)://host[:puerto]/ruta)"
         }
         require(tiempoMaximoMs > 0) { "MOTOR_TIMEOUT_MS debe ser mayor a cero" }
+        require(socksProxy.isEmpty() || Regex("^socks5://[^\\s/:]+(:[0-9]{1,5})?$").matches(socksProxy)) {
+            "MOTOR_SOCKS_PROXY inválido (debe ser socks5://host[:puerto] o estar vacío)"
+        }
     }
 }
 
@@ -281,7 +286,8 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             endpoint = lector.opcional("MOTOR_ENDPOINT", "vision.motorEndpoint")?.trim()?.takeIf { it.isNotEmpty() } ?: MOTOR_ENDPOINT_POR_DEFECTO,
             tiempoMaximoMs = (lector.opcional("MOTOR_TIMEOUT_MS")?.toLongOrNull() ?: MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO).coerceIn(100L, 30_000L),
             wolUrl = lector.opcional("WOL_SERVICE_URL")?.trim().orEmpty(),
-            wolToken = lector.opcional("WOL_TOKEN")?.trim().orEmpty()
+            wolToken = lector.opcional("WOL_TOKEN")?.trim().orEmpty(),
+            socksProxy = lector.opcional("MOTOR_SOCKS_PROXY")?.trim().orEmpty()
         ),
         apagado = ConfiguracionApagado(
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).
