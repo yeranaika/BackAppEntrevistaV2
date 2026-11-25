@@ -140,6 +140,7 @@ class ServicioNivelacion(
 
     private suspend fun calcularResultado(intento: IntentoNivelacion, detalle: List<DetalleIntento>): ResultadoNivelacion {
         val nivelGlobal = CalculadoraNivel.nivelLogrado(puntajesPorNivel(detalle))
+        val alcanzaMinimo = CalculadoraNivel.alcanzaNivelMinimo(puntajesPorNivel(detalle))
         val requisitos = intento.cargoId?.let { mercado.listarRequisitos(it) }.orEmpty().associateBy { it.skill.id }
         val evaluaciones = detalle.filter { it.pregunta.skillId != null }
             .groupBy { UUID.fromString(it.pregunta.skillId) }
@@ -153,14 +154,15 @@ class ServicioNivelacion(
             puntajeGlobal = promedio(detalle),
             skillsBrecha = ordenadas,
             skillsOk = ok,
-            resumen = resumen(nivelGlobal, ordenadas),
+            resumen = resumen(nivelGlobal, alcanzaMinimo, ordenadas),
             fecha = reloj.instant()
         )
     }
 
     private suspend fun evaluarSkill(skillId: UUID, items: List<DetalleIntento>, requisito: RequisitoCargo?): EvaluacionSkill {
         val nivel = CalculadoraNivel.nivelLogrado(puntajesPorNivel(items))
-        val brecha = requisito?.let { CalculadoraNivel.brecha(nivel, it.nivelRequerido) } ?: 0
+        val alcanzaMinimo = CalculadoraNivel.alcanzaNivelMinimo(puntajesPorNivel(items))
+        val brecha = requisito?.let { CalculadoraNivel.brecha(nivel, it.nivelRequerido, alcanzaMinimo) } ?: 0
         return EvaluacionSkill(
             skillId = skillId.toString(),
             nombre = requisito?.skill?.nombre ?: mercado.buscarSkill(skillId)?.nombre ?: "Skill",
@@ -189,10 +191,17 @@ class ServicioNivelacion(
         BigDecimal.valueOf(items.map { it.respuesta?.puntaje ?: 0.0 }.average().takeIf { !it.isNaN() } ?: 0.0)
             .setScale(2, RoundingMode.HALF_UP)
 
-    private fun resumen(nivel: NivelExperiencia, brechas: List<EvaluacionSkill>): String {
+    /** Sin evidencia de junior no se dice "tu nivel es Junior" ni "cumples" (D42). */
+    private fun resumen(nivel: NivelExperiencia, alcanzaMinimo: Boolean, brechas: List<EvaluacionSkill>): String {
+        val reforzar = brechas.take(SKILLS_EN_RESUMEN).joinToString(", ") { it.nombre }
+        if (!alcanzaMinimo) {
+            val base = "Todavía no alcanzas el nivel ${nombreNivel(NivelExperiencia.JUNIOR)} en este test."
+            return if (brechas.isEmpty()) "$base Repasa los temas de las preguntas y vuelve a intentarlo."
+            else "$base Para llegar al cargo refuerza: $reforzar."
+        }
         val base = "Tu nivel actual es ${nombreNivel(nivel)}."
         if (brechas.isEmpty()) return "$base Cumples el nivel que pide el cargo en las skills evaluadas."
-        return "$base Para llegar al cargo refuerza: ${brechas.take(SKILLS_EN_RESUMEN).joinToString(", ") { it.nombre }}."
+        return "$base Para llegar al cargo refuerza: $reforzar."
     }
 
     private fun nivelacionTerminada() = ErrorConflicto("nivelacion_finalizada", "Este test de nivelación ya fue respondido")

@@ -646,7 +646,70 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Contrato Android**: solo rutas nuevas; no se tocó ninguna existente.
 - **Pruebas**: `PruebaControladorVoz` (11).
 
-## D42 · Preguntas generadas sin repetir las del banco (2026-11)
+## D42 · La nivelación solo dice que "cumple" con evidencia (2026-11)
+- **Qué**: una skill alcanza el nivel mínimo (junior) solo si algún nivel con preguntas llega al umbral de 60 (aprobar uno
+  más difícil también cuenta). Sin esa evidencia, `brecha` suma un nivel: un cargo junior queda con brecha 1 y la skill pasa
+  a "por reforzar"; uno semisenior, con brecha 2 (prioridad alta). El resumen dice "Todavía no alcanzas el nivel Junior en
+  este test" en vez de "Tu nivel actual es Junior".
+- **Por qué**: `CalculadoraNivel` parte en junior porque es el mínimo que se puede guardar, así que con 0 % la brecha contra
+  un cargo junior daba 0 y la app mostraba "Ya cumples". Visto en producción el 2026-11-24 con Analista QA Junior: Testing y QA
+  7/100 (dos preguntas semisenior), Automatización de pruebas 12/100 y SQL 38/100 salieron como "cumple".
+- **Por qué sin campo nuevo**: `nivel_actual` sigue en "junior" (la BD no tiene un nivel menor) y el JSON guardado en
+  `resultado_nivelacion` no cambia de forma, así que revertir el despliegue no rompe la lectura de los resultados nuevos.
+  La app reconoce el caso con lo que ya recibe: `brecha` mayor que la distancia entre `nivelRequerido` y `nivelActual`.
+- **App (pendiente, opcional)**: con ese caso, `textoNivelSkill` hoy muestra "Junior → el cargo pide Junior"; conviene
+  "Aún no alcanzas Junior". Sin ese cambio la skill igual aparece en "por reforzar", que es lo importante.
+- **No cambia**: el nivel que se acumula en `nivel_skill_usuario` ni la regla de subir de nivel sin saltarse ninguno.
+- **Pruebas**: `PruebaServicioNivelacion` (3 nuevas: calculadora, todo mal y skill solo con preguntas semisenior falladas).
+## D43 · Tareas periódicas apagables para un backend local sobre la BD compartida (2026-11)
+- **Pedido:** que el backend de cada integrante apunte a la BD de Railway para que todos usen el mismo banco de
+  preguntas, conectándose por Tailscale (subnet router en el proyecto de Railway; la BD no se expone a internet).
+- **Problema:** el backend arranca tres tareas periódicas que escriben en la BD: el rescate de reportes (cada 1 min deja
+  reintentables los atascados), la sincronización semanal de mercado (llama a las APIs de empleo) y la purga diaria de
+  consentimientos (D38). Un backend local conectado a producción tomaría reportes de usuarios reales y los terminaría con
+  su propia configuración (sin IA), y duplicaría llamadas a las APIs de empleo.
+- **Decisión:** `TAREAS_SEGUNDO_PLANO=false` no arranca esas tres tareas (`ConfiguracionGeneral.tareasSegundoPlanoActivas`;
+  `Application.module` llama a `iniciarTareasSegundoPlano()` solo si están activas) y deja un aviso en el log. Por
+  defecto siguen encendidas y solo el literal `false` las apaga. Dentro de Railway (`RAILWAY_PROJECT_ID` o
+  `RAILWAY_ENVIRONMENT_ID`) el servidor no arranca con `false`, igual que D39: sin rescate los reportes cortados quedan
+  en `generando` y sin purga se incumple el plazo legal. El reporte que pide una persona desde el backend local se sigue
+  generando en ese proceso (no es una tarea periódica).
+- **Riesgo aceptado:** lo que se crea desde un backend local (usuarios, entrevistas, reportes) queda en producción.
+  Las migraciones y los cambios a mano contra esa BD se acuerdan con el equipo (`docs/04 Guias/Puesta en marcha.md`).
+- **Contrato Android:** sin cambios.
+- **Pruebas:** `PruebaConfiguracionTareasSegundoPlano` (solo `false` las apaga, falla en Railway y el arranque llama a
+  las tareas solo dentro de la condición).
+
+## D44 · Seis áreas TI nuevas en una semilla aparte (2026-11)
+- **Pedido:** más preguntas y más áreas para tener variedad, guardadas como semilla. El catálogo tenía 16 cargos, casi
+  todos de desarrollo (backend, frontend, móvil, datos, DevOps) más Product Manager.
+- **Decisión:** `src/DB/BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql`, separada de la semilla base para no tocar sus
+  14 preguntas ni las comprobaciones de D25. Áreas del catálogo (`cargo.area` y `skill.tipo_area`, texto libre):
+  `qa`, `seguridad`, `diseno`, `soporte` y `cloud`; los cargos de datos/BI usan `data`, que ya existía.
+  - 13 skills técnicas: Testing y QA, Automatización de pruebas, Seguridad de aplicaciones (OWASP), Seguridad de redes y
+    SOC, Diseño UX, Diseño UI y Figma, Soporte técnico y Help Desk, Redes TCP/IP, Linux, Power BI y visualización de
+    datos, Excel para análisis de datos, Azure, y Terraform e Infraestructura como Código.
+  - 12 cargos (2 por área, de junior a senior) con 69 relaciones cargo↔skill; también usan skills de la base (SQL,
+    Python, Java, AWS, Docker, Kubernetes, CI/CD, CSS, Modelado de Datos, Arquitectura Microservicios y blandas).
+  - 234 preguntas aprobadas **sin cargo** (sirven a todo cargo con la skill): 18 por skill nueva, 6 por nivel (3 de opción
+    múltiple con 4 opciones y 3 abiertas). Así cada skill nueva llega al mínimo de cobertura (5 por nivel) en las 3
+    pruebas que eligen por skill y nivel: nivelación, práctica y entrevista (texto y video).
+- **Contenido:** escritas con Claude fuera del backend (sin gasto del tope de D23 ni traza en `pregunta_generacion_ia`;
+  `generada_por_ia` queda en `false`, como las demás de las semillas) con las reglas de `generar-ia`: rúbrica `TECNICA`
+  con 4–5 criterios, 3–6 palabras clave, 2 respuestas alternativas, sinónimos (D33), feedback genérico correcto/medio/malo
+  (D36) y, en las abiertas, resumen y pasos `1) 2) 3)` (D40). Un validador revisó forma, cantidades, opciones repetidas y
+  la posición de la correcta; se pueden rechazar en el panel como cualquier otra.
+- **Re-ejecutable (como D25):** `ON CONFLICT` en skills, cargos y relaciones; una pregunta solo si no existe otra con el
+  mismo enunciado + skill + sin cargo + nivel, y sus opciones solo si no tiene ninguna. Todo en una transacción que
+  primero exige las skills de la semilla base. Docker la carga en una BD nueva como `003-seeds-areas-ti.sql`.
+- **App:** el onboarding reparte las áreas nuevas en sus cuatro áreas (TI → devops, cloud, soporte, seguridad;
+  Desarrollador → + qa, diseño; Analista → data, qa, gestión), en la rama `feature/areas-ti-onboarding` de la app.
+  Una app sin ese cambio no sugiere los cargos nuevos, pero sí puede escribirlos con «Otro cargo».
+- **Contrato Android:** sin cambios.
+- **Pruebas:** `src/DB/PROBAR_SEMILLA.ps1` la corre dos veces sobre la base: 13/12/234/468, 69 relaciones, 6 aprobadas por
+  skill y nivel, opciones correctas y abiertas con pasos y rúbrica completa (20/20 en PostgreSQL 16, 2026-11-24).
+
+## D45 · Preguntas generadas sin repetir las del banco (2026-11)
 - **Pedido:** evitar que `generar-ia` guarde preguntas iguales o casi iguales a las que ya existen. Plan en
   `Plan-preguntas-sin-duplicados-2026-11-24.md`.
 - **Medida:** `DetectorPreguntasSimilares` reutiliza `ComparadorTextos` (palabras compartidas, sin IA ni tokens) y toma el

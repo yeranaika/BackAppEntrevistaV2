@@ -145,7 +145,12 @@ data class ConfiguracionGeneral(
      * HABILITAR_PRUEBAS_VIDEO=true monta `POST /pruebas/video` y `GET /pruebas` (calibración del modelo de visión, sin
      * sesión: guardan .mp4 en el disco del servidor). Apagado por defecto y nunca en Railway (D39).
      */
-    val pruebasVideoHabilitadas: Boolean = false
+    val pruebasVideoHabilitadas: Boolean = false,
+    /**
+     * TAREAS_SEGUNDO_PLANO=false no arranca las tareas periódicas (sincronización de mercado, rescate de reportes y purga
+     * de consentimientos): para un backend local conectado a la BD compartida de Railway. Nunca en Railway (D43).
+     */
+    val tareasSegundoPlanoActivas: Boolean = true
 )
 
 private val ClaveConfiguracion = AttributeKey<ConfiguracionGeneral>("configuracion-general")
@@ -271,8 +276,25 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).
             esperaTareas = lector.entero("APAGADO_ESPERA_TAREAS_SEGUNDOS", ESPERA_APAGADO_SEGUNDOS_POR_DEFECTO).coerceIn(0, 600).seconds
         ),
-        pruebasVideoHabilitadas = pruebasVideoHabilitadas(lector.opcional("HABILITAR_PRUEBAS_VIDEO"), System::getenv)
+        pruebasVideoHabilitadas = pruebasVideoHabilitadas(lector.opcional("HABILITAR_PRUEBAS_VIDEO"), System::getenv),
+        tareasSegundoPlanoActivas = tareasSegundoPlanoActivas(lector.opcional("TAREAS_SEGUNDO_PLANO"), System::getenv)
     )
+}
+
+/**
+ * TAREAS_SEGUNDO_PLANO (D43): encendidas salvo con el literal "false". Sirve para un backend local que usa la BD de
+ * producción (el mismo banco de preguntas para todo el equipo) sin que ese proceso rescate reportes de usuarios reales,
+ * llame a las APIs de empleo ni purgue consentimientos. Dentro de Railway el servidor no arranca con "false": sin rescate
+ * los reportes cortados por un apagado quedan en 'generando' y sin purga se incumple el plazo legal (D38). Como en D39,
+ * [entorno] lee las variables del sistema directamente, sin el .env.
+ */
+internal fun tareasSegundoPlanoActivas(valor: String?, entorno: (String) -> String?): Boolean {
+    val apagadas = valor?.trim()?.lowercase() == "false"
+    val enRailway = entorno("RAILWAY_PROJECT_ID") != null || entorno("RAILWAY_ENVIRONMENT_ID") != null
+    check(!(apagadas && enRailway)) {
+        "TAREAS_SEGUNDO_PLANO=false no se permite en Railway: sin ellas no se rescatan reportes ni se purgan consentimientos (D43)"
+    }
+    return !apagadas
 }
 
 /**

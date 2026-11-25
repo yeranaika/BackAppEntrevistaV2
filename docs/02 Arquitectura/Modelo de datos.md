@@ -15,6 +15,8 @@ La **semilla es re-ejecutable** (D25): los catálogos usan `ON CONFLICT` sobre s
 skill + cargo + nivel, y sus opciones solo si aún no tiene ninguna. Si el admin editó el enunciado, la skill o el nivel
 de una pregunta de la semilla, volver a correrla crea otra vez la original. Una BD que ya tenga duplicados de la
 semilla vieja no se limpia sola. Se verifica con `src/DB/PROBAR_SEMILLA.ps1` → [[Puesta en marcha]].
+Las áreas TI nuevas (QA, ciberseguridad, diseño, soporte, datos/BI y cloud) están en una semilla aparte,
+`BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql`, que va después de la base (D44).
 
 ## Tablas por dominio
 | Dominio | Tablas | Notas |

@@ -85,7 +85,7 @@ data class EvaluacionSkill(
     @SerialName("nivel_actual") val nivelActual: String,
     @SerialName("nivel_requerido") val nivelRequerido: String? = null,
     @SerialName("puntaje_obtenido") val puntaje: Double,
-    /** Niveles que le faltan (0 si cumple). */
+    /** Niveles que le faltan (0 si cumple); sin evidencia de junior cuenta uno más (D42). */
     val brecha: Int = 0,
     /** alta | media | baja (solo en las brechas) */
     val prioridad: String? = null

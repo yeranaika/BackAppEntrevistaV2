@@ -119,7 +119,10 @@ data class RespuestaEvaluacionSkill(
     val nivelActual: String,
     val nivelRequerido: String? = null,
     val puntaje: Double,
-    /** Niveles que faltan para el requerido */
+    /**
+     * Niveles que faltan para el requerido. Si es mayor que la distancia entre nivelRequerido y nivelActual,
+     * todavía no alcanza ni junior: nivelActual dice "junior" solo porque es el mínimo (D42).
+     */
     val brecha: Int,
     /** alta | media */
     val prioridad: String? = null
