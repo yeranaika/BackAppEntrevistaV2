@@ -6,6 +6,8 @@ import ERRORES.ErrorNoEncontrado
 import ERRORES.ErrorValidacion
 import ESQUEMAS.SolicitudRegistrarLlamada
 import MODELOS.AccionLlamada
+import MODELOS.EventoLlamada
+import MODELOS.SegmentoEventoLlamada
 import MODELOS.Llamada
 import MODELOS.PaginaLlamadas
 import MODELOS.RepositorioLlamada
@@ -80,7 +82,19 @@ class ServicioLlamada(
     /** El feedback se calcula una sola vez, al guardar, y queda en el mismo JSONB del resumen (sin migración). */
     private fun conFeedback(resumen: ResumenLlamada, s: SolicitudRegistrarLlamada): ResumenLlamada {
         val segmentos = s.resumen?.segmentos.orEmpty()
-        return resumen.copy(feedback = EvaluadorLlamada.evaluar(s.duracionSeg, resumen, segmentos))
+        return resumen.copy(
+            feedback = EvaluadorLlamada.evaluar(s.duracionSeg, resumen, segmentos),
+            eventos = eventosDe(segmentos)
+        )
+    }
+
+    companion object {
+        /** D46: veces, total y duración MÁXIMA (segmento más largo; ni el último ni la suma) por evento, en orden de aparición. */
+        fun eventosDe(segmentos: List<SegmentoEventoLlamada>): List<EventoLlamada> =
+            segmentos.groupBy { it.idTarget }.map { (id, segs) ->
+                val duraciones = segs.map { it.finMs - it.inicioMs }
+                EventoLlamada(id, segs.size, duraciones.sum(), duraciones.max())
+            }
     }
 
     private fun leerSesion(texto: String): UUID =

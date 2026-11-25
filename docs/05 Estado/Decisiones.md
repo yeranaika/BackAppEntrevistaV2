@@ -731,3 +731,46 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
   panel está en el plan, fuera de este repo.
 - **Pruebas:** `PruebaPreguntasSimilares` (11 casos: detector, filtro, todo descartado, umbral 0, prompt) y dos casos nuevos
   en `PruebaControladorPregunta` (repetir un lote real sobre H2; `similares` y `duplicadas`).
+
+## D46 · "Toque en cara" más rápido y duración máxima persistida (2026-11)
+- **Contexto:** en vivo, "Toque en cara con apoyo" tardaba en marcarse. Ese evento no sale del motor: la app lo deriva de la
+  pose (`toqueCaraConApoyo`) con un debounce por fotogramas; "Toques en la cara" (`hand_to_face_adaptors`) exigía 2 s
+  sostenidos para abrir. El analizador del backend (`AnalizadorManoCara`, `mano_cara_*`) ya cuenta desde 10 % de los fotogramas
+  (2 de 20), así que no era el cuello de botella y no se tocó.
+- **Decisión (app, constantes mínimas):** `toque_cara_apoyo` abre con 2 fotogramas (antes 3, ~0,2 s a 10 FPS) y cierra con 3;
+  `hand_to_face_adaptors` abre con 1 s (antes 2 s) y cierra igual (4 s). Sin tocar modelo, umbrales de evento ni cruce de
+  brazos (6.0).
+- **Duración máxima:** el backend descartaba los `segmentos` tras calcular el feedback. Ahora guarda `eventos` en el JSONB del
+  resumen: `{idTarget, veces, totalMs, maximoMs}` por evento, donde `maximoMs` es el segmento MÁS LARGO (ni el último ni la
+  suma).
+- **Contrato:** `GET /api/v1/llamadas/{id}` suma `eventos` (vacío en llamadas antiguas); sin migración. Lo demás igual.
+- **Pruebas:** `PruebaEventosLlamada` (máximo ≠ último ≠ suma), caso nuevo en `PruebaAnalizadorManoCara` (2 de 20 fotogramas
+  cuentan; 1 no) y, en la app, `EventosSegmentosTest`/`UmbralesCajaVivaTest` (apertura en 2 fotogramas, `1 to 4`).
+
+## D47 · Motor d37 por Tailscale con despertar bajo demanda (2026-11)
+- **Contexto:** el backend en Railway llega al motor (PC con GPU) por Tailscale (`100.94.73.121:8094`); la PC puede estar
+  apagada. `MOTOR_ENDPOINT` ya era configurable.
+- **Decisión:** `WOL_SERVICE_URL` (vacío = comportamiento anterior exacto) y `WOL_TOKEN`. Si la llamada al motor falla por
+  conexión o timeout (no por 5xx ni cortocircuito abierto), `ClienteMotorVision` hace `POST` a esa URL con `X-Wol-Token` y
+  reintenta 3 veces con esperas de 5, 10 y 20 s; solo entonces responde el 503 `MOTOR_NO_DISPONIBLE`. Máximo un WOL por 60 s
+  (en memoria, por proceso). El token y la URL no se escriben en logs.
+- **Contrato:** ninguno cambia hacia la app; una petición puede tardar hasta ~35 s más mientras la PC arranca.
+- **Pendiente:** `MOTOR_ENDPOINT` debe terminar en `/predict` (el `.env.example` lo documenta así).
+- **Pruebas:** `PruebaDespertarMotorVision` (MockEngine, sin red): sin URL no envía; envía con token y reintenta hasta
+  responder; agota 3 reintentos; rate-limit de 60 s; un 5xx no despierta.
+
+## D48 · Tabla `borrador_prueba` por migración nueva, sin editar `3.sqm` (2026-11)
+- **Contexto:** el `CREATE TABLE` de `borrador_prueba` se agregó a `3.sqm` en el commit `edc5344` (23-nov) después de que
+  esa migración ya había corrido en dispositivos reales (`user_version=5`); SQLite no re-ejecuta migraciones aplicadas, así
+  que esas bases quedaron sin la tabla y fallaban con `no such table: borrador_prueba` al reiniciar una simulación o abrir
+  el reporte (verificado con `sqlite3` en la tablet `HA1KZK9N`).
+- **Decisión:** `5.sqm` (v5→v6) con `CREATE TABLE IF NOT EXISTS borrador_prueba`, copiado literal de `BaseLocal.sq`.
+  `3.sqm` NO se toca: no se editan migraciones ya aplicadas (la misma regla que evita repetir el bug). La versión sube de
+  5 a6 porque SQLDelight la deriva del `.sqm` con número más alto + 1.
+- **Prevención:** `verifyMigrations.set(true)` en el bloque `sqldelight` de `app/build.gradle.kts` (el build falla si un
+  `.sqm` queda desincronizado de `BaseLocal.sq`). Auditoría de `1.sqm`–`5.sqm`: todos los CREATE usan `IF NOT EXISTS` y
+  `borrador_prueba` era el único caso retroactivo.
+- **Contrato Android:** sin cambios de API; las bases existentes suben a v6 en el primer arranque.
+- **Pruebas:** `MigracionBaseLocalTest` con la versión en6 y el caso v5→v6 (base sin la tabla → migrar →
+  `guardarBorrador` funciona); `gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL.
+

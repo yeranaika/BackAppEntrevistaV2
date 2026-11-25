@@ -16,6 +16,10 @@ data class TramoLlamada(val inicioMs: Long, val finMs: Long, val accion: String)
 @Serializable
 data class SegmentoEventoLlamada(val idTarget: String, val inicioMs: Long, val finMs: Long, val valorMax: Double = 0.0)
 
+/** Totales por evento de la app (toque en cara, etc.) calculados desde sus segmentos; [maximoMs] es el segmento MÁS LARGO (D46). */
+@Serializable
+data class EventoLlamada(val idTarget: String, val veces: Int, val totalMs: Long, val maximoMs: Long)
+
 /**
  * Un eje del feedback (presencia, mirada, manos en la cara, apoyo en la mesa). [score] 0-10 es null en una llamada demasiado
  * corta para evaluar; [segundos] y [pctLlamada] viajan siempre junto al score para que nunca se lea sin el dato crudo.
@@ -45,7 +49,9 @@ data class FeedbackLlamada(
 data class ResumenLlamada(
     val acciones: List<AccionLlamada> = emptyList(),
     val linea: List<TramoLlamada> = emptyList(),
-    val feedback: FeedbackLlamada? = null
+    val feedback: FeedbackLlamada? = null,
+    /** D46: duración máxima persistida por evento; filas antiguas no lo traen (lista vacía). */
+    val eventos: List<EventoLlamada> = emptyList()
 ) {
     /** Ocurrencias de acciones reconocidas en toda la llamada. */
     val totalOcurrencias: Int get() = acciones.sumOf { it.veces }

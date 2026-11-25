@@ -115,9 +115,18 @@ data class ConfiguracionLimites(
 data class ConfiguracionMotorVision(
     val endpoint: String = MOTOR_ENDPOINT_POR_DEFECTO,
     /** Tiempo máximo de cada intento (hay 1 reintento). */
-    val tiempoMaximoMs: Long = MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO
+    val tiempoMaximoMs: Long = MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO,
+    /** D47: URL del servicio Wake-on-LAN (`POST /wol`); vacía = sin despertar (comportamiento previo). */
+    val wolUrl: String = "",
+    /** D47: se envía en la cabecera `X-Wol-Token`. */
+    val wolToken: String = "",
+    /** D47: esperas antes de cada reintento tras enviar el WOL (3 reintentos: 5, 10 y 20 s). */
+    val esperasDespertarMs: List<Long> = listOf(5_000L, 10_000L, 20_000L)
 ) {
     init {
+        require(wolUrl.isEmpty() || Regex("^https?://[^\\s/]+(/.*)?$").matches(wolUrl)) {
+            "WOL_SERVICE_URL inválida (debe ser http(s)://host[:puerto]/ruta o estar vacía)"
+        }
         require(Regex("^https?://[^\\s/]+(/.*)?$").matches(endpoint)) {
             "MOTOR_ENDPOINT inválido (debe ser http(s)://host[:puerto]/ruta)"
         }
@@ -270,7 +279,9 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
         ),
         motorVision = ConfiguracionMotorVision(
             endpoint = lector.opcional("MOTOR_ENDPOINT", "vision.motorEndpoint")?.trim()?.takeIf { it.isNotEmpty() } ?: MOTOR_ENDPOINT_POR_DEFECTO,
-            tiempoMaximoMs = (lector.opcional("MOTOR_TIMEOUT_MS")?.toLongOrNull() ?: MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO).coerceIn(100L, 30_000L)
+            tiempoMaximoMs = (lector.opcional("MOTOR_TIMEOUT_MS")?.toLongOrNull() ?: MOTOR_TIEMPO_MAXIMO_MS_POR_DEFECTO).coerceIn(100L, 30_000L),
+            wolUrl = lector.opcional("WOL_SERVICE_URL")?.trim().orEmpty(),
+            wolToken = lector.opcional("WOL_TOKEN")?.trim().orEmpty()
         ),
         apagado = ConfiguracionApagado(
             // Entre 0 y 10 minutos: tiene que caber en el tiempo de drenado de Railway (RAILWAY_DEPLOYMENT_DRAINING_SECONDS).
