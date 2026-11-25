@@ -645,3 +645,19 @@ Relacionado: [[Arquitectura general]] · [[Estado del proyecto]]
 - **Privacidad**: las transcripciones entran en `purgarDatosBiometricos` junto con las de la entrevista.
 - **Contrato Android**: solo rutas nuevas; no se tocó ninguna existente.
 - **Pruebas**: `PruebaControladorVoz` (11).
+
+## D42 · La nivelación solo dice que "cumple" con evidencia (2026-11)
+- **Qué**: una skill alcanza el nivel mínimo (junior) solo si algún nivel con preguntas llega al umbral de 60 (aprobar uno
+  más difícil también cuenta). Sin esa evidencia, `brecha` suma un nivel: un cargo junior queda con brecha 1 y la skill pasa
+  a "por reforzar"; uno semisenior, con brecha 2 (prioridad alta). El resumen dice "Todavía no alcanzas el nivel Junior en
+  este test" en vez de "Tu nivel actual es Junior".
+- **Por qué**: `CalculadoraNivel` parte en junior porque es el mínimo que se puede guardar, así que con 0 % la brecha contra
+  un cargo junior daba 0 y la app mostraba "Ya cumples". Visto en producción el 2026-11-24 con Analista QA Junior: Testing y QA
+  7/100 (dos preguntas semisenior), Automatización de pruebas 12/100 y SQL 38/100 salieron como "cumple".
+- **Por qué sin campo nuevo**: `nivel_actual` sigue en "junior" (la BD no tiene un nivel menor) y el JSON guardado en
+  `resultado_nivelacion` no cambia de forma, así que revertir el despliegue no rompe la lectura de los resultados nuevos.
+  La app reconoce el caso con lo que ya recibe: `brecha` mayor que la distancia entre `nivelRequerido` y `nivelActual`.
+- **App (pendiente, opcional)**: con ese caso, `textoNivelSkill` hoy muestra "Junior → el cargo pide Junior"; conviene
+  "Aún no alcanzas Junior". Sin ese cambio la skill igual aparece en "por reforzar", que es lo importante.
+- **No cambia**: el nivel que se acumula en `nivel_skill_usuario` ni la regla de subir de nivel sin saltarse ninguno.
+- **Pruebas**: `PruebaServicioNivelacion` (3 nuevas: calculadora, todo mal y skill solo con preguntas semisenior falladas).
