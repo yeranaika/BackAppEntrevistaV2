@@ -102,6 +102,17 @@ class PruebaAnalizadorManoCara {
         assertEquals(2, detalle.manoCaraConteo)
     }
 
+    // D46: el contacto debe marcarse casi de inmediato; con 2 de 20 fotogramas (0,2 s) ya cuenta, con 1 es ruido.
+    @Test
+    fun `contacto breve de 2 de 20 fotogramas ya cuenta una mano o ambas`() {
+        fun ventana(izq: Boolean, der: Boolean, n: Int) = VentanaLandmarksDivlara(
+            (0 until 20).map { crearFrame(it, manoIzqEnCara = izq && it < n, manoDerEnCara = der && it < n) }
+        )
+        assertEquals(1, AnalizadorManoCara.analizar(ventana(izq = true, der = false, n = 2)).manoCaraConteo)
+        assertEquals(2, AnalizadorManoCara.analizar(ventana(izq = true, der = true, n = 2)).manoCaraConteo)
+        assertEquals(0, AnalizadorManoCara.analizar(ventana(izq = true, der = false, n = 1)).manoCaraConteo)
+    }
+
     @Test
     fun `calcula proporciones exactas y conteo dominante en ventana mixta`() {
         val frames = buildList {

@@ -21,6 +21,7 @@ import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -28,8 +29,10 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
@@ -39,6 +42,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -49,6 +53,8 @@ private const val INTENTOS_MOTOR = 2 // la llamada y 1 reintento
 private const val TIEMPO_CONEXION_MOTOR_MS = 1_000L
 private const val VIGENCIA_ESTADO_MS = 15_000L
 private const val CODIGO_INTERNO_POLITICA = "motor_no_disponible"
+private const val CABECERA_WOL_TOKEN = "X-Wol-Token"
+private const val ESPERA_ENTRE_WOL_MS = 60_000L
 
 private val JSON_CLIENTE_MOTOR = Json {
     ignoreUnknownKeys = true
@@ -72,7 +78,8 @@ private class FallaMotor(motivo: String) : IOException(motivo)
  */
 class ClienteMotorVision(
     private val config: ConfiguracionMotorVision,
-    motor: HttpClientEngine? = null
+    motor: HttpClientEngine? = null,
+    private val reloj: () -> Long = System::currentTimeMillis
 ) : PredictorVision, ProveedorEstadoModeloDivlara, AutoCloseable {
 
     private val log = LoggerFactory.getLogger(ClienteMotorVision::class.java)
@@ -96,6 +103,7 @@ class ClienteMotorVision(
 
     private val alcance = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refrescando = AtomicBoolean(false)
+    private val ultimoWolMs = AtomicLong(-1)
 
     @Volatile private var ultimoEstado: EstadoModeloDivlara = EstadoModeloDivlara.noDisponible()
     @Volatile private var estadoComprobadoEnMs = 0L
@@ -106,9 +114,7 @@ class ClienteMotorVision(
         validarAntesDeLlamar(solicitud)
         val cuerpo = JSON_CLIENTE_MOTOR.encodeToString(SolicitudPrediccionVision.serializer(), solicitud)
         val resultado = try {
-            politica.ejecutar(esReintentable = { it is IOException || it is TimeoutCancellationException }) {
-                consultar(cuerpo)
-            }
+            consultarDespertando(cuerpo)
         } catch (e: ErrorServicioExterno) {
             if (e.codigo == CODIGO_INTERNO_POLITICA) {
                 registrarEstado(EstadoModeloDivlara(VERSION_MODELO_DIVLARA, EstadoCargaModeloDivlara.ERROR, false, error = CODIGO_MOTOR_NO_DISPONIBLE))
@@ -120,6 +126,55 @@ class ClienteMotorVision(
         }
         registrarEstado(EstadoModeloDivlara(resultado.versionModelo, EstadoCargaModeloDivlara.CARGADO, true))
         return resultado
+    }
+
+    private suspend fun consultarConPolitica(cuerpo: String): ResultadoPrediccionDivlara =
+        politica.ejecutar(esReintentable = { it is IOException || it is TimeoutCancellationException }) { consultar(cuerpo) }
+
+    /**
+     * D47: si el motor no se alcanza (conexión/timeout; no un 5xx) y hay `WOL_SERVICE_URL`, despierta la PC y reintenta
+     * tras cada espera de [ConfiguracionMotorVision.esperasDespertarMs]; solo si todas fallan sale el error original.
+     * Sin URL de WOL el comportamiento es el de siempre. El cortocircuito abierto (sin causa) no despierta nada.
+     */
+    private suspend fun consultarDespertando(cuerpo: String): ResultadoPrediccionDivlara {
+        var error = try {
+            return consultarConPolitica(cuerpo)
+        } catch (e: ErrorServicioExterno) {
+            e
+        }
+        if (config.wolUrl.isEmpty() || !esFallaDeConexion(error)) throw error
+        enviarWol()
+        for (espera in config.esperasDespertarMs) {
+            delay(espera)
+            try {
+                return consultarConPolitica(cuerpo)
+            } catch (e: ErrorServicioExterno) {
+                if (e.codigo != CODIGO_INTERNO_POLITICA) throw e
+                error = e
+            }
+        }
+        throw error
+    }
+
+    private fun esFallaDeConexion(e: ErrorServicioExterno): Boolean {
+        if (e.codigo != CODIGO_INTERNO_POLITICA) return false
+        val causa = e.cause
+        return (causa is IOException && causa !is FallaMotor) || causa is TimeoutCancellationException
+    }
+
+    /** Máximo un WOL por [ESPERA_ENTRE_WOL_MS]: las peticiones simultáneas no inundan el servicio de la NUC. */
+    private suspend fun enviarWol() {
+        val ahora = reloj()
+        val anterior = ultimoWolMs.get()
+        if (anterior >= 0 && ahora - anterior < ESPERA_ENTRE_WOL_MS) return
+        if (!ultimoWolMs.compareAndSet(anterior, ahora)) return
+        try {
+            val respuesta = http.post(config.wolUrl) { header(CABECERA_WOL_TOKEN, config.wolToken) }
+            log.info("WOL enviado al servicio de despertar (HTTP {})", respuesta.status.value)
+        } catch (e: Exception) {
+            if (e is CancellationException && e !is TimeoutCancellationException) throw e
+            log.warn("No se pudo enviar el WOL ({})", e.javaClass.simpleName) // sin URL ni token
+        }
     }
 
     private fun registrarEstado(estado: EstadoModeloDivlara) {
