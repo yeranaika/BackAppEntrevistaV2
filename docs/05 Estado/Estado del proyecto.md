@@ -52,6 +52,8 @@ actualizado: 2026-11-23
 | `/pruebas/video` apagado | Las rutas de calibración de video (sin sesión) solo se montan con `HABILITAR_PRUEBAS_VIDEO=true`; por defecto 404 y en Railway el servidor no arranca con ella (D39) | `fix/pruebas-video-apagado` | (ver git log) | 589/590 (falta el `.onnx`) · revisión adversarial (2026-11-24) |
 | Respuesta ideal con formato | `generar-ia` pide `S: T: A: R:` en blandas abiertas y resumen con pasos `1) 2)` en técnicas; el validador normaliza y exige las marcas; la corrección freemium compara sin ellas (D40) | `feature/respuesta-ideal-formato` | (ver git log) | 605/606 (falta el `.onnx`) · revisión adversarial (2026-11-24) |
 | Nivelación con evidencia mínima | Sin evidencia de junior (ningún nivel con promedio ≥ 60) la brecha suma un nivel: ya no dice "cumple" a quien saca casi cero en un cargo junior; resumen "Todavía no alcanzas el nivel Junior"; sin cambio de contrato (D42) | `feature/nivelacion-bajo-junior` | (ver git log) | 619/620 (falta el `.onnx`) (2026-11-24) |
+| Tareas periódicas apagables | `TAREAS_SEGUNDO_PLANO=false` deja sin rescate de reportes, sincronización de mercado ni purga a un backend local conectado a la BD de Railway por Tailscale; en Railway no arranca con `false` (D43) | `feature/tareas-segundo-plano-apagables` | (ver git log) | 592/593 (falta el `.onnx`) (2026-11-24) |
+| Áreas TI en la semilla | `BasedeDatos.EntrevistaApp.Seeds.AreasTI.sql`: QA, ciberseguridad, diseño UX/UI, soporte y redes, datos/BI y cloud, con 13 skills, 12 cargos y 234 preguntas aprobadas sin cargo (D44) | `feature/semilla-areas-ti` | (ver git log) | semilla 20/20 en PostgreSQL 16 (2026-11-24) |
 
 Bitácora detallada de cada fase (hallazgos, bugs corregidos, decisiones): [[PLAN_REFACTORIZACION]].
 
