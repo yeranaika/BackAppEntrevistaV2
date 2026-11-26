@@ -743,6 +743,8 @@ CREATE TABLE IF NOT EXISTS reporte_entrevista (
     areas_mejora              JSONB        NOT NULL DEFAULT '[]',
     -- [{ "skill_id":"...", "nombre":"Docker", "nivel_actual":"junior", "prioridad":"alta" }]
     recomendaciones_skills    JSONB        NOT NULL DEFAULT '[]',
+    -- Plan de estudio de 3-5 pasos (solo evaluación IA). BD existente: ALTER TABLE reporte_entrevista ADD COLUMN IF NOT EXISTS plan_estudio JSONB NOT NULL DEFAULT '[]';
+    plan_estudio              JSONB        NOT NULL DEFAULT '[]',
     -- Resumen narrativo generado por el LLM (párrafo de 3-5 líneas)
     resumen_ia                TEXT,
     -- 'generando' | 'listo' | 'error'

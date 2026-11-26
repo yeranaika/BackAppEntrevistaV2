@@ -147,6 +147,7 @@ class RepositorioReporteExposed : RepositorioReporte {
                 it[areasMejora] = resultado.areasMejora
                 it[recomendaciones] = resultado.recomendaciones
                 it[resumen] = resultado.resumen
+                it[planEstudio] = resultado.planEstudio
                 it[estado] = EstadoReporte.LISTO.valorBd
                 it[errorDetalle] = null
                 it[modoEvaluacion] = resultado.modo.valorBd
@@ -175,6 +176,7 @@ class RepositorioReporteExposed : RepositorioReporte {
                     put("observacion", evaluacion.observacion)
                     putJsonArray("mejoras") { evaluacion.mejoras.forEach { add(JsonPrimitive(it)) } }
                     put("modo", evaluacion.modo.valorBd)
+                    evaluacion.evidencia?.let { put("evidencia", it) }
                 }
                 TablaSesionPreguntaRespuesta.update({
                     (TablaSesionPreguntaRespuesta.respuestaId eq evaluacion.preguntaSesionId) and (TablaSesionPreguntaRespuesta.sesionId eq sesionId)
@@ -387,6 +389,7 @@ class RepositorioReporteExposed : RepositorioReporte {
             areasMejora = this[TablaReporteEntrevista.areasMejora],
             recomendaciones = this[TablaReporteEntrevista.recomendaciones],
             resumen = this[TablaReporteEntrevista.resumen],
+            planEstudio = this[TablaReporteEntrevista.planEstudio],
             errorDetalle = this[TablaReporteEntrevista.errorDetalle],
             modo = ModoEvaluacion.desdeBd(this[TablaReporteEntrevista.modoEvaluacion]),
             uso = modelo?.let {

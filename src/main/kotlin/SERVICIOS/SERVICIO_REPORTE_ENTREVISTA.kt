@@ -262,12 +262,13 @@ class ServicioReporteEntrevista(
             areasMejora = areasMejora(evaluacion, sesion, detalles, corporal, sinTranscripcion.size),
             recomendaciones = recomendaciones,
             resumen = evaluacion.resumen ?: resumenFreemium(sesion, global(tecnico, blando, corporal), detalles, conceptosPorRepasar(evaluacion)),
+            planEstudio = evaluacion.planEstudio,
             modo = evaluacion.modo,
             uso = evaluacion.uso,
             detalles = detalles,
             evaluaciones = abiertas.mapNotNull { pregunta ->
                 porPregunta[pregunta.id]?.let {
-                    EvaluacionPreguntaSesion(pregunta.id, pregunta.categoria, decimal(it.puntaje), it.observacion, it.mejoras, evaluacion.modo)
+                    EvaluacionPreguntaSesion(pregunta.id, pregunta.categoria, decimal(it.puntaje), it.observacion, it.mejoras, evaluacion.modo, it.evidencia)
                 }
             },
             // Una evaluación con IA queda con la fecha de su reserva: así cuenta en el mes en que tomó el cupo aunque la

@@ -40,6 +40,7 @@ fun SesionEntrevista.aReporte(reporte: ReporteEntrevista?): RespuestaReporteEntr
         areasMejora = reporte?.areasMejora.orEmpty(),
         recomendaciones = reporte?.recomendaciones.orEmpty().map { RespuestaRecomendacionSkill(it.skillId, it.nombre, it.puntaje, it.nivelRequerido, it.prioridad) },
         resumen = reporte?.resumen,
+        planEstudio = reporte?.planEstudio.orEmpty(),
         modoEvaluacion = reporte?.modo?.valorBd?.takeIf { listo },
         // El código interno del error queda en la BD; al usuario solo un mensaje claro.
         error = MENSAJE_ERROR_REPORTE.takeIf { estado == EstadoReporte.ERROR },
@@ -72,7 +73,8 @@ private fun PreguntaSesion.aFeedback(): RespuestaFeedbackPregunta {
         observacion = if (esAlternativa) opciones.firstOrNull { it.id == opcionElegidaId }?.explicacion
             else (feedback?.get("observacion") as? JsonPrimitive)?.contentOrNull,
         mejoras = (feedback?.get("mejoras") as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
-        respuestaIdeal = if (esAlternativa) opcionCorrecta?.texto else respuestaIdeal
+        respuestaIdeal = if (esAlternativa) opcionCorrecta?.texto else respuestaIdeal,
+        evidencia = if (esAlternativa) null else (feedback?.get("evidencia") as? JsonPrimitive)?.contentOrNull
     )
 }
 
