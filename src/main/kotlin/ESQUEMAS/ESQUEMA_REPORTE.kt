@@ -1,5 +1,6 @@
 package ESQUEMAS
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // Reporte de feedback de la entrevista y progreso por skill (/api/v1).
@@ -43,7 +44,9 @@ data class RespuestaFeedbackPregunta(
     val esCorrecta: Boolean? = null,
     val observacion: String? = null,
     val mejoras: List<String> = emptyList(),
-    val respuestaIdeal: String? = null
+    val respuestaIdeal: String? = null,
+    /** Cita textual de la respuesta que respalda la evaluación (solo IA). */
+    val evidencia: String? = null
 )
 
 @Serializable
@@ -63,6 +66,8 @@ data class RespuestaReporteEntrevista(
     val areasMejora: List<String> = emptyList(),
     val recomendaciones: List<RespuestaRecomendacionSkill> = emptyList(),
     val resumen: String? = null,
+    /** 3-5 pasos de estudio (solo IA; vacío en freemium). */
+    @SerialName("plan_estudio") val planEstudio: List<String> = emptyList(),
     /** freemium | ia */
     val modoEvaluacion: String? = null,
     /** Mensaje para el usuario si el reporte terminó con error. */

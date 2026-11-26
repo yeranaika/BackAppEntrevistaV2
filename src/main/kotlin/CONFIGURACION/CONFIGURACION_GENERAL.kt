@@ -79,7 +79,8 @@ data class ConfiguracionLlm(
     /** Credits por periodo del Token Plan de MiMo (D31); 0 = sin Token Plan (clave de pago por uso o sin MiMo). */
     val mimoTokenPlanCreditos: Long = 0,
     /** Día del mes (1–28, UTC) en que se renueva el Token Plan. */
-    val mimoTokenPlanDiaRenovacion: Int = 1
+    val mimoTokenPlanDiaRenovacion: Int = 1,
+    val llmModeloEvaluacion: String = "mimo-v2.6-pro"
 ) {
     val tieneProveedor: Boolean get() = openAiApiKey.isNotBlank() || anthropicApiKey.isNotBlank() || mimoApiKey.isNotBlank()
 }
@@ -272,7 +273,8 @@ private fun cargarConfiguracion(entorno: ApplicationEnvironment): ConfiguracionG
             evaluacionesIaMensuales = lector.entero("LIMITE_EVALUACIONES_IA_MENSUAL", EVALUACIONES_IA_MENSUALES_POR_DEFECTO).coerceAtLeast(0),
             gastoGeneracionIaMensualUsd = leerTopeGastoUsd(lector.opcional("LIMITE_GASTO_GENERACION_IA_MENSUAL_USD")),
             mimoTokenPlanCreditos = leerCreditosTokenPlan(lector.opcional("MIMO_TOKEN_PLAN_CREDITOS"), lector.opcional("MIMO_API_KEY").orEmpty()),
-            mimoTokenPlanDiaRenovacion = lector.entero("MIMO_TOKEN_PLAN_DIA_RENOVACION", 1).coerceIn(1, 28)
+            mimoTokenPlanDiaRenovacion = lector.entero("MIMO_TOKEN_PLAN_DIA_RENOVACION", 1).coerceIn(1, 28),
+            llmModeloEvaluacion = lector.opcional("LLM_MODELO_EVALUACION").orEmpty()
         ),
         limites = ConfiguracionLimites(
             registrosPorIp = lector.entero("LIMITE_REGISTROS_POR_IP", REGISTROS_POR_IP_POR_DEFECTO),

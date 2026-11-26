@@ -20,6 +20,7 @@ object TablaReporteEntrevista : Table("reporte_entrevista") {
     val fortalezas = jsonb("fortalezas", Json, listaDeTextos).default(emptyList())
     val areasMejora = jsonb("areas_mejora", Json, listaDeTextos).default(emptyList())
     val recomendaciones = jsonb("recomendaciones_skills", Json, ListSerializer(RecomendacionSkill.serializer())).default(emptyList())
+    val planEstudio = jsonb("plan_estudio", Json, listaDeTextos).default(emptyList())
     val resumen = text("resumen_ia").nullable()
     val estado = varchar("estado_generacion", 15).default(EstadoReporte.GENERANDO.valorBd)
     val errorDetalle = text("error_detalle").nullable()

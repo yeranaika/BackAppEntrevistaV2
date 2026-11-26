@@ -231,8 +231,10 @@ class ServicioReporteEntrevista(
         // Primero lo barato; la reserva del cupo (que bloquea al usuario en la BD) va al final.
         val reservaIa = if (evaluadorIa != null && abiertas.isNotEmpty() && premium.esPremium(sesion.usuarioId)) reservarCupoIa(sesion) else null
         val evaluador = if (reservaIa != null) evaluadorIa!! else evaluadorGratis
+        val video = metricas.resumir(sesion.id)
+        val corporal = video?.let { puntajeCorporal(it) }
         val inicioEvaluacion = System.nanoTime()
-        val evaluacion = evaluador.evaluar(ContextoEvaluacionEntrevista(sesion.cargoObjetivo, sesion.nivel, abiertas.map { aEvaluar(it) }))
+        val evaluacion = evaluador.evaluar(ContextoEvaluacionEntrevista(sesion.cargoObjetivo, sesion.nivel, abiertas.map { aEvaluar(it) }, corporal))
         log.info("Evaluación de la entrevista {}: {} respuestas abiertas, modo {}, {} ms", sesion.id, abiertas.size, evaluacion.modo.valorBd, milisDesde(inicioEvaluacion))
         val porPregunta = evaluacion.evaluaciones.associateBy { it.preguntaSesionId }
 
@@ -247,8 +249,6 @@ class ServicioReporteEntrevista(
         }
         val tecnico = promedio(puntajes.filterKeys { it.categoria == CategoriaHabilidad.TECNICA }.values)
         val blando = promedio(puntajes.filterKeys { it.categoria == CategoriaHabilidad.BLANDA }.values)
-        val video = metricas.resumir(sesion.id)
-        val corporal = video?.let { puntajeCorporal(it) }
         val detalles = detallesPorSkill(sesion, puntajes)
         val recomendaciones = recomendaciones(sesion, detalles)
 
@@ -262,12 +262,13 @@ class ServicioReporteEntrevista(
             areasMejora = areasMejora(evaluacion, sesion, detalles, corporal, sinTranscripcion.size),
             recomendaciones = recomendaciones,
             resumen = evaluacion.resumen ?: resumenFreemium(sesion, global(tecnico, blando, corporal), detalles, conceptosPorRepasar(evaluacion)),
+            planEstudio = evaluacion.planEstudio,
             modo = evaluacion.modo,
             uso = evaluacion.uso,
             detalles = detalles,
             evaluaciones = abiertas.mapNotNull { pregunta ->
                 porPregunta[pregunta.id]?.let {
-                    EvaluacionPreguntaSesion(pregunta.id, pregunta.categoria, decimal(it.puntaje), it.observacion, it.mejoras, evaluacion.modo)
+                    EvaluacionPreguntaSesion(pregunta.id, pregunta.categoria, decimal(it.puntaje), it.observacion, it.mejoras, evaluacion.modo, it.evidencia)
                 }
             },
             // Una evaluación con IA queda con la fecha de su reserva: así cuenta en el mes en que tomó el cupo aunque la

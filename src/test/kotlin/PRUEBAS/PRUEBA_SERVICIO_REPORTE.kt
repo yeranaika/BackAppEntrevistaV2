@@ -16,6 +16,7 @@ import MODELOS.ReporteEntrevista
 import MODELOS.SesionEntrevista
 import MODELOS.TipoPregunta
 import PRUEBAS.DOBLES.ProveedorEvaluacionFalso
+import VISTAS.aReporte
 import PRUEBAS.DOBLES.SistemaPrueba
 import PRUEBAS.DOBLES.fallaCon
 import PRUEBAS.DOBLES.sembrarPregunta
@@ -313,6 +314,30 @@ class PruebaServicioReporte {
         // Las respuestas del candidato van como datos en el mensaje de usuario, nunca en las instrucciones.
         val solicitud = proveedor.solicitudes.single()
         assertTrue(solicitud.instruccionUsuario.contains("no sé") && !solicitud.prompt.contains("no sé"))
+    }
+
+    /** Lo que ve la app: el reporte ya mapeado, con la sesión recargada (feedback por pregunta incluido). */
+    private fun respuestaDe(sesion: SesionEntrevista, servicio: ServicioReporteEntrevista): ESQUEMAS.RespuestaReporteEntrevista = runBlocking {
+        val reporte = generar(sesion, servicio)
+        sistema.sesionesEntrevista.buscar(sesion.id)!!.aReporte(reporte)
+    }
+
+    @Test
+    fun `la respuesta del reporte con IA incluye plan de estudio y evidencia por pregunta`() {
+        sistema.premium.esPremium = true
+        val r = respuestaDe(entrevistaFinalizada(), servicioCon(ia(ProveedorEvaluacionFalso())))
+        assertEquals(listOf("Repasar fundamentos", "Practicar ejemplos concretos", "Simular entrevistas"), r.planEstudio)
+        val abiertas = r.preguntas.filter { it.tipo != "opcion_multiple" && it.respondida }
+        assertTrue(abiertas.isNotEmpty() && abiertas.all { !it.evidencia.isNullOrBlank() })
+        assertTrue(Json.encodeToString(ESQUEMAS.RespuestaReporteEntrevista.serializer(), r).contains("\"plan_estudio\""))
+    }
+
+    @Test
+    fun `la respuesta del reporte freemium trae plan_estudio vacio y evidencia nula`() {
+        val r = respuestaDe(entrevistaFinalizada(), sistema.reporte)
+        assertEquals(ModoEvaluacion.FREEMIUM.valorBd, r.modoEvaluacion)
+        assertTrue(r.planEstudio.isEmpty())
+        assertTrue(r.preguntas.all { it.evidencia == null })
     }
 
     @Test

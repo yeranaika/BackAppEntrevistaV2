@@ -58,7 +58,8 @@ data class EvaluacionPreguntaSesion(
     val puntaje: BigDecimal,
     val observacion: String,
     val mejoras: List<String>,
-    val modo: ModoEvaluacion
+    val modo: ModoEvaluacion,
+    val evidencia: String? = null
 )
 
 /** Uso del LLM al generar un reporte (null si se usó el motor freemium). */
@@ -84,7 +85,8 @@ data class ResultadoReporte(
     val uso: UsoLlm?,
     val detalles: List<DetalleSkillReporte>,
     val evaluaciones: List<EvaluacionPreguntaSesion>,
-    val fecha: Instant
+    val fecha: Instant,
+    val planEstudio: List<String> = emptyList()
 )
 
 data class ReporteEntrevista(
@@ -100,6 +102,7 @@ data class ReporteEntrevista(
     val areasMejora: List<String>,
     val recomendaciones: List<RecomendacionSkill>,
     val resumen: String?,
+    val planEstudio: List<String> = emptyList(),
     val errorDetalle: String?,
     val modo: ModoEvaluacion,
     val uso: UsoLlm?,
