@@ -67,12 +67,13 @@ class ProveedorEvaluacionFalso(var modo: String = "valido", private val puntaje:
         if (modo == "caido") throw ERRORES.ErrorServicioExterno("provider_not_configured")
         if (modo == "json_roto") return INTEGRACIONES.RespuestaProveedorIa("{no es json", 10, 5)
         val datos = solicitud.instruccionUsuario.substringAfter("\n")
-        val ids = kotlinx.serialization.json.Json.parseToJsonElement(datos).let { it as kotlinx.serialization.json.JsonObject }["respuestas"]
+        val items = kotlinx.serialization.json.Json.parseToJsonElement(datos).let { it as kotlinx.serialization.json.JsonObject }["respuestas"]
             .let { it as kotlinx.serialization.json.JsonArray }
-            .map { (it as kotlinx.serialization.json.JsonObject)["id"].toString().trim('"') }
-            .let { if (modo == "ids_incorrectos") it.map { UUID.randomUUID().toString() } else it }
-        val evaluaciones = ids.joinToString(",") { """{"id":"$it","puntaje":$puntaje,"observacion":"Buena respuesta","mejoras":["Da un ejemplo concreto"]}""" }
-        val contenido = """{"evaluaciones":[$evaluaciones],"fortalezas":["Comunicación clara"],"areas_mejora":["Profundizar en arquitectura"],"resumen":"Resumen de la IA."}"""
+            .map { it as kotlinx.serialization.json.JsonObject }
+            .map { it["id"].toString().trim('"') to (it["respuesta_candidato"] as kotlinx.serialization.json.JsonPrimitive).content.trim().take(20) }
+            .let { l -> if (modo == "ids_incorrectos") l.map { UUID.randomUUID().toString() to it.second } else l }
+        val evaluaciones = items.joinToString(",") { (id, cita) -> """{"id":"$id","puntaje":$puntaje,"observacion":"Buena respuesta","mejoras":["Da un ejemplo concreto"],"evidencia":${kotlinx.serialization.json.JsonPrimitive(cita)}}""" }
+        val contenido = """{"evaluaciones":[$evaluaciones],"fortalezas":["Comunicación clara"],"areas_mejora":["Profundizar en arquitectura"],"resumen":"Resumen de la IA.","plan_estudio":["Repasar fundamentos","Practicar ejemplos concretos","Simular entrevistas"]}"""
         return INTEGRACIONES.RespuestaProveedorIa(contenido, 1000, 300)
     }
 }

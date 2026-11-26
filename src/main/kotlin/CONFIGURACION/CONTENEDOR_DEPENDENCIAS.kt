@@ -262,12 +262,18 @@ class ContenedorDependencias(configuracion: ConfiguracionGeneral) : AutoCloseabl
     val evaluadorRespuesta: EvaluadorRespuesta = EvaluadorRespuestaFreemium()
     private val evaluadorEntrevistaGratis = EvaluadorEntrevistaFreemium(evaluadorRespuesta)
     private val evaluadorEntrevistaIa: EvaluadorEntrevista? = when {
-        configuracion.llm.openAiApiKey.isNotBlank() ->
-            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), MODELO_OPENAI_POR_DEFECTO, evaluadorEntrevistaGratis)
-        configuracion.llm.anthropicApiKey.isNotBlank() ->
-            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), MODELO_ANTHROPIC_POR_DEFECTO, evaluadorEntrevistaGratis)
-        configuracion.llm.mimoApiKey.isNotBlank() ->
-            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.MIMO), MODELO_MIMO_POR_DEFECTO, evaluadorEntrevistaGratis)
+        configuracion.llm.openAiApiKey.isNotBlank() -> {
+            val modelo = configuracion.llm.llmModeloEvaluacion.ifEmpty { MODELO_OPENAI_POR_DEFECTO }
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.OPENAI), modelo, evaluadorEntrevistaGratis)
+        }
+        configuracion.llm.anthropicApiKey.isNotBlank() -> {
+            val modelo = configuracion.llm.llmModeloEvaluacion.ifEmpty { MODELO_ANTHROPIC_POR_DEFECTO }
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.ANTHROPIC), modelo, evaluadorEntrevistaGratis)
+        }
+        configuracion.llm.mimoApiKey.isNotBlank() -> {
+            val modelo = configuracion.llm.llmModeloEvaluacion.ifEmpty { MODELO_MIMO_POR_DEFECTO }
+            EvaluadorEntrevistaIa(proveedoresIa.getValue(TipoProveedorIa.MIMO), modelo, evaluadorEntrevistaGratis)
+        }
         else -> null
     }
     private val repositorioMetricaVideo = RepositorioMetricaVideoExposed()
